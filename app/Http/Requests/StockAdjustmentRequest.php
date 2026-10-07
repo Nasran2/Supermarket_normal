@@ -1,0 +1,18 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StockAdjustmentRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return $this->user()?->hasPermission('products.edit');
+    }
+
+    public function rules(): array
+    {
+        return ['quantity' => 'required|numeric|not_in:0|max:999999|min:-999999|decimal:0,3', 'reason' => 'required|string|min:3|max:255'];
+    }
+}

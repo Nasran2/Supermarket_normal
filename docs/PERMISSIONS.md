@@ -1,0 +1,123 @@
+# Permissions
+
+54 permissions; route middleware and controller/Form Request checks enforce them. Administrator has all; Manager has all except users.* and roles.*; Cashier has only the list below. Cashier has no Settings access. Generic categories/suppliers/customers use products permissions; expense categories use expenses; method/rule maintenance uses dedicated Settings permissions.
+
+## Default role assignments
+
+### Administrator
+
+- `dashboard.view`
+- `expenses.create`
+- `expenses.delete`
+- `expenses.edit`
+- `expenses.view`
+- `pos.access`
+- `products.create`
+- `products.delete`
+- `products.edit`
+- `products.view`
+- `purchases.create`
+- `purchases.delete`
+- `purchases.edit`
+- `purchases.view`
+- `register.close`
+- `register.open`
+- `register.view`
+- `reports.audit`
+- `reports.bank-charges`
+- `reports.card-charges`
+- `reports.cash`
+- `reports.expenses`
+- `reports.payment-charges`
+- `reports.payments`
+- `reports.product-sales`
+- `reports.profit`
+- `reports.purchases`
+- `reports.qr-charges`
+- `reports.register`
+- `reports.sales`
+- `reports.stock`
+- `roles.create`
+- `roles.delete`
+- `roles.edit`
+- `roles.view`
+- `sales.create`
+- `sales.delete`
+- `sales.edit`
+- `sales.view`
+- `sales.void`
+- `settings.business`
+- `settings.payment_methods`
+- `settings.payment_rules`
+- `settings.pos`
+- `settings.receipt`
+- `settings.view`
+- `units.create`
+- `units.delete`
+- `units.edit`
+- `units.view`
+- `users.create`
+- `users.delete`
+- `users.edit`
+- `users.view`
+
+### Cashier
+
+- `dashboard.view`
+- `pos.access`
+- `products.view`
+- `register.close`
+- `register.open`
+- `register.view`
+- `sales.create`
+- `sales.view`
+
+### Manager
+
+- `dashboard.view`
+- `expenses.create`
+- `expenses.delete`
+- `expenses.edit`
+- `expenses.view`
+- `pos.access`
+- `products.create`
+- `products.delete`
+- `products.edit`
+- `products.view`
+- `purchases.create`
+- `purchases.delete`
+- `purchases.edit`
+- `purchases.view`
+- `register.close`
+- `register.open`
+- `register.view`
+- `reports.audit`
+- `reports.bank-charges`
+- `reports.card-charges`
+- `reports.cash`
+- `reports.expenses`
+- `reports.payment-charges`
+- `reports.payments`
+- `reports.product-sales`
+- `reports.profit`
+- `reports.purchases`
+- `reports.qr-charges`
+- `reports.register`
+- `reports.sales`
+- `reports.stock`
+- `sales.create`
+- `sales.delete`
+- `sales.edit`
+- `sales.view`
+- `sales.void`
+- `settings.business`
+- `settings.payment_methods`
+- `settings.payment_rules`
+- `settings.pos`
+- `settings.receipt`
+- `settings.view`
+- `units.create`
+- `units.delete`
+- `units.edit`
+- `units.view`
+

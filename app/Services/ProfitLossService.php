@@ -1,0 +1,25 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Expense;
+use App\Models\Sale;
+use App\Support\Money;
+
+class ProfitLossService
+{
+    public function calculate(string $from, string $to): array
+    {
+        $sales = Sale::where('status', 'ACTIVE')->whereBetween('sold_at', [$from.' 00:00:00', $to.' 23:59:59']);
+        $expenses = Expense::where('status', 'ACTIVE')->whereBetween('expense_date', [$from, $to]);
+        $revenue = Money::round((string) (clone $sales)->sum('sale_amount'));
+        $cogs = Money::round((string) $sales->sum('cost_total'));
+        $gross = Money::sub($revenue, $cogs);
+        $manual = Money::round((string) (clone $expenses)->where('type', 'MANUAL')->sum('amount'));
+        $processing = Money::round((string) $expenses->where('type', 'AUTOMATIC')->sum('amount'));
+        $totalExpenses = Money::add($manual, $processing);
+        $net = Money::sub($gross, $totalExpenses);
+
+        return compact('revenue', 'cogs', 'gross', 'manual', 'processing', 'net') + ['expenses' => $totalExpenses];
+    }
+}
