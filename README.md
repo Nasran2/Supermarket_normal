@@ -6,7 +6,9 @@ A working Laravel 12 + PHP + Blade + MySQL supermarket POS with Tailwind CSS, va
 
 App: **http://localhost/Super%20market/public/** (XAMPP Apache and MySQL must be running).
 
-The initial administrator email is `admin@twinsofte.local`. Its generated password is in the private, Git-ignored `.local-credentials.md` file in this directory. There is no hardcoded default password. The main database is `twinsofte_supermarket`; it contains configuration and the initial administrator, with no test products or transactions.
+Sign in with username `admin` **or** email `admin@twinsofte.local`, using the same password. Its generated password is in the private, Git-ignored `.local-credentials.md` file in this directory. There is no hardcoded default password. The main database is `twinsofte_supermarket`; it contains configuration and the initial administrator, with no test products or transactions.
+
+Usernames can be added or changed under **Users**. They are unique, case-insensitive and allow letters, numbers, dots, underscores and hyphens. Upgrades assign existing accounts names based on their email prefix, adding a numeric suffix when needed; passwords remain unchanged.
 
 Start in **Settings** to enter your business details, upload a logo and review payment fees. Then add suppliers/products, receive purchases, and open a register before selling. The example Card 3% and QR greater-than-5,000 10% rules are enabled here and can be changed or deactivated.
 
@@ -28,7 +30,7 @@ CREATE DATABASE twinsofte_supermarket CHARACTER SET utf8mb4 COLLATE utf8mb4_unic
 
 ```sh
 php artisan migrate --seed
-php artisan pos:admin owner@example.com --name="Store Administrator"
+php artisan pos:admin owner@example.com --username=owner --name="Store Administrator"
 php artisan storage:link
 npm ci
 npm run build

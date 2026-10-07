@@ -419,4 +419,5 @@ Generated from the installed MySQL/MariaDB database. Money is DECIMAL(15,2), qua
 | updated_at | timestamp | Yes |
 | role_id | bigint(20) unsigned | Yes |
 | active | tinyint(1) | No |
+| username | varchar(64) | Yes |
 

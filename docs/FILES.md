@@ -150,3 +150,9 @@ The workspace was empty before this project; all listed files were created durin
 - `tests/TestCase.php`
 - `tests/Unit/MoneyTest.php`
 - `vite.config.js`
+
+Added in username-login update:
+
+- `database/migrations/2026_10_07_000500_add_usernames_to_users.php`
+- `tests/Feature/AuthenticationTest.php`
+- `docs/screenshots/login.jpg`

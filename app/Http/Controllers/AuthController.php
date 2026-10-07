@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\ProfileRequest;
+use App\Models\User;
 use App\Support\Audit;
 use App\Support\Navigation;
 use Illuminate\Http\Request;
@@ -20,13 +21,17 @@ class AuthController extends Controller
 
     public function authenticate(LoginRequest $request)
     {
-        $key = strtolower($request->email).'|'.$request->ip();
+        $login = strtolower($request->validated('login'));
+        $field = str_contains($login, '@') ? 'email' : 'username';
+        $userId = User::where($field, $login)->value('id');
+        // Both identifiers share the same account-level throttle.
+        $key = 'login:'.($userId ?? hash('sha256', $login)).'|'.$request->ip();
         if (RateLimiter::tooManyAttempts($key, 5)) {
-            throw ValidationException::withMessages(['email' => 'Too many attempts. Try again in '.RateLimiter::availableIn($key).' seconds.']);
+            throw ValidationException::withMessages(['login' => 'Too many attempts. Try again in '.RateLimiter::availableIn($key).' seconds.']);
         }
-        if (! Auth::attempt($request->only('email', 'password') + ['active' => true])) {
+        if (! Auth::attempt([$field => $login, 'password' => $request->validated('password'), 'active' => true])) {
             RateLimiter::hit($key, 60);
-            throw ValidationException::withMessages(['email' => 'Email or password is incorrect.']);
+            throw ValidationException::withMessages(['login' => 'Username/email or password is incorrect.']);
         }RateLimiter::clear($key);
         $request->session()->regenerate();
 

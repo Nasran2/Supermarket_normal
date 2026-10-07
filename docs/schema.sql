@@ -484,8 +484,10 @@ CREATE TABLE `users` (
   `updated_at` timestamp NULL DEFAULT NULL,
   `role_id` bigint(20) unsigned DEFAULT NULL,
   `active` tinyint(1) NOT NULL DEFAULT 1,
+  `username` varchar(64) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `users_email_unique` (`email`),
+  UNIQUE KEY `users_username_unique` (`username`),
   KEY `users_role_id_foreign` (`role_id`),
   KEY `users_active_index` (`active`),
   CONSTRAINT `users_role_id_foreign` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`)

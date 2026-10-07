@@ -20,7 +20,7 @@ The [file manifest](FILES.md) lists source files. Dependencies, secrets, logs, c
 
 ## 2. Migrations
 
-Laravel's normal users/sessions, cache and queue migrations accompany four POS migrations:
+Laravel's normal users/sessions, cache and queue migrations accompany five POS migrations:
 
 | Migration | Effect |
 | --- | --- |
@@ -28,6 +28,7 @@ Laravel's normal users/sessions, cache and queue migrations accompany four POS m
 | `2026_10_07_000200_add_purchase_cost_history` | Adds purchase_items.previous_cost for purchase correction/void |
 | `2026_10_07_000300_add_product_search_indexes` | Product active/name composite and MySQL FULLTEXT name index; sales status/sold_at composite |
 | `2026_10_07_000400_allow_payment_rule_bearer_inheritance` | Nullable payment_charge_rules.charge_bearer lets a rule use its method's default payer |
+| `2026_10_07_000500_add_usernames_to_users` | Unique users.username and collision-safe backfill for existing accounts; passwords are preserved |
 
 Migrations do not seed sample sales/products or reset business settings. Changes to schema use migrations.
 
@@ -35,7 +36,7 @@ Migrations do not seed sample sales/products or reset business settings. Changes
 
 New business tables: roles, permissions, permission_role, settings, units, categories, suppliers, customers, products, payment_methods, payment_charge_rules, registers, register_movements, sales, sale_items, sale_payments, expense_categories, expenses, purchases, purchase_items, stock_movements and audit_logs.
 
-`users` gains a role foreign key and indexed active flag. Subsequent migrations add `purchase_items.previous_cost`, search/status indexes, and nullable rule bearer. The installed schema contains 31 tables including Laravel's framework tables. See [every column and type](SCHEMA.md) and [all indexes/foreign keys in schema-only SQL](schema.sql).
+`users` gains a role foreign key, indexed active flag and unique username. Subsequent migrations add `purchase_items.previous_cost`, search/status indexes, and nullable rule bearer. The installed schema contains 31 tables including Laravel's framework tables. See [every column and type](SCHEMA.md) and [all indexes/foreign keys in schema-only SQL](schema.sql).
 
 Money is DECIMAL(15,2), quantities DECIMAL(15,3), and configurable rule values DECIMAL(15,4). Sale/payment/item snapshots preserve original prices, costs, unit names, method metadata and applied charge rules even when configuration changes. Used records cannot be deleted through CRUD; deactivate them instead. Sales and purchases are voided, and manual expenses reversed, keeping history.
 
@@ -121,7 +122,7 @@ The current local database is `twinsofte_supermarket`, and APP_URL is the XAMPP 
 
 ## 10. Verification
 
-- **52 tests, 321 assertions passed on SQLite and on MySQL/MariaDB**. Includes all nine specified fee/quantity/P&L cases, fixed/prioritized/inherited rules, thresholds, zero tiers, exact rounding, tampered/stale/duplicate checkout, inactive methods/users, financial rollback, stock restoration, purchase corrections, expense reversal, closed-register protection, permissions/session security, upload type/size validation, audit redaction, streamed CSV exports, custom methods and immutable snapshots.
+- **63 tests, 392 assertions passed on SQLite and on MySQL/MariaDB** after the username-login update. Username/email sign-in, case/whitespace normalization, legacy email submissions, disabled users, shared alias throttling and unique username management are covered. Includes all nine specified fee/quantity/P&L cases, fixed/prioritized/inherited rules, thresholds, zero tiers, exact rounding, tampered/stale/duplicate checkout, inactive methods/users, financial rollback, stock restoration, purchase corrections, expense reversal, closed-register protection, permissions/session security, upload type/size validation, audit redaction, streamed CSV exports, custom methods and immutable snapshots.
 - Vite production build, Blade compilation, PHP formatting/lint, Composer validation and dependency audits completed. Composer and npm report no known dependency vulnerabilities after removing the unused concurrently development dependency.
 - Browser login, logo change/removal, business/POS settings, barcode/quantity/discount/cash, customer- and business-paid card fees, QR below/exact/above threshold, purchase receipt and linked real reports were checked in an isolated QA database. A cash checkout with 1.250kg and discount 50 showed payable 950, paid 1,000, change 50 and an embedded receipt; Next sale cleared the cart.
 - Dashboard, POS, business settings, product form, purchase form, payment-charge report and P&L were checked at **1920, 1366, 1024, 768, 430 and 390px**. No root horizontal overflow remained; wide tables scroll inside their containers.
@@ -138,3 +139,7 @@ No known blocking application issue remained in the completed checks. **Physical
 One payment method per sale is supported; split tender and refunds/returns are outside this implementation. Completed financial records use void/reversal rather than hard deletion, and financial sale correction is limited to the open register. The app operates in one configured currency with two-decimal money storage; changing currency labels does not convert historic amounts. Choose currency/timezone before live trading. Number-decimal settings control minimum display precision while retaining significant cents. Inventory is current-state reporting; reporting does not reconstruct historical stock valuation.
 
 Routine operational backups, a dedicated production database user, a public/ document root and actual business/payment settings should be established when delivering this local installation to another customer environment.
+
+## Username login update
+
+Login accepts username or email and the existing password. The field is plain text, so entering `admin` no longer triggers browser email validation. Existing accounts receive a unique username from their email prefix; duplicate prefixes receive numeric suffixes. Username values normalize to lowercase and remain editable in Users. The administrator here can use `admin` or `admin@twinsofte.local`. The CLI accepts `--username` for new administrators. Apply the update elsewhere using `php artisan migrate` and `php artisan optimize:clear`. Both login modes were verified through the browser in the isolated QA environment; the current port-8002 login displays the updated form. [Login screenshot](screenshots/login.jpg).

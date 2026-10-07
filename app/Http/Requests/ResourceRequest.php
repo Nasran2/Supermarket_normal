@@ -67,7 +67,7 @@ class ResourceRequest extends FormRequest
             $r[$key] = $rules;
         }
         $unique = match ($resource) {
-            'products' => ['sku', 'barcode'],'units' => ['name', 'short_name'],'payment-methods' => ['name', 'code'],'users' => ['email'],'roles','categories','expense-categories' => ['name'],default => []
+            'products' => ['sku', 'barcode'],'units' => ['name', 'short_name'],'payment-methods' => ['name', 'code'],'users' => ['email', 'username'],'roles','categories','expense-categories' => ['name'],default => []
         };
         foreach ($unique as $key) {
             $r[$key][] = Rule::unique($model->getTable(), $key)->ignore($id);
@@ -76,6 +76,7 @@ class ResourceRequest extends FormRequest
             $r['short_name'][] = 'max:20';
         }
         if ($resource === 'users') {
+            $r['username'] = ['required', 'string', 'max:64', 'regex:/^[a-z0-9][a-z0-9._-]*$/', Rule::unique('users', 'username')->ignore($id)];
             $r['password'] = ['nullable', 'string', 'min:10', 'max:128'];
             if (! $id) {
                 $r['password'][0] = 'required';
@@ -104,6 +105,9 @@ class ResourceRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        if ($this->route('resource') === 'users' && is_string($this->input('username'))) {
+            $this->merge(['username' => strtolower(trim($this->input('username')))]);
+        }
         foreach (Resources::get($this->route('resource'))['fields'] as $key => $field) {
             if ($field[1] === 'checkbox') {
                 $this->merge([$key => $this->boolean($key)]);
