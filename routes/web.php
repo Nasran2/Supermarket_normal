@@ -82,4 +82,7 @@ Route::middleware(['auth', 'auth.session'])->group(function () {
         Route::put('/{id}', [ResourceController::class, 'update'])->whereNumber('id')->name('update');
         Route::delete('/{id}', [ResourceController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
+    
+    Route::post('/manage/customers/{customer}/payments', [\App\Http\Controllers\CustomerPaymentController::class, 'store'])->name('manage.customers.payments.store');
+    Route::get('/manage/customers/{customer}/ledger', [\App\Http\Controllers\CustomerPaymentController::class, 'ledger'])->name('manage.customers.ledger');
 });

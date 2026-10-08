@@ -9,11 +9,11 @@ use Illuminate\Support\Facades\DB;
 
 class Customer extends Model
 {
-    protected $fillable = ['name', 'phone', 'email', 'address', 'active', 'opening_due'];
+    protected $fillable = ['name', 'phone', 'email', 'address', 'active', 'opening_due', 'opening_due_paid'];
 
-    protected $casts = ['active' => 'boolean', 'opening_due' => 'decimal:2'];
+    protected $casts = ['active' => 'boolean', 'opening_due' => 'decimal:2', 'opening_due_paid' => 'decimal:2'];
 
-    protected $attributes = ['opening_due' => '0.00'];
+    protected $attributes = ['opening_due' => '0.00', 'opening_due_paid' => '0.00'];
 
     public static function invoiceDueSql(): string
     {
@@ -43,11 +43,17 @@ class Customer extends Model
 
     public function getDueBalanceAttribute(): string
     {
-        return Money::add($this->opening_due ?? '0', $this->invoice_due);
+        $openingRemaining = Money::sub($this->opening_due ?? '0.00', $this->opening_due_paid ?? '0.00');
+        return Money::add($openingRemaining, $this->invoice_due);
     }
 
     public function sales()
     {
         return $this->hasMany(Sale::class);
+    }
+
+    public function customerPayments()
+    {
+        return $this->hasMany(CustomerPayment::class);
     }
 }
