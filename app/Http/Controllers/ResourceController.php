@@ -121,7 +121,7 @@ class ResourceController extends Controller
     {
         $options = [];
         foreach ($def['fields'] as $key => $f) {
-            if ($f[1] === 'select') {
+            if ($f[1] === 'select' || $f[1] === 'multiselect') {
                 $query = $f[3]::query();
                 $options[$key] = $query->orderBy('name')->pluck('name', 'id');
             }

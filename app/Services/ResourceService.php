@@ -65,6 +65,9 @@ class ResourceService
                 if (in_array($resource, ['products', 'unit-presets']) && $id) {
                     $before['conversions'] = $record->conversions->toArray();
                 }
+                if ($resource === 'products' && $id) {
+                    $before['categories'] = $record->categories->pluck('id')->toArray();
+                }
                 if ($resource === 'unit-presets' || ($resource === 'products' && array_key_exists('conversions', $data))) {
                     $base = Unit::whereKey($data['unit_id'])->lockForUpdate()->firstOrFail();
                     app(ProductUnitService::class)->rows($base, $data['conversions'] ?? []);
@@ -182,10 +185,11 @@ class ResourceService
                     }
                 }
                 $permissionIds = $values['permissions'] ?? [];
+                $categoryIds = $values['categories'] ?? [];
                 if ($resource === 'roles') {
                     $this->guardPermissions($permissionIds);
                 }
-                unset($values['permissions']);
+                unset($values['permissions'], $values['categories']);
                 $record->fill($values);
                 $record->save();
                 if (in_array($resource, ['products', 'unit-presets']) && (array_key_exists('conversions', $data) || $resource === 'unit-presets')) {
@@ -194,7 +198,9 @@ class ResourceService
                     $record->unsetRelation('conversions');
                 }
                 if ($resource === 'products') {
+                    $record->categories()->sync($categoryIds);
                     $record->unsetRelation('unit');
+                    $record->unsetRelation('categories');
                     app(ProductUnitService::class)->options($record);
                 }
                 if ($resource === 'roles') {
@@ -209,6 +215,9 @@ class ResourceService
                 $after = $record->getAttributes();
                 if (in_array($resource, ['products', 'unit-presets'])) {
                     $after['conversions'] = $record->conversions->toArray();
+                }
+                if ($resource === 'products') {
+                    $after['categories'] = $categoryIds;
                 }
 
                 if ($resource === 'roles') {

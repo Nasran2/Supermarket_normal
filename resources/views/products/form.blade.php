@@ -10,7 +10,14 @@
         <label class="field full"><span>Product name <b class="required">*</b></span><input name="name" value="{{ old('name',$record->name) }}" placeholder="e.g. Ceylon Tea 200g" maxlength="255" required autofocus></label>
         <label class="field"><span>SKU <b class="required">*</b></span><input name="sku" value="{{ old('sku',$record->sku) }}" placeholder="Product code" maxlength="255" required></label>
         <label class="field"><span>Barcode <small>optional</small></span><input name="barcode" value="{{ old('barcode',$record->barcode) }}" placeholder="Scan or enter barcode" maxlength="255"></label>
-        <label class="field full"><span>Category <b class="required">*</b></span><select name="category_id" required><option value="">Select category</option>@foreach($options['category_id'] as $id=>$name)<option value="{{ $id }}" @selected(old('category_id',$record->category_id)==$id)>{{ $name }}</option>@endforeach</select></label>
+        <label class="field full"><span>Categories</span>
+            <select name="categories[]" multiple style="min-height:100px;">
+                @foreach($options['categories'] as $id => $name)
+                    <option value="{{ $id }}" @selected(in_array($id, old('categories', $record->exists ? $record->categories->pluck('id')->toArray() : [])))>{{ $name }}</option>
+                @endforeach
+            </select>
+            <small>Hold Ctrl (or Cmd on Mac) to select multiple categories.</small>
+        </label>
     </div>
 </section>
 <aside class="card product-image-card">

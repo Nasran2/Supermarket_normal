@@ -39,13 +39,15 @@ class RegisterService
         if (! array_key_exists('cash_collections', $register->getAttributes())) {
             $register = $this->withSummary(Register::whereKey($register->id))->firstOrFail();
         }
-        $cash = Money::sub(Money::add(Money::sub((string) ($register->cash_collections ?? 0), (string) ($register->cash_change ?? 0)), (string) ($register->due_cash ?? 0)), (string) ($register->cash_refunds ?? 0));
+        $pos_cash = Money::sub((string) ($register->cash_collections ?? 0), (string) ($register->cash_change ?? 0));
+        $due_cash = (string) ($register->due_cash ?? 0);
+        $cash = Money::sub(Money::add($pos_cash, $due_cash), (string) ($register->cash_refunds ?? 0));
         $in = Money::round((string) ($register->movement_in ?? 0));
         $out = Money::round((string) ($register->movement_out ?? 0));
         $expenses = Money::round((string) ($register->cash_expenses ?? 0));
         $expected = Money::sub(Money::sub(Money::add(Money::add($register->opening_cash, $cash), $in), $out), $expenses);
 
-        $summary = compact('cash', 'in', 'out', 'expenses', 'expected') + ['collections' => Money::sub(Money::add(Money::sub((string) ($register->total_collections ?? 0), (string) ($register->total_change ?? 0)), (string) ($register->due_collections ?? 0)), (string) ($register->total_refunds ?? 0)), 'transactions' => $register->transactions_count,
+        $summary = compact('cash', 'pos_cash', 'due_cash', 'in', 'out', 'expenses', 'expected') + ['collections' => Money::sub(Money::add(Money::sub((string) ($register->total_collections ?? 0), (string) ($register->total_change ?? 0)), (string) ($register->due_collections ?? 0)), (string) ($register->total_refunds ?? 0)), 'transactions' => $register->transactions_count,
             'due_collections' => Money::round((string) ($register->due_collections ?? 0)), 'refunds' => Money::round((string) ($register->total_refunds ?? 0)), 'returns' => Money::round((string) ($register->returned_amount ?? 0))];
         if (! $detailed) {
             return $summary;

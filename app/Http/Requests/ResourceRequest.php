@@ -52,6 +52,10 @@ class ResourceRequest extends FormRequest
                 $rules[] = 'integer';
                 $rules[] = Rule::exists((new $field[3])->getTable(), 'id');
             }
+            if ($type === 'multiselect') {
+                $rules = ['nullable', 'array'];
+                $r[$key.'.*'] = ['integer', Rule::exists((new $field[3])->getTable(), 'id')];
+            }
             if ($type === 'options') {
                 $rules[] = Rule::in(array_keys($field[3]));
             }

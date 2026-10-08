@@ -36,7 +36,7 @@ class PosController extends Controller
         $this->requireRegister($registers);
         $data = $request->validate(['q' => 'nullable|string|max:255', 'scan' => 'nullable|boolean', 'category_id' => 'nullable|integer|exists:categories,id', 'ids' => 'nullable|array|max:300', 'ids.*' => 'integer|min:1']);
         $q = trim($data['q'] ?? '');
-        $products = Product::with(['unit', 'category', 'conversions.unit'])->where('active', true)->whereHas('unit', fn ($u) => $u->where('active', true));
+        $products = Product::with(['unit', 'categories', 'conversions.unit'])->where('active', true)->whereHas('unit', fn ($u) => $u->where('active', true));
         if (array_key_exists('ids', $data)) {
             return $this->productPayload($products->whereIn('id', $data['ids'] ?? [])->get());
         }
@@ -50,7 +50,7 @@ class PosController extends Controller
                 }
             });
             if (! empty($data['category_id']) && ! $scanning) {
-                $exactQuery->where('category_id', $data['category_id']);
+                $exactQuery->whereHas('categories', fn($q) => $q->where('categories.id', $data['category_id']));
             }
             $exact = $exactQuery->first();
         }
@@ -74,14 +74,14 @@ class PosController extends Controller
             });
         }
         if (! empty($data['category_id'])) {
-            $products->where('category_id', $data['category_id']);
+            $products->whereHas('categories', fn($q) => $q->where('categories.id', $data['category_id']));
         }
 
         $found = $products->orderByRaw('CASE WHEN barcode = ? THEN 0 WHEN sku = ? THEN 1 ELSE 2 END', [$q, $q])->orderBy('name')->limit(60)->get();
         if ($q !== '' && $found->isEmpty() && in_array($settings->get('search_mode', 'all'), ['all', 'name'])) {
-            $fallback = Product::with(['unit', 'category', 'conversions.unit'])->where('active', true)->whereHas('unit', fn ($u) => $u->where('active', true))->where('name', 'like', $q.'%');
+            $fallback = Product::with(['unit', 'categories', 'conversions.unit'])->where('active', true)->whereHas('unit', fn ($u) => $u->where('active', true))->where('name', 'like', $q.'%');
             if (! empty($data['category_id'])) {
-                $fallback->where('category_id', $data['category_id']);
+                $fallback->whereHas('categories', fn($q) => $q->where('categories.id', $data['category_id']));
             }
             $found = $fallback->orderBy('name')->limit(60)->get();
         }
@@ -91,7 +91,7 @@ class PosController extends Controller
 
     private function productPayload($products)
     {
-        return $products->map(fn ($p) => ['units' => app(ProductUnitService::class)->options($p), 'unit_id' => $p->unit_id, 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => $p->barcode, 'price' => $p->price, 'stock' => $p->stock, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'category' => $p->category->name, 'image' => $p->image ? asset('storage/'.$p->image) : null]);
+        return $products->map(fn ($p) => ['units' => app(ProductUnitService::class)->options($p), 'unit_id' => $p->unit_id, 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => $p->barcode, 'price' => $p->price, 'stock' => $p->stock, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'category' => $p->categories->pluck('name')->join(', '), 'image' => $p->image ? asset('storage/'.$p->image) : null]);
     }
 
     public function storeCustomer(PosCustomerRequest $request, RegisterService $registers)
