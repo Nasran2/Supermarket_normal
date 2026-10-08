@@ -45,7 +45,7 @@ class ResourceService
         }
     }
 
-    public function save(string $resource, array $data, ?int $id = null): void
+    public function save(string $resource, array $data, ?int $id = null)
     {
         $def = Resources::get($resource);
         $path = null;
@@ -54,7 +54,7 @@ class ResourceService
             $data['image'] = $path;
         }
         try {
-            DB::transaction(function () use ($resource, $def, $data, $id) {
+            $result = DB::transaction(function () use ($resource, $def, $data, $id) {
                 $record = $id ? $def['model']::whereKey($id)->lockForUpdate()->firstOrFail() : new $def['model'];
                 if ($id) {
                     $this->guardEditable($resource, $record);
@@ -216,6 +216,7 @@ class ResourceService
                 }
                 unset($after['password']);
                 Audit::record($resource.'.save', $record, $before, $after);
+                return $record;
             }, 3);
         } catch (\Throwable $e) {
             if ($path) {
@@ -223,7 +224,7 @@ class ResourceService
             }
             throw $e;
         }
-
+        return $result;
     }
 
     public function delete(string $resource, int $id): void

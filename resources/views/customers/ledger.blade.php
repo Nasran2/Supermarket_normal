@@ -6,6 +6,7 @@
     <div>
         <span class="eyebrow">CUSTOMER LEDGER</span>
         <h1>{{ $customer->name }}</h1>
+        <p>Complete history of purchases and payments.</p>
     </div>
     <div class="heading-actions">
         <a class="btn secondary" href="{{ route('manage.show', ['customers', $customer->id]) }}">
@@ -14,12 +15,12 @@
     </div>
 </div>
 
-<div class="card" style="margin-bottom:20px;">
-    <form method="GET" style="display:flex; gap:15px; align-items:flex-end;">
-        <label class="field">Start Date
+<div class="card padded" style="margin-bottom: 24px;">
+    <form method="GET" style="display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end;">
+        <label class="field" style="margin:0; width: 180px;">Start Date
             <input type="date" name="start_date" value="{{ $startDate }}">
         </label>
-        <label class="field">End Date
+        <label class="field" style="margin:0; width: 180px;">End Date
             <input type="date" name="end_date" value="{{ $endDate }}">
         </label>
         <button type="submit" class="btn primary">Filter</button>
@@ -44,16 +45,34 @@
             <tbody>
                 @forelse($ledger as $row)
                 <tr>
-                    <td>{{ $row['date']->format('d/m/Y H:i') }}</td>
-                    <td>{{ $row['type'] }}</td>
+                    <td>{{ $row['date']->format('d M Y, H:i') }}</td>
+                    <td>
+                        @if($row['type'] === 'Opening Balance')
+                            <span class="badge slate">{{ $row['type'] }}</span>
+                        @elseif($row['type'] === 'Invoice')
+                            <span class="badge amber">{{ $row['type'] }}</span>
+                        @else
+                            <span class="badge green">{{ $row['type'] }}</span>
+                        @endif
+                    </td>
                     <td>{{ $row['description'] }}</td>
-                    <td style="text-align:right;">{{ \App\Support\Money::compare($row['debit'], 0) > 0 ? \App\Support\Money::display($row['debit']) : '-' }}</td>
-                    <td style="text-align:right;">{{ \App\Support\Money::compare($row['credit'], 0) > 0 ? \App\Support\Money::display($row['credit']) : '-' }}</td>
+                    <td style="text-align:right; font-weight:500;">
+                        {!! \App\Support\Money::compare($row['debit'], 0) > 0 ? \App\Support\Money::display($row['debit']) : '<span class="muted">-</span>' !!}
+                    </td>
+                    <td style="text-align:right; font-weight:500; color:var(--green-700);">
+                        {!! \App\Support\Money::compare($row['credit'], 0) > 0 ? \App\Support\Money::display($row['credit']) : '<span class="muted">-</span>' !!}
+                    </td>
                     <td style="text-align:right;"><strong>{{ \App\Support\Money::display($row['balance']) }}</strong></td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6"><div class="empty-state">No records found.</div></td>
+                    <td colspan="6">
+                        <div class="empty-state">
+                            <x-icon name="file-text" :size="34"/>
+                            <h3>No ledger records</h3>
+                            <p>Try adjusting the date filters.</p>
+                        </div>
+                    </td>
                 </tr>
                 @endforelse
             </tbody>

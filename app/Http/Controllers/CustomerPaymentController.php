@@ -166,14 +166,14 @@ class CustomerPaymentController extends Controller
         if ($endDate) $paymentsQuery->whereDate('payment_date', '<=', $endDate);
         
         $payments = $paymentsQuery->with(['paymentMethod', 'allocations.sale'])->get()->map(function ($payment) {
-            $desc = 'Payment - ' . ($payment->paymentMethod->name ?? 'Unknown');
+            $desc = 'Customer Payment - ' . ($payment->paymentMethod->name ?? 'Unknown');
             if ($payment->allocations->count() > 0) {
                 $parts = [];
                 foreach ($payment->allocations as $alloc) {
                     if ($alloc->type === 'OPENING_BALANCE') {
-                        $parts[] = "Opening Balance (" . \App\Support\Money::display($alloc->amount) . ")";
+                        $parts[] = "Opening Balance";
                     } elseif ($alloc->type === 'INVOICE' && $alloc->sale) {
-                        $parts[] = $alloc->sale->invoice . " (" . \App\Support\Money::display($alloc->amount) . ")";
+                        $parts[] = $alloc->sale->invoice;
                     }
                 }
                 if (count($parts) > 0) {
@@ -189,6 +189,23 @@ class CustomerPaymentController extends Controller
             ];
         });
 
+        // Add POS Payments (SalePayments)
+        $salePaymentsQuery = \App\Models\SalePayment::whereHas('sale', function($q) use ($customer) {
+            $q->where('customer_id', $customer->id);
+        });
+        if ($startDate) $salePaymentsQuery->whereDate('created_at', '>=', $startDate);
+        if ($endDate) $salePaymentsQuery->whereDate('created_at', '<=', $endDate);
+        
+        $salePayments = $salePaymentsQuery->with('sale')->get()->map(function ($sp) {
+            return [
+                'date' => $sp->created_at,
+                'type' => 'POS Payment',
+                'description' => 'Payment for ' . ($sp->sale->invoice ?? 'Sale') . ' (' . $sp->method_name . ')',
+                'debit' => 0,
+                'credit' => \App\Support\Money::sub($sp->amount_paid, $sp->change),
+            ];
+        });
+
         $ledger = collect();
         if (!$startDate) {
             $ledger->push([
@@ -200,7 +217,7 @@ class CustomerPaymentController extends Controller
             ]);
         }
 
-        $ledger = $ledger->concat($sales)->concat($payments)->sortBy('date')->values();
+        $ledger = $ledger->concat($sales)->concat($payments)->concat($salePayments)->sortBy('date')->values();
         
         $balance = '0.00';
         $ledger = $ledger->map(function ($item) use (&$balance) {

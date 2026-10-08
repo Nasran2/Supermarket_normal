@@ -10,13 +10,61 @@
 </div>
 <div class="customer-profile-body">
     <section class="card customer-contact-card"><div class="customer-section-heading"><span class="customer-section-icon"><x-icon name="contact"/></span><div><h2>Contact details</h2><p>Customer account information</p></div></div><dl><div><dt>Phone</dt><dd>{{ $record->phone??'Not added' }}</dd></div><div><dt>Email</dt><dd>{{ $record->email??'Not added' }}</dd></div><div><dt>Address</dt><dd class="customer-address">{{ $record->address??'Not added' }}</dd></div><div><dt>Customer since</dt><dd>{{ $record->created_at->format('d M Y') }}</dd></div></dl><div class="customer-profile-opening"><span>Old balance / opening due</span><strong>{{ $currency }} {{ \App\Support\Money::display($record->opening_due) }}</strong><p>This is the unpaid balance brought into the customer account. New POS sales and their payments are recorded separately.</p></div></section>
-    <section class="card customer-purchase-history"><div class="card-heading"><div><h2>Purchase history</h2><p class="muted text-sm">{{ $sales->total() }} recorded {{ \Illuminate\Support\Str::plural('sale',$sales->total()) }}</p></div></div><div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Date</th><th>Payment</th><th>Amount collected</th><th>Due</th><th>Status</th></tr></thead><tbody>
-        @forelse($sales as $sale)
-        <tr><td><a class="text-link" href="{{ route('sales.show',$sale) }}">{{ $sale->invoice }}</a></td><td>{{ $sale->sold_at->format('d/m/Y H:i') }}</td><td>{{ $sale->payment_names ?: 'On account (unpaid)' }}</td><td>{{ $currency }} {{ \App\Support\Money::display(\App\Support\Money::sub($sale->collected_total,$sale->refunded_total)) }}</td><td>{{ $currency }} {{ \App\Support\Money::display($sale->due_balance) }}</td><td><span class="badge {{ $sale->status==='ACTIVE'?(\App\Support\Money::compare($sale->due_balance,0)>0?'amber':'green'):'slate' }}">{{ $sale->payment_status }}</span></td></tr>
-        @empty
-        <tr><td colspan="6"><div class="empty-state"><x-icon name="receipt-text" :size="34"/><h3>No purchases yet</h3><p>Sales linked to this customer will appear here.</p></div></td></tr>
-        @endforelse
-    </tbody></table></div><div class="pagination">{{ $sales->links() }}</div></section>
+    
+    <div style="display: flex; flex-direction: column; gap: 24px; min-width: 0;">
+        <section class="card customer-purchase-history">
+            <div class="card-heading"><div><h2>Purchase history</h2><p class="muted text-sm">{{ $sales->total() }} recorded {{ \Illuminate\Support\Str::plural('sale',$sales->total()) }}</p></div></div>
+            <div class="table-wrap">
+                <table style="width: 100%;">
+                    <thead><tr><th>Invoice</th><th>Date</th><th>Payment</th><th>Amount collected</th><th>Due</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @forelse($sales as $sale)
+                        <tr><td><a class="text-link" href="{{ route('sales.show',$sale) }}">{{ $sale->invoice }}</a></td><td>{{ $sale->sold_at->format('d/m/Y H:i') }}</td><td>{{ $sale->payment_names ?: 'On account (unpaid)' }}</td><td>{{ $currency }} {{ \App\Support\Money::display(\App\Support\Money::sub($sale->collected_total,$sale->refunded_total)) }}</td><td>{{ $currency }} {{ \App\Support\Money::display($sale->due_balance) }}</td><td><span class="badge {{ $sale->status==='ACTIVE'?(\App\Support\Money::compare($sale->due_balance,0)>0?'amber':'green'):'slate' }}">{{ $sale->payment_status }}</span></td></tr>
+                        @empty
+                        <tr><td colspan="6"><div class="empty-state"><x-icon name="receipt-text" :size="34"/><h3>No purchases yet</h3><p>Sales linked to this customer will appear here.</p></div></td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination">{{ $sales->links() }}</div>
+        </section>
+
+        <section class="card customer-payment-history">
+            <div class="card-heading"><div><h2>Payment history</h2><p class="muted text-sm">Customer dues collections</p></div></div>
+            <div class="table-wrap">
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Method</th>
+                            <th style="text-align:right;">Amount</th>
+                            <th>Allocated to</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($record->customerPayments()->with(['paymentMethod', 'allocations.sale'])->latest('payment_date')->take(10)->get() as $payment)
+                        <tr>
+                            <td>{{ \Carbon\Carbon::parse($payment->payment_date)->format('d/m/Y') }}</td>
+                            <td>{{ $payment->paymentMethod->name ?? 'Unknown' }}</td>
+                            <td style="text-align:right; font-weight:500;">{{ $currency }} {{ \App\Support\Money::display($payment->amount) }}</td>
+                            <td>
+                                <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                                @foreach($payment->allocations as $alloc)
+                                    <span class="badge slate" style="font-size:10px; padding:2px 6px;">{{ $alloc->type === 'OPENING_BALANCE' ? 'Old Balance' : ($alloc->sale->invoice ?? 'Invoice') }}</span>
+                                @endforeach
+                                </div>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="4"><div class="empty-state"><x-icon name="wallet" :size="34"/><h3>No payments</h3><p>Collections for outstanding dues will appear here.</p></div></td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
 </div>
 </div>
 
@@ -65,9 +113,9 @@
             </div>
 
             <div id="manual-allocations" style="display:none; margin-top:15px; max-height:200px; overflow-y:auto; border:1px solid var(--line); padding:10px; border-radius:8px;">
-                @php
-                    $openingRemaining = \App\Support\Money::sub($record->opening_due, $record->opening_due_paid);
-                @endphp
+                <?php
+                    $openingRemaining = \App\Support\Money::sub($record->opening_due ?? '0', $record->opening_due_paid ?? '0');
+                ?>
                 @if(\App\Support\Money::compare($openingRemaining, 0) > 0)
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                         <span style="font-size:12px;">Opening Balance (Due: {{ $currency }} {{ \App\Support\Money::display($openingRemaining) }})</span>
@@ -75,9 +123,9 @@
                     </div>
                 @endif
                 
-                @php
+                <?php
                     $unpaidSales = $record->sales()->where('status','ACTIVE')->get()->filter(fn($s) => \App\Support\Money::compare($s->due_balance, 0) > 0);
-                @endphp
+                ?>
                 @foreach($unpaidSales as $sale)
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                         <div style="font-size:12px;">
@@ -119,5 +167,11 @@
             }
         }
     });
+    
+    if (window.location.hash === '#payment-modal') {
+        document.getElementById('payment-modal').showModal();
+        // Remove hash so it doesn't reopen on reload
+        history.replaceState(null, null, ' ');
+    }
 </script>
 @endsection

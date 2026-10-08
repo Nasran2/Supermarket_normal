@@ -141,7 +141,11 @@ class ResourceController extends Controller
 
     public function store(ResourceRequest $request, string $resource, ResourceService $service)
     {
-        $service->save($resource, $request->validated());
+        $record = $service->save($resource, $request->validated());
+
+        if ($request->wantsJson()) {
+            return response()->json($record);
+        }
 
         return redirect()->route('manage.index', $resource)->with('success', 'Changes saved.');
     }
