@@ -24,7 +24,8 @@ class PurchaseService
             $isNew = ! $purchase;
             $mode = $data['payment_mode'] ?? 'AUTO';
             if ($isNew && (in_array($mode, ['FULL', 'PARTIAL']) || ($mode === 'AUTO' && Money::compare((string) ($data['amount_paid'] ?? 0), 0) > 0))) {
-                app(PurchasePaymentService::class)->registerFor($data['payment_method_id'] ?? null, $userId);
+                $take = ! isset($data['take_from_register']) || $data['take_from_register'];
+                app(PurchasePaymentService::class)->registerFor($data['payment_method_id'] ?? null, $userId, $take);
             }
             if ($purchase) {
                 $purchase = Purchase::whereKey($purchase->id)->lockForUpdate()->firstOrFail();
@@ -106,7 +107,7 @@ class PurchaseService
                     throw ValidationException::withMessages(['amount_paid' => 'For a partial payment, enter an amount greater than zero and less than the purchase total.']);
                 }
                 if (Money::compare($amount, 0) > 0) {
-                    app(PurchasePaymentService::class)->record($purchase, ['token' => (string) Str::uuid(), 'allow_change' => $mode === 'AUTO', 'amount' => $amount, 'payment_method_id' => $data['payment_method_id'], 'reference' => $data['payment_reference'] ?? null], $userId);
+                    app(PurchasePaymentService::class)->record($purchase, ['token' => (string) Str::uuid(), 'allow_change' => $mode === 'AUTO', 'amount' => $amount, 'payment_method_id' => $data['payment_method_id'], 'reference' => $data['payment_reference'] ?? null, 'take_from_register' => $data['take_from_register'] ?? true], $userId);
                 }
             }
             Audit::record('purchase.save', $purchase, $before, $purchase->load('items')->toArray());

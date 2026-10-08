@@ -20,18 +20,18 @@ class PurchasePaymentService
         throw ValidationException::withMessages(['payment' => $message]);
     }
 
-    public function registerFor(?int $methodId, int $userId): ?Register
+    public function registerFor(?int $methodId, int $userId, bool $takeFromRegister = true): ?Register
     {
         $method = PaymentMethod::whereKey($methodId)->where('active', true)->first();
         if (! $method) {
             $this->fail('Choose an active payment method.');
         }
-        if ($method->type !== 'CASH') {
+        if ($method->type !== 'CASH' || ! $takeFromRegister) {
             return null;
         }
         $register = app(RegisterService::class)->current($userId, true);
         if (! $register) {
-            $this->fail('Open your register before recording a cash supplier payment or refund.');
+            $this->fail('Open your register before recording a cash supplier payment (Or uncheck "Take from register").');
         }
 
         return $register;
@@ -47,7 +47,8 @@ class PurchasePaymentService
 
                 return $existing;
             }
-            $register = $this->registerFor($data['payment_method_id'] ?? null, $userId);
+            $take = ! isset($data['take_from_register']) || $data['take_from_register'];
+            $register = $this->registerFor($data['payment_method_id'] ?? null, $userId, $take);
             $purchase = Purchase::whereKey($original->id)->lockForUpdate()->firstOrFail();
             $existing = PurchasePayment::where('token', $data['token'])->first();
             if ($existing) {

@@ -170,8 +170,10 @@ function addCharge(initial={}) {
 }
 document.getElementById('add-purchase-charge').addEventListener('click',()=>addCharge());
 document.querySelectorAll('input[name=charge_treatment]').forEach(input=>input.addEventListener('change',total));
-JSON.parse(document.getElementById('purchase-charges-initial')?.textContent||'[]').forEach(row=>addCharge(row));
-const initialData = JSON.parse(document.getElementById('purchase-initial')?.textContent || '[]');
+const initialChargesRaw = JSON.parse(document.getElementById('purchase-charges-initial')?.textContent||'[]');
+(Array.isArray(initialChargesRaw) ? initialChargesRaw : Object.values(initialChargesRaw)).forEach(row=>addCharge(row));
+const initialDataRaw = JSON.parse(document.getElementById('purchase-initial')?.textContent || '[]');
+const initialData = Array.isArray(initialDataRaw) ? initialDataRaw : Object.values(initialDataRaw);
 if (initialData.length) initialData.forEach(i => add(i, false));
 document.getElementById('purchase-payment-inputs')?.addEventListener('input', total);
 document.getElementById('purchase-payment-method')?.addEventListener('change', total);

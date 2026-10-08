@@ -3,7 +3,9 @@
         <div class="modal-heading"><div><span class="eyebrow">START YOUR SHIFT</span><h2 id="open-register-title">Open register</h2></div><button class="icon-button" type="button" data-dismiss-register aria-label="Close register opening"><x-icon name="x"/></button></div>
         <div class="register-dialog-body"><div class="register-welcome"><span class="register-welcome-icon"><x-icon name="wallet" :size="26"/></span><p>Count your opening cash to unlock the POS and start selling.</p></div>
             <div id="open-register-error" class="notice error" role="alert" hidden></div>
-            @can('register.open')<form id="open-register-form" method="POST" action="{{ route('register.open') }}">@csrf<label class="field">Opening cash ({{ $settings['currency_symbol']??'Rs.' }})<input name="opening_cash" type="text" inputmode="decimal" value="{{ old('opening_cash','0') }}" data-register-amount aria-label="Opening cash" autocomplete="off" required maxlength="15"></label>
+            @can('register.open')
+            @php($lastRegister = \App\Models\Register::whereNotNull('closed_at')->latest('closed_at')->first())
+            <form id="open-register-form" method="POST" action="{{ route('register.open') }}">@csrf<label class="field">Opening cash ({{ $settings['currency_symbol']??'Rs.' }})<input name="opening_cash" type="text" inputmode="decimal" value="{{ old('opening_cash', $lastRegister ? (float)$lastRegister->actual_cash : '0') }}" data-register-amount aria-label="Opening cash" autocomplete="off" required maxlength="15"></label>
                 @include('register.partials.keypad')
                 <button class="btn primary w-full" type="submit"><x-icon name="wallet"/>Open register & start selling</button>
             </form>@else<div class="notice info">Ask a manager to enable register opening for your account.</div>@endcan

@@ -18,6 +18,7 @@ class PurchaseRequest extends FormRequest
             'payment_mode' => [$this->route('purchase') ? 'prohibited' : 'nullable', 'in:AUTO,FULL,PARTIAL,UNPAID'],
             'amount_paid' => [$this->route('purchase') ? 'prohibited' : 'nullable', 'required_if:payment_mode,PARTIAL', 'numeric', 'min:0', 'max:9999999999999.99', 'decimal:0,2'],
             'payment_method_id' => [$this->route('purchase') ? 'prohibited' : 'nullable', 'required_if:payment_mode,FULL,PARTIAL', Rule::requiredIf(! $this->route('purchase') && (float) $this->input('amount_paid', 0) > 0), 'integer', Rule::exists('payment_methods', 'id')->where('active', true)],
-            'payment_reference' => [$this->route('purchase') ? 'prohibited' : 'nullable', 'string', 'max:255']];
+            'payment_reference' => [$this->route('purchase') ? 'prohibited' : 'nullable', 'string', 'max:255'],
+            'take_from_register' => ['nullable', 'boolean']];
     }
 }
