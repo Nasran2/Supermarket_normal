@@ -221,7 +221,7 @@ class ReportService
                 $headers = array_merge($headers, ['Actual COGS before returns', 'Gross profit before invoice discount / returns', 'Margin % before invoice discount / returns']);
             }
             $map = fn ($i) => array_merge([$i->name, $i->unit, $i->quantity, Money::display($i->total)], $canCost ? [Money::display($i->cogs), Money::display(Money::sub($i->total, $i->cogs)), Money::compare($i->total, 0) > 0 ? (string) BigDecimal::of(Money::sub($i->total, $i->cogs))->multipliedBy(100)->dividedBy($i->total, 2, RoundingMode::HALF_UP) : '0.00'] : []);
-        } elseif (in_array($kind, ['register', 'cash'])) {
+        } elseif ($kind === 'register') {
             $query = app(RegisterService::class)->withSummary(Register::with('user'))->whereBetween('opened_at', [$start, $end])->latest('opened_at');
             if (! empty($filters['user_id'])) {
                 $query->where('user_id', $filters['user_id']);
@@ -232,6 +232,58 @@ class ReportService
 
                 return ['REG-'.$r->id, $r->user->name, $r->opened_at->format('Y-m-d H:i'), $r->closed_at?->format('Y-m-d H:i') ?? 'Open', Money::display($r->opening_cash), Money::display($s['cash']), Money::display($s['in']), Money::display($s['out']), Money::display($s['expenses']), Money::display($r->closed_at ? $r->expected_cash : $s['expected']), $r->closed_at ? Money::display($r->actual_cash) : '—', $r->closed_at ? Money::display($r->difference) : '—'];
             };
+        } elseif ($kind === 'cash') {
+            $sp = DB::table('sale_payments')->selectRaw("'Sale' as type, sale_id as reference_id, reference, created_at as date, payment_method_id, amount_paid - `change` as in_amount, 0 as out_amount");
+            $cp = DB::table('customer_payments')->selectRaw("'Customer payment' as type, id as reference_id, notes as reference, payment_date as date, payment_method_id, amount as in_amount, 0 as out_amount");
+            $sc = DB::table('sale_collections')->selectRaw("'Due collection' as type, sale_id as reference_id, reference, collected_at as date, payment_method_id, amount as in_amount, 0 as out_amount");
+            $sr = DB::table('sale_returns')->selectRaw("'Refund' as type, id as reference_id, reference, returned_at as date, payment_method_id, 0 as in_amount, refund_amount as out_amount")->whereNotNull('payment_method_id');
+            $pp = DB::table('purchase_payments')->selectRaw("CASE WHEN kind = 'REFUND' THEN 'Supplier refund' ELSE 'Supplier payment' END as type, purchase_id as reference_id, reference, created_at as date, payment_method_id, CASE WHEN kind = 'REFUND' THEN amount ELSE 0 END as in_amount, CASE WHEN kind = 'PAYMENT' THEN amount ELSE 0 END as out_amount");
+            $xp = DB::table('expenses')->selectRaw("'Expense' as type, id as reference_id, reference, expense_date as date, payment_method_id, 0 as in_amount, amount as out_amount")->whereNotNull('payment_method_id')->where('status', 'ACTIVE');
+            
+            $unionQuery = $sp->unionAll($cp)->unionAll($sc)->unionAll($sr)->unionAll($pp)->unionAll($xp);
+            
+            $query = DB::table($unionQuery, 'transactions')
+                ->whereBetween('date', [$start, $end])
+                ->orderByDesc('date')
+                ->join('payment_methods as pm', 'transactions.payment_method_id', '=', 'pm.id')
+                ->select('transactions.*', 'pm.name as method_name', 'pm.type as method_type');
+
+            if (!empty($filters['payment_method_id'])) {
+                $query->where('transactions.payment_method_id', $filters['payment_method_id']);
+            }
+            
+            $headers = ['Date', 'Type', 'Reference', 'Payment method', 'Money In', 'Money Out'];
+            $map = function ($t) {
+                return [
+                    \Carbon\Carbon::parse($t->date)->format('Y-m-d H:i'),
+                    $t->type,
+                    $t->reference ?: ($t->type === 'Expense' ? 'EXP-'.$t->reference_id : ($t->type === 'Sale' ? 'SALE-'.$t->reference_id : ($t->type === 'Supplier payment' || $t->type === 'Supplier refund' ? 'PUR-'.$t->reference_id : '—'))),
+                    $t->method_name,
+                    Money::display($t->in_amount),
+                    Money::display($t->out_amount)
+                ];
+            };
+
+            $openingQuery = DB::table($unionQuery, 'transactions')
+                ->where('date', '<', $start);
+            if (!empty($filters['payment_method_id'])) {
+                $openingQuery->where('payment_method_id', $filters['payment_method_id']);
+            }
+            
+            $openingBalances = (clone $openingQuery)->reorder()->select(DB::raw("SUM(in_amount) as total_in, SUM(out_amount) as total_out"))->first();
+            $opening = Money::sub($openingBalances->total_in ?? 0, $openingBalances->total_out ?? 0);
+            
+            $periodTotals = (clone $query)->reorder()->select(DB::raw("SUM(in_amount) as total_in, SUM(out_amount) as total_out"))->first();
+            $periodIn = $periodTotals->total_in ?? 0;
+            $periodOut = $periodTotals->total_out ?? 0;
+            $closing = Money::add(Money::sub($opening, $periodOut), $periodIn);
+            
+            $cards = [
+                'Opening balance' => (string) $opening,
+                'Period Money In' => (string) $periodIn,
+                'Period Money Out' => (string) $periodOut,
+                'Closing balance' => (string) $closing
+            ];
         } elseif ($kind === 'audit') {
             $query = AuditLog::with('user')->whereBetween('created_at', [$start, $end])->latest();
             $headers = ['Time', 'User', 'Action', 'Record', 'Before', 'After'];
