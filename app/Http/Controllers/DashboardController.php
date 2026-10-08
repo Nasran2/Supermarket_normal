@@ -17,12 +17,28 @@ class DashboardController extends Controller
 {
     public function index(Request $request, ProfitLossService $profit, RegisterService $registers)
     {
-        $today = today()->toDateString();
-        $summary = $profit->calculate($today, $today);
-        $todaySales = Sale::where('status', 'ACTIVE')->whereBetween('sold_at', [$today.' 00:00:00', $today.' 23:59:59']);
-        $transactions = $todaySales->count();
-        $payments = app(ReportService::class)->build('payments', ['from' => $today, 'to' => $today])['query']->get();
-        $days = $request->input('period') === '30' ? 30 : 7;
+        $period = $request->input('period', 'today');
+        $from = $request->input('from');
+        $to = $request->input('to');
+
+        if ($period !== 'custom' || ! $from || ! $to) {
+            [$from, $to] = match ($period) {
+                'yesterday' => [today()->subDay()->toDateString(), today()->subDay()->toDateString()],
+                'this_week' => [now()->startOfWeek()->toDateString(), now()->endOfWeek()->toDateString()],
+                'last_week' => [now()->subWeek()->startOfWeek()->toDateString(), now()->subWeek()->endOfWeek()->toDateString()],
+                'this_month' => [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()],
+                'last_month' => [now()->subMonth()->startOfMonth()->toDateString(), now()->subMonth()->endOfMonth()->toDateString()],
+                'this_year' => [now()->startOfYear()->toDateString(), now()->endOfYear()->toDateString()],
+                'last_year' => [now()->subYear()->startOfYear()->toDateString(), now()->subYear()->endOfYear()->toDateString()],
+                default => [today()->toDateString(), today()->toDateString()],
+            };
+        }
+
+        $summary = $profit->calculate($from, $to);
+        $periodSales = Sale::where('status', 'ACTIVE')->whereBetween('sold_at', [$from.' 00:00:00', $to.' 23:59:59']);
+        $transactions = $periodSales->count();
+        $payments = app(ReportService::class)->build('payments', ['from' => $from, 'to' => $to])['query']->get();
+        $days = $request->input('chart_days') === '30' ? 30 : 7;
         $dailyTotals = Sale::where('status', 'ACTIVE')->whereBetween('sold_at', [today()->subDays($days - 1)->startOfDay(), today()->endOfDay()])->selectRaw('DATE(sold_at) as day, SUM(sale_amount) as amount')->groupByRaw('DATE(sold_at)')->pluck('amount', 'day');
         $dailyReturns = SaleReturn::whereBetween('returned_at', [today()->subDays($days - 1)->startOfDay(), today()->endOfDay()])->selectRaw('DATE(returned_at) as day, SUM(amount) as amount')->groupByRaw('DATE(returned_at)')->pluck('amount', 'day');
         $overview = [];
@@ -36,6 +52,6 @@ class DashboardController extends Controller
         $topProducts = SaleItem::whereHas('sale', fn ($q) => $q->where('status', 'ACTIVE')->whereBetween('sold_at', [today()->subDays($days - 1)->startOfDay(), today()->endOfDay()]))->selectRaw('product_id, name, unit, SUM(quantity) as quantity, SUM(total) as total')->groupBy('product_id', 'name', 'unit')->orderByDesc('total')->limit(5)->get();
         $register = $registers->current(auth()->id());
 
-        return view('dashboard', compact('today', 'summary', 'transactions', 'payments', 'days', 'overview', 'lowStock', 'recentSales', 'recentExpenses', 'topProducts', 'register'));
+        return view('dashboard', compact('period', 'from', 'to', 'summary', 'transactions', 'payments', 'days', 'overview', 'lowStock', 'recentSales', 'recentExpenses', 'topProducts', 'register'));
     }
 }
