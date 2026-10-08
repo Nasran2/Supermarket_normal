@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-BzTIhom4.css",
+    "file": "assets/app-DxMxu1Pb.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -9,13 +9,13 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-C9agjl3g.js",
+    "file": "assets/app-BLU7-t8r.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
   },
   "resources/js/pos.js": {
-    "file": "assets/pos-CL0IJCc6.js",
+    "file": "assets/pos-6858XOsf.js",
     "name": "pos",
     "src": "resources/js/pos.js",
     "isEntry": true
@@ -27,7 +27,7 @@
     "isEntry": true
   },
   "resources/js/purchase.js": {
-    "file": "assets/purchase-BdeSPsHn.js",
+    "file": "assets/purchase-BOMGQo5W.js",
     "name": "purchase",
     "src": "resources/js/purchase.js",
     "isEntry": true
@@ -39,7 +39,7 @@
     "isEntry": true
   },
   "resources/js/stock-adjustments.js": {
-    "file": "assets/stock-adjustments-7j7tf9JZ.js",
+    "file": "assets/stock-adjustments-Bqb4VtF0.js",
     "name": "stock-adjustments",
     "src": "resources/js/stock-adjustments.js",
     "isEntry": true

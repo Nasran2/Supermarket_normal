@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\Expense;
 use App\Models\Product;
+use App\Models\ProductStockLayer;
 use App\Models\Purchase;
 use App\Models\Register;
 use App\Models\Sale;
@@ -13,6 +14,8 @@ use App\Models\SaleItem;
 use App\Models\SalePayment;
 use App\Models\SaleReturn;
 use App\Support\Money;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Illuminate\Support\Facades\DB;
 
 class ReportService
@@ -99,6 +102,18 @@ class ReportService
             }
             $headers = ['Date', 'Invoice', 'Cashier', 'Customer', 'Subtotal', 'Discount', 'Processing charge', 'Base sales', 'Customer payable', 'Method', 'Returned', 'Balance due', 'Status'];
             $map = fn ($s) => [$s->sold_at->format('Y-m-d H:i'), $s->invoice, $s->user->name, $s->customer?->name ?? 'Walk-in', Money::display($s->subtotal), Money::display($s->discount), Money::display($s->processing_charge), Money::display($s->sale_amount), Money::display($s->customer_payable),  $s->payment_names, Money::display($s->returned_total), Money::display($s->due_balance), $s->status];
+            if (auth()->user()?->hasPermission('products.view_cost')) {
+                $headers = array_merge($headers, ['Invoice COGS after returns', 'Invoice gross profit after returns', 'Margin %']);
+                $baseMap = $map;
+                $map = function ($s) use ($baseMap) {
+                    $cogs = Money::sub($s->cost_total, Money::sum($s->returns->pluck('cost_total')));
+                    $revenue = Money::sub($s->sale_amount, $s->returned_total);
+                    $profit = Money::sub($revenue, $cogs);
+                    $margin = Money::compare($revenue, 0) > 0 ? (string) BigDecimal::of($profit)->multipliedBy(100)->dividedBy($revenue, 2, RoundingMode::HALF_UP) : '0.00';
+
+                    return array_merge($baseMap($s), [Money::display($cogs), Money::display($profit), $margin]);
+                };
+            }
             $periodReturns = SaleReturn::whereBetween('returned_at', [$start, $end]);
             $periodReturns->whereHas('sale', function ($q) use ($filters) {
                 if (! empty($filters['user_id'])) {
@@ -115,9 +130,9 @@ class ReportService
             $returned = (string) $periodReturns->sum('amount');
             $cards = ['Sales before returns' => $original, 'Returns in period' => $returned, 'Net revenue in period' => Money::sub($original, $returned), 'Original invoice payable' => (string) (clone $query)->where('status', 'ACTIVE')->sum('customer_payable')];
         } elseif ($kind === 'purchases') {
-            $query = Purchase::with('supplier', 'user')->whereBetween('purchase_date', [$from, $to])->latest('purchase_date');
-            $headers = ['Date', 'Reference', 'Supplier', 'Amount', 'Recorded by', 'Status'];
-            $map = fn ($p) => [$p->purchase_date->format('Y-m-d'), $p->reference, $p->supplier->name, Money::display($p->total), $p->user->name, $p->status];
+            $query = Purchase::with('supplier', 'user')->withPaymentTotals()->whereBetween('purchase_date', [$from, $to])->latest('purchase_date');
+            $headers = ['Date', 'Reference', 'Supplier', 'Amount', 'Paid less refunds', 'Due', 'Payment status', 'Recorded by', 'Status'];
+            $map = fn ($p) => [$p->purchase_date->format('Y-m-d'), $p->reference, $p->supplier->name, Money::display($p->total), $p->payment_tracking ? Money::display($p->paid_amount) : 'Unrecorded', $p->due_amount !== null ? Money::display($p->due_amount) : 'Unrecorded', $p->payment_status, $p->user->name, $p->status];
             $cards = ['Active purchases' => (string) (clone $query)->where('status', 'ACTIVE')->sum('total')];
         } elseif ($kind === 'expenses') {
             $query = Expense::with('category', 'user', 'method')->whereBetween('expense_date', [$from, $to])->latest('expense_date');
@@ -131,17 +146,81 @@ class ReportService
             $map = fn ($e) => [$e->expense_date->format('Y-m-d'), $e->reference ?? 'EXP-'.$e->id, $e->category->name, $e->description, Money::display($e->amount), $e->type, $e->status, $e->method?->name ?? '—', $e->user->name];
             $cards = ['Active expenses' => (string) (clone $query)->where('status', 'ACTIVE')->sum('amount')];
         } elseif ($kind === 'stock') {
-            $query = Product::with('unit', 'category')->orderBy('name');
+            $canCost = auth()->user()?->hasPermission('products.view_cost') ?? false;
+            $lotQuery = ProductStockLayer::where('status', 'ACTIVE')->with('product.unit', 'product.categories');
             if (! empty($filters['q'])) {
-                $query->where('name', 'like', '%'.$filters['q'].'%');
+                $lotQuery->whereHas('product', fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%'));
             }
-            $headers = ['Product', 'SKU', 'Barcode', 'Category', 'Unit', 'Stock', 'Low stock level', 'Cost', 'Price', 'Status'];
-            $map = fn ($p) => [$p->name, $p->sku, $p->barcode, $p->category->name, $p->unit->short_name, $p->stock, $p->low_stock, Money::display($p->cost), Money::display($p->price), $p->active ? 'Active' : 'Inactive'];
-            $cards = ['Stock at cost' => (string) (clone $query)->reorder()->selectRaw('SUM(stock * cost) as value')->value('value')];
+            if (! empty($filters['product_id'])) {
+                $lotQuery->where('product_id', $filters['product_id']);
+            }
+            if (! empty($filters['category_id'])) {
+                $lotQuery->whereHas('product.categories', fn ($q) => $q->where('categories.id', $filters['category_id']));
+            }
+            if (isset($filters['selling_price'])) {
+                $lotQuery->where('selling_price', $filters['selling_price']);
+            }
+            if ($canCost && isset($filters['cost_price'])) {
+                $lotQuery->where('cost_price', $filters['cost_price']);
+            }
+            if (! empty($filters['source_reference'])) {
+                $lotQuery->where('source_reference', 'like', '%'.$filters['source_reference'].'%');
+            }
+            if (! empty($filters['received_from'])) {
+                $lotQuery->whereDate('received_at', '>=', $filters['received_from']);
+            }
+            if (! empty($filters['received_to'])) {
+                $lotQuery->whereDate('received_at', '<=', $filters['received_to']);
+            }
+            $status = $filters['stock_status'] ?? 'available';
+            if ($status === 'available') {
+                $lotQuery->where('remaining_quantity', '>', 0);
+            } elseif ($status === 'depleted') {
+                $lotQuery->where('remaining_quantity', '<=', 0);
+            }
+            $values = (clone $lotQuery)->selectRaw('SUM(COALESCE(remaining_cost_total, remaining_quantity * cost_price)) as cost_value, SUM(remaining_quantity * selling_price) as selling_value')->first();
+            $cards = ['Potential sales value' => (string) ($values->selling_value ?? 0)];
+            if ($canCost) {
+                $cards = ['Stock at cost' => (string) ($values->cost_value ?? 0)] + $cards;
+            }
+            if (($filters['stock_view'] ?? '') === 'layers') {
+                $query = $lotQuery->orderBy('product_id')->orderBy('received_at')->orderBy('id');
+                $headers = ['Product', 'SKU', 'Primary unit', 'Selling price', 'Available', 'Original quantity', 'Source', 'Received'];
+                if ($canCost) {
+                    $headers = array_merge($headers, ['Cost / unit', 'Stock at cost']);
+                }
+                $map = fn ($l) => array_merge([$l->product->name, $l->product->sku, $l->product->unit->short_name, Money::display($l->selling_price), $l->remaining_quantity, $l->original_quantity, $l->source_reference ?? $l->source_type, $l->received_at->format('Y-m-d')], $canCost ? [Money::display($l->cost_price), Money::display($l->stock_value)] : []);
+            } else {
+                $query = Product::with('unit', 'categories')->with(['stockLayers' => fn ($q) => $q->available()])->orderBy('name');
+                if (! empty($filters['q'])) {
+                    $query->where(fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%'));
+                }
+                if (! empty($filters['product_id'])) {
+                    $query->whereKey($filters['product_id']);
+                }
+                if (! empty($filters['category_id'])) {
+                    $query->whereHas('categories', fn ($q) => $q->where('categories.id', $filters['category_id']));
+                }
+                if ($status === 'depleted') {
+                    $query->where('stock', '<=', 0);
+                }
+                if (array_intersect(array_keys($filters), ['selling_price', 'cost_price', 'source_reference', 'received_from', 'received_to'])) {
+                    $query->whereIn('id', (clone $lotQuery)->select('product_id'));
+                }
+                $headers = ['Product', 'SKU', 'Categories', 'Unit', 'Stock', 'Low stock level', 'Available selling prices', 'Potential sales value'];
+                if ($canCost) {
+                    $headers[] = 'Stock at cost';
+                }
+                $map = fn ($p) => array_merge([$p->name, $p->sku, $p->categories->pluck('name')->join(', '), $p->unit->short_name, $p->stock, $p->low_stock, $p->stockLayers->pluck('selling_price')->unique()->sort()->map(fn ($v) => Money::display($v))->join(' / '), Money::display(Money::sum($p->stockLayers->map(fn ($l) => Money::mul($l->remaining_quantity, $l->selling_price))))], $canCost ? [Money::display(Money::sum($p->stockLayers->map(fn ($l) => $l->stock_value)))] : []);
+            }
         } elseif ($kind === 'product-sales') {
-            $query = SaleItem::whereHas('sale', fn ($q) => $q->where('status', 'ACTIVE')->whereBetween('sold_at', [$start, $end]))->selectRaw('product_id, name, unit, SUM(quantity) as quantity, SUM(total) as total')->groupBy('product_id', 'name', 'unit')->orderByDesc('total');
+            $query = SaleItem::whereHas('sale', fn ($q) => $q->where('status', 'ACTIVE')->whereBetween('sold_at', [$start, $end]))->selectRaw('product_id, name, unit, SUM(quantity) as quantity, SUM(total) as total, SUM(COALESCE(cogs_total, COALESCE(base_quantity, quantity) * COALESCE(base_cost, cost))) as cogs')->groupBy('product_id', 'name', 'unit')->orderByDesc('total');
             $headers = ['Product', 'Unit', 'Original quantity before returns', 'Original line sales before invoice discount / returns'];
-            $map = fn ($i) => [$i->name, $i->unit, $i->quantity, Money::display($i->total)];
+            $canCost = auth()->user()?->hasPermission('products.view_cost') ?? false;
+            if ($canCost) {
+                $headers = array_merge($headers, ['Actual COGS before returns', 'Gross profit before invoice discount / returns', 'Margin % before invoice discount / returns']);
+            }
+            $map = fn ($i) => array_merge([$i->name, $i->unit, $i->quantity, Money::display($i->total)], $canCost ? [Money::display($i->cogs), Money::display(Money::sub($i->total, $i->cogs)), Money::compare($i->total, 0) > 0 ? (string) BigDecimal::of(Money::sub($i->total, $i->cogs))->multipliedBy(100)->dividedBy($i->total, 2, RoundingMode::HALF_UP) : '0.00'] : []);
         } elseif (in_array($kind, ['register', 'cash'])) {
             $query = app(RegisterService::class)->withSummary(Register::with('user'))->whereBetween('opened_at', [$start, $end])->latest('opened_at');
             if (! empty($filters['user_id'])) {

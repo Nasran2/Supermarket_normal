@@ -1,91 +1,34 @@
 @extends('layouts.app')
 @section('title',$purchase->exists?'Edit purchase':'Add purchase')
 @section('content')
-<style>
-.search-dropdown { border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); background: #fff; max-height: 250px; overflow-y: auto; position: absolute; width: 100%; z-index: 50; display: none; }
-.search-dropdown.show { display: block; }
-.search-option { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 14px; }
-.search-option:hover, .search-option.active { background: #f0fdf4; }
-.search-option:last-child { border-bottom: none; }
-.product-search-input { width: 100%; padding: 14px 18px; font-size: 16px; border: 2px solid var(--primary); border-radius: 8px; outline: none; }
-.product-search-input:focus { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
-.purchase-line { display: grid; grid-template-columns: minmax(200px, 1fr) 150px 120px 120px 100px 40px; gap: 15px; align-items: center; background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e5e7eb; }
-@media (max-width: 768px) {
-    .purchase-line { grid-template-columns: 1fr 1fr; }
-    .purchase-line > div:first-child { grid-column: 1 / -1; }
-}
-.purchase-line-name { font-weight: 600; font-size: 14px; color: #111827; }
-.purchase-line-sku { font-size: 12px; color: #6b7280; }
-</style>
-<div class="page-heading"><div><span class="eyebrow">PURCHASES</span><h1>{{ $purchase->exists?'Edit':'Add' }} purchase</h1><p>Stock updates automatically when you save.</p></div><a class="btn secondary" href="{{ route('purchases.index') }}">Back</a></div>
-<form class="card padded" method="POST" action="{{ $purchase->exists?route('purchases.update',$purchase):route('purchases.store') }}" id="purchase-form" data-quantity-precision="{{ $settings['quantity_decimals']??3 }}">
-    @csrf @if($purchase->exists)@method('PUT')@endif
-    <div class="form-grid">
-        <label class="field">Reference<input name="reference" value="{{ old('reference',$purchase->reference) }}" required></label>
-        
-        <label class="field" style="position:relative;">Supplier
-            <div style="display:flex; gap:10px;">
-                <div style="position:relative; flex:1;" id="supplier-search-container">
-                    <input type="hidden" name="supplier_id" id="supplier_id" value="{{ old('supplier_id',$purchase->supplier_id) }}" required>
-                    <input type="text" id="supplier-search" placeholder="Search supplier..." autocomplete="off" style="width:100%" value="{{ $purchase->supplier ? $purchase->supplier->name : '' }}">
-                    <div id="supplier-dropdown" class="search-dropdown">
-                        @foreach($suppliers as $s)
-                            <div class="search-option supplier-option" data-id="{{ $s->id }}" data-name="{{ $s->name }}">{{ $s->name }}</div>
-                        @endforeach
-                    </div>
-                </div>
-                <button type="button" class="btn secondary" onclick="document.getElementById('add-supplier-modal').showModal()" title="Add Supplier"><x-icon name="plus"/></button>
-            </div>
-        </label>
-        
-        <label class="field">Date<input type="date" name="purchase_date" value="{{ old('purchase_date',$purchase->purchase_date?->toDateString()??today()->toDateString()) }}" required></label>
-        <label class="field">Notes<input name="notes" value="{{ old('notes',$purchase->notes) }}"></label>
-    </div>
-    
-    <h2 class="mt-6 mb-4">Purchase items</h2>
-    
-    <div style="position:relative; margin-bottom: 20px;" id="product-search-container">
-        <input type="text" id="product-search" class="product-search-input" placeholder="🔍 Search product to add..." autocomplete="off">
-        <div id="product-dropdown" class="search-dropdown">
-            @foreach($products as $p)
-                <div class="search-option product-option" data-id="{{ $p->id }}" data-name="{{ $p->name }}">
-                    <strong>{{ $p->name }}</strong> <small class="muted">· {{ $p->sku }}</small>
-                </div>
-            @endforeach
-        </div>
-    </div>
-
-    <div id="purchase-items"></div>
-    <div class="form-footer">
-        <strong>Purchase total: <span id="purchase-total">0.00</span></strong>
-        <button class="btn primary">Save purchase</button>
-    </div>
-</form>
-
-<template id="purchase-item-template">
-<div class="purchase-line">
-    <div>
-        <input type="hidden" data-field="product_id" required>
-        <div class="purchase-line-name" data-field-display="name">Product Name</div>
-        <div class="purchase-line-sku" data-field-display="sku">SKU</div>
-    </div>
-    <label class="field" style="margin:0;">Unit
-        <select data-field="unit_id" required></select>
-    </label>
-    <label class="field" style="margin:0;">Quantity
-        <input data-field="quantity" type="number" step="0.001" min="0.001" value="1" required>
-    </label>
-    <label class="field" style="margin:0;">Unit cost
-        <input data-field="cost" type="number" step="0.01" min="0" value="0" required>
-    </label>
-    <div style="text-align:right; font-weight:bold;">
-        <span data-field-display="line_total">0.00</span>
-    </div>
-    <button type="button" class="icon-button text-danger remove-line" title="Remove item" style="margin-left:auto;"><x-icon name="trash-2"/></button>
+<div class="page-heading purchase-page-heading"><div><span class="eyebrow">SUPPLIER DELIVERIES</span><h1>{{ $purchase->exists?'Edit purchase':'Receive a purchase' }}</h1><p>Bring stock in, record your payment and keep the supplier balance clear.</p></div><a class="btn secondary" href="{{ route('purchases.index') }}"><x-icon name="arrow-left"/>Purchases</a></div>
+<form method="POST" action="{{ $purchase->exists?route('purchases.update',$purchase):route('purchases.store') }}" id="purchase-form" class="purchase-editor" data-quantity-precision="{{ $settings['quantity_decimals']??3 }}" data-currency="{{ $settings['currency_symbol']??'Rs.' }}" data-payment-tracked="{{ !$purchase->exists || $purchase->payment_tracking?1:0 }}">
+@csrf @if($purchase->exists)@method('PUT')@else<input type="hidden" name="auto_reference" value="1"><input type="hidden" name="payment_mode" value="AUTO">@endif
+<section class="card purchase-meta-card"><div class="purchase-section-heading"><span class="customer-section-icon"><x-icon name="truck"/></span><div><h2>Delivery details</h2><p>Who supplied the stock and which invoice it belongs to.</p></div><span class="badge green">{{ $purchase->exists?$purchase->reference:'New delivery' }}</span></div><div class="purchase-meta-fields">
+<label class="field"><span>Reference <b class="required">*</b></span><input name="reference" value="{{ old('reference',$purchase->reference??$nextReference) }}" required maxlength="255" @if(!$purchase->exists)readonly @endif>@if(!$purchase->exists)<small class="muted">Final monthly number is assigned when saved.</small>@endif</label>
+<div class="field"><label for="supplier-search">Supplier <span class="required">*</span></label><div class="purchase-supplier-control"><div class="purchase-search-container" id="supplier-search-container"><input type="hidden" name="supplier_id" id="supplier_id" value="{{ old('supplier_id',$purchase->supplier_id) }}"><input type="text" id="supplier-search" placeholder="Search supplier..." autocomplete="off" required value="{{ $suppliers->firstWhere('id',old('supplier_id',$purchase->supplier_id))?->name }}"><div id="supplier-dropdown" class="search-dropdown">@foreach($suppliers as $supplier)<button type="button" class="search-option supplier-option" data-id="{{ $supplier->id }}" data-name="{{ $supplier->name }}">{{ $supplier->name }}</button>@endforeach</div></div>@can(\App\Support\Resources::permission('suppliers','create'))<button type="button" class="btn secondary" onclick="document.getElementById('add-supplier-modal').showModal()" title="Add Supplier" aria-label="Add supplier"><x-icon name="plus"/></button>@endcan</div></div>
+<label class="field"><span>Delivery date <b class="required">*</b></span><input type="date" name="purchase_date" max="{{ today()->toDateString() }}" value="{{ old('purchase_date',$purchase->purchase_date?->toDateString()??today()->toDateString()) }}" required></label>
+<label class="field"><span>Notes <small class="muted">optional</small></span><input name="notes" value="{{ old('notes',$purchase->notes) }}" placeholder="Delivery notes or supplier details" maxlength="2000"></label>
+</div></section>
+<section class="card purchase-items-card"><div class="purchase-section-heading"><span class="customer-section-icon"><x-icon name="package-plus"/></span><div><h2>Purchase items</h2><p>Set the quantity and prices for this delivery.</p></div><span class="badge slate" id="purchase-line-count">0 items</span></div>
+<div class="purchase-item-search purchase-search-container" id="product-search-container"><x-icon name="search"/><input type="text" id="product-search" placeholder="Search name, SKU or barcode to add a product..." autocomplete="off" aria-label="Find purchase products"><kbd>Search</kbd><div id="product-dropdown" class="search-dropdown">@foreach($products as $product)<button type="button" class="search-option product-option" data-id="{{ $product->id }}" data-name="{{ $product->name }}" data-sku="{{ $product->sku }}" data-barcode="{{ $product->barcode }}"><strong>{{ $product->name }}</strong> <small>· {{ $product->sku }}</small></button>@endforeach</div></div>
+<div class="purchase-line-header" aria-hidden="true"><span>Product</span><span>Unit</span><span>Quantity</span><span>Cost / unit</span><span>Sell / unit</span><span class="text-right">Amount</span><span></span></div><div id="purchase-items"></div>
+<div class="purchase-empty" id="purchase-empty"><x-icon name="package-open" :size="34"/><h3>Your delivery starts here</h3><p>Search above to add products to this purchase.</p></div>
+<div class="purchase-stock-note"><x-icon name="info" :size="16"/>These selling prices apply to new stock. Existing stock keeps its prices.</div></section>
+@include('purchases.partials.charges-form')
+<div class="purchase-bottom-grid">
+<section class="card purchase-payment-card"><div class="purchase-section-heading"><span class="customer-section-icon"><x-icon name="wallet"/></span><div><h2>{{ $purchase->exists?'Recorded payments':'Supplier payment' }}</h2><p>{{ $purchase->exists?'Payment history stays with this purchase.':'Enter what you give the supplier. Status and change update automatically.' }}</p></div></div>
+@if($purchase->exists)<div class="purchase-payment-fields"><p class="muted">{{ $purchase->payment_tracking?'Already paid: '.($settings['currency_symbol']??'Rs.').' '.\App\Support\Money::display($purchase->paid_amount):'Payment status has not been recorded for this older purchase.' }}</p><a class="btn secondary" href="{{ route('purchases.show',$purchase) }}#purchase-payments"><x-icon name="credit-card"/>Manage payments</a><small class="muted">Saving stock changes keeps all recorded payments.</small></div>
+@else
+<div class="purchase-payment-fields"><p class="purchase-auto-status">Payment status <span id="purchase-auto-status" class="badge amber">Unpaid</span></p>
+<div class="purchase-payment-inputs" id="purchase-payment-inputs"><label class="field">Payment method<select name="payment_method_id" id="purchase-payment-method"><option value="">Choose payment method</option>@foreach($methods as $method)<option value="{{ $method->id }}" data-type="{{ $method->type }}" @selected((string)old('payment_method_id')===(string)$method->id)>{{ $method->name }}</option>@endforeach</select></label><label class="field">Amount paid now<input type="number" name="amount_paid" id="purchase-amount-paid" min="0" max="9999999999999.99" step="0.01" value="{{ old('amount_paid',0) }}" inputmode="decimal" placeholder="0.00"></label><label class="field full"><span>Payment reference <small class="muted">optional</small></span><input name="payment_reference" maxlength="255" value="{{ old('payment_reference') }}" placeholder="Bank reference or payment note"></label></div><p class="purchase-payment-note" id="purchase-payment-note"><x-icon name="info" :size="16"/><span>This purchase will be saved with the full balance due.</span></p></div>
+@endif
+</section>
+<aside class="card purchase-total-card"><span class="eyebrow">PURCHASE SUMMARY</span><h2>Ready to receive</h2><dl><div><dt>Products subtotal</dt><dd id="purchase-subtotal">0.00</dd></div><div><dt>Extra charges</dt><dd id="purchase-charges-total">0.00</dd></div><div><dt>Purchase total</dt><dd id="purchase-total">0.00</dd></div><div><dt>{{ $purchase->exists?'Previously paid':'Paid now' }}</dt><dd id="purchase-summary-paid" data-recorded-paid="{{ $purchase->exists?$purchase->paid_amount:0 }}">0.00</dd></div><div id="purchase-change-row" hidden><dt>Change balance</dt><dd id="purchase-summary-change">0.00</dd></div><div class="purchase-due-total"><dt>Balance due</dt><dd id="purchase-summary-due">0.00</dd></div></dl><p id="purchase-payment-validation" class="text-danger" role="alert" hidden></p><button class="btn primary w-full" id="save-purchase"><x-icon name="check"/>{{ $purchase->exists?'Save purchase changes':'Receive stock & save' }}</button><a class="purchase-cancel" href="{{ route('purchases.index') }}">Cancel</a></aside>
 </div>
-</template>
-
-<dialog id="add-supplier-modal" class="payment-dialog">
+</form>
+<template id="purchase-item-template"><div class="purchase-line"><div class="purchase-line-product"><input type="hidden" data-field="product_id" required><strong data-field-display="name"></strong><span data-field-display="sku"></span><small class="purchase-current-prices" data-field-display="prices"></small><small class="text-danger" data-field-display="price_warning" hidden>Selling below cost</small></div><label class="field"><span>Unit</span><select data-field="unit_id" required></select></label><label class="field"><span>Quantity</span><input data-field="quantity" type="number" step="0.001" min="0.001" value="1" required inputmode="decimal"></label><label class="field"><span>Unit cost</span><input data-field="cost" type="number" step="0.01" min="0" value="0" required inputmode="decimal"></label><label class="field"><span>Selling price</span><input data-field="selling_price" type="number" step="0.01" min="0" value="0" required @cannot('purchases.manage_prices')readonly @endcannot inputmode="decimal"></label><strong class="purchase-line-amount" data-field-display="line_total">0.00</strong><button type="button" class="icon-button text-danger remove-line" title="Remove item"><x-icon name="trash-2"/></button></div></template>
+<dialog id="add-supplier-modal" class="customer-dialog purchase-small-dialog">
     <div class="modal-heading">
         <div><span class="eyebrow">NEW SUPPLIER</span><h2>Add Supplier</h2></div>
         <button class="icon-button" type="button" onclick="document.getElementById('add-supplier-modal').close()"><x-icon name="x"/></button>
@@ -93,6 +36,7 @@
     <div class="modal-body">
         <form id="add-supplier-form" onsubmit="submitNewSupplier(event)">
             @csrf
+            <p class="text-danger" id="supplier-error" role="alert" hidden></p>
             <div class="form-grid">
                 <label class="field">Name <input type="text" name="name" required></label>
                 <label class="field">Phone <input type="text" name="phone"></label>
@@ -108,20 +52,29 @@
 
 @endsection
 @push('scripts')
-<script type="application/json" id="purchase-initial">{!! json_encode(old('items',$purchase->exists?$purchase->items->map(fn($i)=>$i->only('product_id','unit_id','quantity','cost'))->all():[]),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
-<script type="application/json" id="all-products-data">{!! json_encode($products->map(fn($p) => ['id'=>$p->id, 'name'=>$p->name, 'sku'=>$p->sku, 'cost'=>$p->cost, 'units'=>app(\App\Services\ProductUnitService::class)->options($p)]),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+<script type="application/json" id="purchase-charges-initial">{!! json_encode(old('charges',$purchase->charges->map(fn($c)=>$c->only('label','amount'))->all()),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+<script type="application/json" id="purchase-initial">{!! json_encode(old('items',$purchase->exists?$purchase->items->map(fn($i)=>$i->only('product_id','unit_id','quantity','cost','selling_price'))->all():[]),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+<script type="application/json" id="all-products-data">{!! json_encode($products->map(fn($p) => ['id'=>$p->id, 'name'=>$p->name, 'sku'=>$p->sku, 'cost'=>$p->cost, 'price'=>$p->price, 'unit'=>$p->unit->short_name, 'prices'=>app(\App\Services\StockLayerService::class)->groups($p), 'units'=>app(\App\Services\ProductUnitService::class)->options($p)]),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
 @vite('resources/js/purchase.js')
 <script>
 function submitNewSupplier(e) {
     e.preventDefault();
     const form = e.target;
     const data = Object.fromEntries(new FormData(form));
+    const error = document.getElementById('supplier-error');
+    const button = form.querySelector('[type="submit"]');
+    error.hidden = true;
+    button.disabled = true;
     fetch('{{ route("manage.store", "suppliers") }}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value },
         body: JSON.stringify({...data, active: 1, opening_due: 0})
     })
-    .then(r => r.json())
+    .then(async r => {
+        const payload = await r.json();
+        if (!r.ok || !payload.id) throw new Error(Object.values(payload.errors || {}).flat().join(' ') || payload.message || 'Unable to save supplier.');
+        return payload;
+    })
     .then(supplier => {
         document.getElementById('supplier_id').value = supplier.id;
         document.getElementById('supplier-search').value = supplier.name;
@@ -144,7 +97,8 @@ function submitNewSupplier(e) {
             drop.classList.remove('show');
         });
     })
-    .catch(err => alert("Failed to add supplier."));
+    .catch(err => { error.textContent = err.message; error.hidden = false; })
+    .finally(() => { button.disabled = false; });
 }
 </script>
 @endpush

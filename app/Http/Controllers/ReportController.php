@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ReportRequest;
+use App\Models\Category;
 use App\Models\PaymentChargeRule;
 use App\Models\PaymentMethod;
+use App\Models\Product;
 use App\Models\User;
 use App\Services\ProfitLossService;
 use App\Services\ReportService;
@@ -22,6 +24,7 @@ class ReportController extends Controller
         $filters = $request->validated();
         $title = ReportService::TITLES[$report];
         if ($report === 'profit') {
+            abort_unless($request->user()->hasPermission('products.view_cost'), 403);
             $summary = $profit->calculate($filters['from'], $filters['to']);
 
             return view('reports.profit', compact('filters', 'title', 'summary'));
@@ -35,7 +38,10 @@ class ReportController extends Controller
         $users = User::orderBy('name')->get();
         $rules = PaymentChargeRule::orderBy('name')->get();
 
-        return view('reports.table', compact('report', 'filters', 'title', 'records', 'rows', 'headers', 'cards', 'methods', 'users', 'rules'));
+        $products = $report === 'stock' ? Product::orderBy('name')->get(['id', 'name']) : collect();
+        $categories = $report === 'stock' ? Category::orderBy('name')->get(['id', 'name']) : collect();
+
+        return view('reports.table', compact('report', 'filters', 'title', 'records', 'rows', 'headers', 'cards', 'methods', 'users', 'rules', 'products', 'categories'));
     }
 
     public function export(ReportRequest $request, string $report, ReportService $service)

@@ -14,7 +14,7 @@ The sales directory and invoice view use the existing emerald theme. Invoice act
 
 Returns and due collections require the cashier's current open register. They can apply to invoices from closed registers, without modifying the original closed drawer. Each activity records its own register, cashier, time and audit event. UUID submission tokens prevent duplicate returns/payments on retries; sale/register/product locks serialize related changes.
 
-Invoice due is original customer payable minus merchandise returned and net payments retained after refunds. Cash tender is reduced by change. Old customer `opening_due` remains separate; it is not attached to an invoice or collected by this action. Current POS checkout still requires full payment. Pay due also supports underpaid historical/imported invoices; this update does not add a credit checkout flow.
+Invoice due is original customer payable minus merchandise returned and net payments retained after refunds. Cash tender is reduced by change. Old customer `opening_due` remains separate; it is not attached to an invoice or collected by this action. New POS sales can use **Complete with due** for a partial payment or **No payment · leave bill due** for a fully unpaid invoice. These sales require an active named customer; the popup supports selecting or creating one. Fully paid walk-in checkout offers the same popup with a Continue as walk-in option. **Pay due** collects later invoice payments. See [due checkout](POS-DUE-SALES.md).
 
 ## Accounting and reports
 

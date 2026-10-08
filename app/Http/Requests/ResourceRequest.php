@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Product;
 use App\Support\Resources;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -114,6 +115,14 @@ class ResourceRequest extends FormRequest
                 $r['conversions.*.price'] = ['nullable', 'numeric', 'min:0', 'max:999999999', 'decimal:0,2'];
             }
         }
+        if ($resource === 'products' && ! $id) {
+            $r['opening_layers'] = ['sometimes', 'array', 'min:1', 'max:30'];
+            $r['opening_layers.*'] = ['array:quantity,cost,selling_price'];
+            $r['opening_layers.*.quantity'] = ['required', 'numeric', 'min:0', 'max:999999', 'decimal:0,3'];
+            foreach (['cost', 'selling_price'] as $key) {
+                $r['opening_layers.*.'.$key] = ['required', 'numeric', 'min:0', 'max:999999999', 'decimal:0,2'];
+            }
+        }
         if ($resource === 'products' && $id) {
             unset($r['stock']);
         }
@@ -123,6 +132,16 @@ class ResourceRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        if ($this->route('resource') === 'products' && ! $this->route('id') && is_array($this->input('opening_layers'))) {
+            $rows = $this->input('opening_layers');
+            $this->merge(['cost' => $rows[0]['cost'] ?? null, 'price' => $rows[0]['selling_price'] ?? null, 'stock' => '0']);
+        }
+        if ($this->route('resource') === 'products' && empty($this->input('sku'))) {
+            do {
+                $sku = (string) random_int(10000000, 99999999);
+            } while (Product::where('sku', $sku)->exists());
+            $this->merge(['sku' => $sku]);
+        }
         if ($this->route('resource') === 'users' && is_string($this->input('username'))) {
             $this->merge(['username' => strtolower(trim($this->input('username')))]);
         }

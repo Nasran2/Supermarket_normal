@@ -110,6 +110,7 @@ class SaleRevisionTest extends TestCase
     {
         $sale = $this->sale();
         $this->product->update(['stock' => '0']);
+        $this->product->stockLayers()->update(['remaining_quantity' => '0']);
         $data = $this->data($sale, '2', '180');
         $valid = $this->quoted($sale, $data);
         $this->assertSame('0.000', $this->product->fresh()->stock);
@@ -150,7 +151,7 @@ class SaleRevisionTest extends TestCase
         $sale->update(['notes' => 'Changed in another window']);
         $this->postJson(route('sales.revise', $sale), $data)->assertUnprocessable()->assertJsonValidationErrors('sale');
         $fresh = $this->quoted($sale, $this->data($sale));
-        $this->product->update(['price' => '101']);
+        $this->product->stockLayers()->update(['selling_price' => '101']);
         $this->postJson(route('sales.revise', $sale), $fresh)->assertUnprocessable()->assertJsonValidationErrors('payment');
         $this->assertSame('8.000', $this->product->fresh()->stock);
         $this->assertSame('190.00', $sale->fresh()->sale_amount);

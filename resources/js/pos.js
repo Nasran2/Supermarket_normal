@@ -74,6 +74,8 @@ function saveDraft() {
         billDiscount,
         items: cart.map((p) => ({
           id: p.id,
+          line_key: p.line_key,
+          stock_price: p.stock_price,
           name: p.name,
           unit_id: p.unit_id,
           unit: p.unit,
@@ -140,7 +142,7 @@ async function restoreDraft() {
   }
   token = saved.token;
   checkoutAttempted = !!saved.attempted;
-  cart = saved.items;
+  cart = saved.items.map((item) => ({ ...item, line_key: item.line_key || crypto.randomUUID() }));
   billDiscount = saved.billDiscount || { type: 'AMOUNT', value: '0' };
   $('customer').value = [...$('customer').options].some((o) => o.value === saved.customer)
     ? saved.customer
@@ -170,10 +172,13 @@ async function restoreDraft() {
     if (current !== restoreNumber) return;
     cart = saved.items.map((item) => {
       const fresh = available.find((p) => p.id === item.id);
-      const unit = fresh?.units.find((u) => u.id === item.unit_id);
+      const group = fresh?.price_options?.find((g) => item.stock_price != null && scaled(g.stock_price, 2) === scaled(item.stock_price, 2)) || (item.stock_price == null && fresh?.price_options?.length === 1 ? fresh.price_options[0] : null);
+      const unit = group?.units.find((u) => u.id === item.unit_id);
       return {
         ...item,
-        units: fresh?.units || [],
+        line_key: item.line_key || crypto.randomUUID(),
+        stock_price: group?.stock_price ?? item.stock_price,
+        units: group?.units || [],
         unavailable: !unit,
         ...(unit
           ? { name: fresh.name, unit: unit.short_name, decimal: unit.decimal, price: unit.price }
@@ -237,6 +242,7 @@ const payload = () => ({
   ...(editMode ? { version: editSeed.version, notes: $('edit-notes').value } : {}),
   items: cart.map((p) => ({
     product_id: p.id,
+    stock_price: p.stock_price,
     unit_id: p.unit_id,
     quantity: String(p.quantity),
     unit_price: p.unit_price ?? null,
@@ -303,7 +309,7 @@ async function search(scanner = false) {
       ? products
           .map(
             (p) =>
-              `<button class="product-tile" data-product="${p.id}" type="button">${p.image ? `<img src="${escape(p.image)}" alt="${escape(p.name)}">` : `<span class="product-art"><i data-lucide="package"></i></span>`}<strong>${escape(p.name)}</strong><small>${escape(p.category)} · ${escape(p.sku)}</small><span class="tile-bottom"><b>${moneyHTML(p.price)}</b><span>${Number(p.stock)} ${escape(p.unit)}</span></span></button>`,
+              `<button class="product-tile" data-product="${p.id}" type="button">${p.image ? `<img src="${escape(p.image)}" alt="${escape(p.name)}">` : `<span class="product-art"><i data-lucide="package"></i></span>`}<strong>${escape(p.name)}</strong><small>${escape(p.category)} · ${escape(p.sku)}</small><span class="tile-bottom"><b>${priceRange(p)}</b><span>${Number(p.stock)} ${escape(p.unit)}</span></span></button>`,
           )
           .join('')
       : '<div class="empty-state col-span-full"><i data-lucide="search-x"></i><h3>No products found</h3><p>Add products or change your search.</p></div>';
@@ -313,28 +319,57 @@ async function search(scanner = false) {
     $('product-count').textContent = 'Products unavailable';
   }
 }
+function priceRange(p) {
+  const prices = (p.price_options || []).map((group) => Number(group.stock_price));
+  if (!prices.length) return moneyHTML(p.price);
+  const low = Math.min(...prices), high = Math.max(...prices);
+  return low === high ? moneyHTML(low) : `${moneyHTML(low)} – ${moneyHTML(high)}`;
+}
+const priceDialog = $('price-choice-dialog');
+let choosingProduct = null;
 function add(p) {
-  if (orderLoading || pending) return;
-  if (checkoutAttempted) {
-    dialog.close();
-    restoreDraft();
-    return;
-  }
+  if (!p || orderLoading || pending) return;
+  if (checkoutAttempted) { dialog.close(); restoreDraft(); return; }
   if (!syncQuantities()) return;
-  const existing = cart.find((i) => i.id === p.id);
+  const groups = p.price_options || [];
+  if (!groups.length) { message.textContent = `${p.name} is out of stock.`; return; }
+  if (groups.length === 1) { addPrice(p, groups[0]); return; }
+  choosingProduct = p;
+  $('price-choice-product').textContent = `${p.name} · ${Number(p.stock)} ${p.unit} available`;
+  $('price-choice-options').innerHTML = groups.map((group, index) => `<button type="button" class="price-choice" data-price-choice="${index}"><span><strong>${moneyHTML(group.stock_price)}</strong><small>${Number(group.quantity)} ${escape(p.unit)} available</small></span><kbd>${index + 1}</kbd></button>`).join('');
+  priceDialog.showModal();
+  $('price-choice-options').querySelector('button').focus();
+}
+function addPrice(p, group) {
+  const unit = group.units.find((option) => option.id === p.unit_id);
+  const existing = cart.find((item) => item.id === p.id && item.unit_id === p.unit_id && scaled(item.stock_price, 2) === scaled(group.stock_price, 2));
   if (existing) existing.quantity = Number((Number(existing.quantity) + 1).toFixed(3));
-  else
-    cart.push({
-      ...p,
-      quantity: 1,
-      unit_price: null,
-      discount_type: 'AMOUNT',
-      discount_value: '0',
-    });
+  else cart.push({ ...p, line_key: crypto.randomUUID(), stock_price: group.stock_price, units: group.units, price: unit.price, quantity: 1, unit_price: null, discount_type: 'AMOUNT', discount_value: '0' });
   quote = null;
   message.textContent = '';
   render();
 }
+function selectPrice(index) {
+  const group = choosingProduct?.price_options[index];
+  if (!group) return;
+  addPrice(choosingProduct, group);
+  priceDialog.close();
+  $('product-search').focus({ preventScroll: true });
+}
+$('price-choice-options').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-price-choice]');
+  if (button) selectPrice(Number(button.dataset.priceChoice));
+});
+$('close-price-choice').addEventListener('click', () => priceDialog.close());
+priceDialog.addEventListener('keydown', (event) => {
+  if (/^[1-9]$/.test(event.key)) { event.preventDefault(); selectPrice(Number(event.key) - 1); }
+  if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
+    event.preventDefault();
+    const buttons = [...$('price-choice-options').querySelectorAll('button')];
+    const index = buttons.indexOf(document.activeElement);
+    buttons[(index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length].focus();
+  }
+});
 function render(persist = true) {
   if (!cart.length) billDiscount = { type: 'AMOUNT', value: '0' };
   $('cart-count').textContent = cart.length;
@@ -342,7 +377,7 @@ function render(persist = true) {
     ? cart
         .map(
           (p) =>
-            `<div class="cart-line compact-cart-line" data-cart-id="${p.id}"><button class="cart-item-name ${p.unavailable ? 'unavailable' : ''}" data-action="edit" type="button" title="${escape(p.name)} · ${escape(p.unit)} · Edit price and line discount" aria-label="Edit ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><span>${escape(p.name)}</span><small>${escape(p.unit)}</small></button><div class="cart-qty-controls"><button class="icon-button" data-action="minus" type="button" aria-label="Decrease quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>−</button><input class="cart-quantity" type="number" required max="999999" min="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" step="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" value="${p.quantity}" aria-label="Quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><button class="icon-button" data-action="plus" type="button" aria-label="Increase quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>+</button></div><strong class="cart-line-amount" title="${moneyHTML(Number(lineCents(p)) / 100)}">${moneyHTML(Number(lineCents(p)) / 100)}</strong><button class="icon-button cart-remove" ${orderLoading ? 'disabled' : ''} data-action="remove" title="Remove item" aria-label="Remove ${escape(p.name)}" type="button"><i data-lucide="x" style="width:14px"></i></button></div>`,
+            `<div class="cart-line compact-cart-line" data-cart-id="${p.line_key}"><button class="cart-item-name ${p.unavailable ? 'unavailable' : ''}" data-action="edit" type="button" title="${escape(p.name)} · ${escape(p.unit)} · Edit price and line discount" aria-label="Edit ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><span>${escape(p.name)}</span><small>${escape(p.unit)} · ${moneyHTML(p.unit_price ?? p.price)}</small></button><div class="cart-qty-controls"><button class="icon-button" data-action="minus" type="button" aria-label="Decrease quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>−</button><input class="cart-quantity" type="number" required max="999999" min="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" step="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" value="${p.quantity}" aria-label="Quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><button class="icon-button" data-action="plus" type="button" aria-label="Increase quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>+</button></div><strong class="cart-line-amount" title="${moneyHTML(Number(lineCents(p)) / 100)}">${moneyHTML(Number(lineCents(p)) / 100)}</strong><button class="icon-button cart-remove" ${orderLoading ? 'disabled' : ''} data-action="remove" title="Remove item" aria-label="Remove ${escape(p.name)}" type="button"><i data-lucide="x" style="width:14px"></i></button></div>`,
         )
         .join('')
     : '<div class="cart-empty"><i data-lucide="shopping-basket" style="width:35px;height:35px"></i><strong>Your order is empty</strong><small>Scan a barcode or choose a product.</small></div>';
@@ -393,7 +428,7 @@ $('cart-items').addEventListener('click', (e) => {
   const button = e.target.closest('[data-action]');
   if (!button) return;
   const line = button.closest('[data-cart-id]'),
-    p = cart.find((p) => p.id === Number(line.dataset.cartId));
+    p = cart.find((p) => p.line_key === line.dataset.cartId);
   if (orderLoading || pending) return;
   if (checkoutAttempted) {
     dialog.close();
@@ -405,12 +440,12 @@ $('cart-items').addEventListener('click', (e) => {
     return;
   }
   if (!syncQuantities() && button.dataset.action !== 'remove') return;
-  if (button.dataset.action === 'remove') cart = cart.filter((i) => i.id !== p.id);
+  if (button.dataset.action === 'remove') cart = cart.filter((i) => i.line_key !== p.line_key);
   else {
     p.quantity = Number(
       (Number(p.quantity) + (button.dataset.action === 'plus' ? 1 : -1)).toFixed(3),
     );
-    if (p.quantity <= 0) cart = cart.filter((i) => i.id !== p.id);
+    if (p.quantity <= 0) cart = cart.filter((i) => i.line_key !== p.line_key);
     if (Number(p.quantity) > 999999) p.quantity = '999999';
   }
   quote = null;
@@ -429,7 +464,7 @@ function syncQuantities() {
       message.textContent = 'Enter a valid quantity for this unit.';
       return false;
     }
-    const p = cart.find((p) => p.id === Number(input.closest('[data-cart-id]').dataset.cartId));
+    const p = cart.find((p) => p.line_key === input.closest('[data-cart-id]').dataset.cartId);
     p.quantity = input.value;
   }
   return true;
@@ -443,7 +478,7 @@ $('cart-items').addEventListener('input', (e) => {
     }
     const input = e.target;
     if (!validQuantity(input)) return;
-    const p = cart.find((p) => p.id === Number(input.closest('[data-cart-id]').dataset.cartId));
+    const p = cart.find((p) => p.line_key === input.closest('[data-cart-id]').dataset.cartId);
     p.quantity = input.value;
     quote = null;
     input.closest('.cart-line').querySelector('.cart-line-amount').textContent = money(

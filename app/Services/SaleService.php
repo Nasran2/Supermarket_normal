@@ -7,12 +7,10 @@ use App\Models\Expense;
 use App\Models\Product;
 use App\Models\Register;
 use App\Models\Sale;
-use App\Models\Setting;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\Money;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -37,6 +35,7 @@ class SaleService
                 }
             }
         }
+        $reserved = [];
         $lines = [];
         $subtotal = '0.00';
         $cost = '0.00';
@@ -49,20 +48,10 @@ class SaleService
                 throw ValidationException::withMessages(['items' => 'One or more products or units are inactive.']);
             }
             $q = (string) $item['quantity'];
-            $selected = app(ProductUnitService::class)->resolve($p, $item['unit_id'] ?? null, $q);
-            $baseQuantity = $selected['base_stock_quantity'];
-            $available = $p->stock;
-            if ($editing) {
-                foreach ($editing->items->where('product_id', $p->id) as $original) {
-                    $available = Money::quantity($available, $original->base_quantity ?? $original->quantity);
-                }
-            }
-            if (Money::compare($available, 0) <= 0 && ! $this->settings->get('sell_zero_stock', false)) {
-                throw ValidationException::withMessages(['items' => $p->name.' is out of stock.']);
-            }
-            if (Money::compare($baseQuantity, $available) > 0 && ! $this->settings->get('negative_stock', false)) {
-                throw ValidationException::withMessages(['items' => 'Insufficient stock for '.$p->name.'. Available: '.$available.' '.$p->unit->short_name]);
-            }
+            $units = app(ProductUnitService::class);
+            $baseQuantity = $units->resolve($p, $item['unit_id'] ?? null, $q)['base_stock_quantity'];
+            $allocation = app(StockLayerService::class)->plan($p, $baseQuantity, isset($item['stock_price']) ? (string) $item['stock_price'] : null, $reserved, $lock, $editing);
+            $selected = $units->resolve($p, $item['unit_id'] ?? null, $q, $allocation['stock_price']);
             $adjustment = app(SaleLineService::class)->calculate($item, $selected['price']);
             $catalogTotal = Money::mul($selected['price'], $q);
             $priceReduction = Money::sub($catalogTotal, $adjustment['line_subtotal']);
@@ -70,8 +59,8 @@ class SaleService
             $referenceSubtotal = Money::add($referenceSubtotal, Money::compare($catalogTotal, $adjustment['line_subtotal']) > 0 ? $catalogTotal : $adjustment['line_subtotal']);
             $lineDiscounts = Money::add($lineDiscounts, $adjustment['line_discount']);
             $subtotal = Money::add($subtotal, $adjustment['line_subtotal']);
-            $cost = Money::add($cost, Money::mul($p->cost, $baseQuantity));
-            $lines[] = ['product_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit' => $selected['short_name'], 'unit_id' => $selected['id'], 'base_quantity' => $baseQuantity, 'base_cost' => $p->cost, 'quantity' => Money::quantity('0', $q), 'cost' => $selected['cost']] + $adjustment;
+            $cost = Money::add($cost, $allocation['cogs_total']);
+            $lines[] = ['product_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit' => $selected['short_name'], 'unit_id' => $selected['id'], 'base_quantity' => $baseQuantity, 'base_cost' => $allocation['allocations'][0]['cost_price'], 'quantity' => Money::quantity('0', $q), 'cost' => $units->rate($allocation['allocations'][0]['cost_price'], $selected['base_quantity'], $selected['converted_quantity'])] + $adjustment + $allocation;
         }
         $invoiceDiscount = app(SaleLineService::class)->billDiscount($data, Money::sub($subtotal, $lineDiscounts));
         $discount = Money::add($lineDiscounts, $invoiceDiscount);
@@ -101,6 +90,18 @@ class SaleService
         return $quote;
     }
 
+    public function publicQuote(array $quote, User $user): array
+    {
+        if (! $user->hasPermission('products.view_cost')) {
+            unset($quote['cost_total']);
+            foreach ($quote['items'] as &$item) {
+                unset($item['cost'], $item['base_cost'], $item['cogs_total'], $item['allocations']);
+            }
+        }
+
+        return $quote;
+    }
+
     public function complete(array $data, User $user): Sale
     {
         return DB::transaction(function () use ($data, $user) {
@@ -125,20 +126,12 @@ class SaleService
                 throw ValidationException::withMessages(['payment' => 'The order or payment rule changed. Review payment again.']);
             }
             $payments = $this->payments->settle($data, $quote);
-            $sequence = Setting::where('key', 'next_invoice_number')->lockForUpdate()->firstOrFail();
-            $number = (int) json_decode($sequence->value, true);
-            $prefix = $this->settings->get('invoice_prefix', 'INV-');
-            $invoice = $prefix.str_pad((string) $number, 6, '0', STR_PAD_LEFT);
-            while (Sale::where('invoice', $invoice)->exists()) {
-                $invoice = $prefix.str_pad((string) ++$number, 6, '0', STR_PAD_LEFT);
-            }
-            $sequence->update(['value' => json_encode($number + 1)]);
-            DB::afterCommit(fn () => Cache::forget('business_settings'));
+            $invoice = app(DocumentNumberService::class)->next('SALE', now());
             $sale = Sale::create(['invoice' => $invoice, 'checkout_token' => $data['checkout_token'], 'user_id' => $user->id, 'register_id' => $register->id, 'customer_id' => $data['customer_id'] ?? null, 'sold_at' => now(), 'subtotal' => $quote['subtotal'], 'discount' => $quote['discount'], 'sale_amount' => $quote['sale_amount'], 'processing_charge' => $quote['processing_charge'], 'customer_payable' => $quote['customer_payable'], 'cost_total' => $quote['cost_total'], 'notes' => $data['notes'] ?? null]);
             foreach ($quote['items'] as $line) {
-                $sale->items()->create($line);
+                $item = $sale->items()->create(array_diff_key($line, ['allocations' => true]));
                 $p = Product::findOrFail($line['product_id']);
-                $this->stock->move($p, '-'.$line['base_quantity'], 'SALE', $invoice, $user->id);
+                app(StockLayerService::class)->consume($p, $item, $line['allocations'], 'SALE', $invoice, $user->id);
             }
             foreach ($payments as $part) {
                 $payment = $sale->payments()->create([
@@ -174,7 +167,7 @@ class SaleService
             $items = $sale->items()->orderBy('product_id')->get();
             foreach ($items as $item) {
                 $p = Product::whereKey($item->product_id)->lockForUpdate()->firstOrFail();
-                $this->stock->move($p, $item->base_quantity ?? $item->quantity, 'SALE VOID', $sale->invoice, $userId);
+                app(StockLayerService::class)->restore($p, $item, $item->base_quantity ?? $item->quantity, 'SALE VOID', $sale->invoice, $userId);
             }
             Expense::where('sale_id', $sale->id)->where('type', 'AUTOMATIC')->update(['status' => 'REVERSED']);
             $sale->update(['status' => 'VOIDED', 'voided_by' => $userId, 'voided_at' => now(), 'void_reason' => $reason]);

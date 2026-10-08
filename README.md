@@ -83,7 +83,7 @@ Thermal receipts support 80mm and 58mm with print-only layouts and measured roll
 
 In the POS cart, tap **+** beside Customer to open **Add customer**. Name is required; phone, email and address are optional. **Save & select customer** saves an active customer and selects them for the current order without reloading or clearing the cart. Existing customer-create permission (`sales.create`) applies.
 
-Enter **Old balance (due)** in the popup or customer create/edit page to record money already owed from earlier purchases. Customer pages show outstanding totals, balance filters, contacts and purchase history; the selected customer's due is also visible in the POS. This opening due stays separate from today's paid sale and register cash. Collection of old dues is not part of this change. Existing customers start at zero; run `php artisan migrate` on another installation to add the opening-due column.
+Enter **Old balance (due)** in the popup or customer create/edit page to record money already owed from earlier purchases. Customer pages show outstanding totals, balance filters, contacts and purchase history; the selected customer's due is also visible in the POS. This opening due stays separate from today's paid sale and register cash. Existing customers start at zero; run `php artisan migrate` on another installation to add the opening-due column.
 
 ## Product units
 
@@ -102,3 +102,15 @@ Expandable sidebar groups provide list/create links for existing modules and lin
 Sales now include labeled View, Edit, Delete/reversal, item Return and conditional Pay due actions. Returns and later payments update stock, invoice balances, register reconciliation and reports, with historical invoices retained. See [sales workflow](docs/SALES-WORKFLOW.md).
 
 Invoice **Edit** now opens the POS screen for products, quantities, units, prices, line/bill discounts and payments. Review payment displays collection/refund adjustments; saving retains the invoice number and date with revision history. Unsaved edits reset on refresh or leaving and returning; new-sale carts continue to persist. See [eligibility and workflow](docs/SALES-WORKFLOW.md).
+
+## Due checkout and product history
+
+Use **Complete with due** for a partial payment or **No payment · leave bill due** for an unpaid sale. Select or add a named customer in the checkout popup; fully paid sales can continue as walk-in. The balance appears on the invoice and customer account, and successful due checkout clears the cart. Product profiles show stock movement history with clickable invoice numbers. See [workflow and checks](docs/POS-DUE-SALES.md).
+
+## Stock prices and refreshed management views
+
+Products can hold separately priced opening stock and deliveries. POS chooses an available selling price and consumes actual-cost stock FIFO within that price. Stock reports, returns and invoice revisions preserve those costs. Units support a changeable global default, and management forms now share a responsive emerald design. See [implementation, migration and verification report](docs/STOCK-PRICE-LAYERS.md).
+
+## Purchase payments
+
+Receive stock with **Paid in full**, **Partial payment**, or **Leave due**, and settle supplier balances later using **Pay due**. Purchases show paid/due totals, status and payment history. Cash payments update the open register automatically; older purchases use **Set balance** before tracking begins. See [purchase workflow and verification](docs/PURCHASE-PAYMENTS.md).

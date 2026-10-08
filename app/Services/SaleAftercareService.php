@@ -6,6 +6,7 @@ use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleCollection;
+use App\Models\SaleItem;
 use App\Models\SaleReturn;
 use App\Support\Audit;
 use App\Support\Money;
@@ -119,16 +120,20 @@ class SaleAftercareService
             }
             $return = SaleReturn::create(['sale_id' => $sale->id, 'register_id' => $register->id, 'user_id' => $userId, 'token' => $data['token'], 'reference' => 'RET-'.now()->format('Ymd').'-'.Str::upper(Str::random(8)), 'reason' => $data['reason'], 'amount' => $amount, 'cost_total' => $cost, 'due_reduction' => $reduction, 'refund_amount' => $refund, 'payment_method_id' => $method?->id, 'method_name' => $method?->name, 'method_type' => $method?->type, 'returned_at' => now()]);
             $products = Product::with('unit')->whereIn('id', array_column($lines, 'product_id'))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $restoredCost = '0.00';
             foreach ($lines as $line) {
                 $product = $products->get($line['product_id']);
                 if (! $product) {
                     $this->fail('The original product is unavailable.');
                 }
                 $this->stock->validateQuantity($product, $line['base_quantity']);
+                $line['cost_total'] = app(StockLayerService::class)->restore($product, SaleItem::findOrFail($line['sale_item_id']), $line['base_quantity'], 'SALE RETURN', $return->reference, $userId);
+                $restoredCost = Money::add($restoredCost, $line['cost_total']);
                 unset($line['product_id']);
                 $return->items()->create($line);
-                $this->stock->move($product, $line['base_quantity'], 'SALE RETURN', $return->reference, $userId);
+
             }
+            $return->update(['cost_total' => $restoredCost]);
             Audit::record('sale.return', $return, [], $return->load('items')->toArray());
 
             return $return;

@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PurchaseController;
+use App\Http\Controllers\PurchasePaymentController;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ResourceController;
@@ -11,6 +13,7 @@ use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StockBatchController;
 use App\Http\Controllers\StockController;
+use App\Http\Controllers\StockPriceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -49,6 +52,9 @@ Route::middleware(['auth', 'auth.session'])->group(function () {
     Route::put('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
     Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->middleware('permission:purchases.view')->name('purchases.show');
     Route::post('/purchases/{purchase}/void', [PurchaseController::class, 'void'])->name('purchases.void');
+    Route::post('/purchases/{purchase}/payments', [PurchasePaymentController::class, 'store'])->name('purchases.payments.store');
+    Route::post('/purchases/{purchase}/refunds', [PurchasePaymentController::class, 'refund'])->name('purchases.refunds.store');
+    Route::post('/purchases/{purchase}/payment-balance', [PurchasePaymentController::class, 'balance'])->name('purchases.balance');
     Route::get('/register', [RegisterController::class, 'index'])->middleware('permission:register.view')->name('register.index');
     Route::get('/register/current-summary', [RegisterController::class, 'currentSummary'])->middleware('permission:register.view')->name('register.current-summary');
     Route::post('/register/open', [RegisterController::class, 'open'])->name('register.open');
@@ -73,6 +79,8 @@ Route::middleware(['auth', 'auth.session'])->group(function () {
     });
     Route::get('/stock/{product}/adjust', [StockController::class, 'edit'])->middleware('permission:products.edit')->name('stock.edit');
     Route::put('/stock/{product}/adjust', [StockController::class, 'update'])->name('stock.update');
+    Route::post('/units/{unit}/default', [StockPriceController::class, 'defaultUnit'])->middleware('permission:units.edit')->name('units.default');
+    Route::put('/stock-prices/{layer}', [StockPriceController::class, 'reprice'])->middleware('permission:products.manage_prices')->name('stock-prices.update');
     Route::prefix('manage/{resource}')->name('manage.')->group(function () {
         Route::get('/', [ResourceController::class, 'index'])->name('index');
         Route::get('/create', [ResourceController::class, 'create'])->name('create');
@@ -82,7 +90,7 @@ Route::middleware(['auth', 'auth.session'])->group(function () {
         Route::put('/{id}', [ResourceController::class, 'update'])->whereNumber('id')->name('update');
         Route::delete('/{id}', [ResourceController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
-    
-    Route::post('/manage/customers/{customer}/payments', [\App\Http\Controllers\CustomerPaymentController::class, 'store'])->name('manage.customers.payments.store');
-    Route::get('/manage/customers/{customer}/ledger', [\App\Http\Controllers\CustomerPaymentController::class, 'ledger'])->name('manage.customers.ledger');
+
+    Route::post('/manage/customers/{customer}/payments', [CustomerPaymentController::class, 'store'])->name('manage.customers.payments.store');
+    Route::get('/manage/customers/{customer}/ledger', [CustomerPaymentController::class, 'ledger'])->name('manage.customers.ledger');
 });

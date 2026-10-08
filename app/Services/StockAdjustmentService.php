@@ -37,7 +37,7 @@ class StockAdjustmentService
                 if (! $p || ! $p->active || ! $p->unit->active) {
                     $this->fail('Choose active products with active primary units.');
                 }
-                if ((int) $input['unit_id'] !== $p->unit_id || Money::compare($input['expected_stock'], $p->stock) !== 0 || Money::compare($input['expected_price'], $p->price) !== 0 || Money::compare($input['expected_cost'], $p->cost) !== 0) {
+                if ((int) $input['unit_id'] !== $p->unit_id || Money::compare($input['expected_stock'], $p->stock) !== 0 || Money::compare($input['expected_price'], $p->price) !== 0 || ($user->hasPermission('products.view_cost') && Money::compare($input['expected_cost'], $p->cost) !== 0)) {
                     $this->fail($p->name.' changed since it was selected. Reload the product before saving.');
                 }
                 $old = $oldItems->get($p->id);
@@ -61,6 +61,19 @@ class StockAdjustmentService
                 }
                 $price = isset($input['price']) ? Money::round((string) $input['price']) : $p->price;
                 $cost = isset($input['cost']) ? Money::round((string) $input['cost']) : $p->cost;
+                $layerId = $input['stock_layer_id'] ?? null;
+                if ($layerId) {
+                    $selected = $p->stockLayers()->whereKey($layerId)->where('status', 'ACTIVE')->lockForUpdate()->first();
+                    if (! $selected) {
+                        $this->fail('Choose a stock price row belonging to '.$p->name.'.');
+                    }
+                    // Selecting an existing row copies its prices for incoming stock without changing defaults.
+                    $price = $p->price;
+                    $cost = $p->cost;
+                }
+                if (isset($input['cost']) && ! $user->hasPermission('products.view_cost')) {
+                    $this->fail('You do not have permission to enter stock costs.');
+                }
                 $priceChanged = Money::compare($price, $p->price) !== 0;
                 $costChanged = Money::compare($cost, $p->cost) !== 0;
                 if ($old && (($priceChanged && $old->price_changed && Money::compare($p->price, $old->price_after) !== 0) || ($costChanged && $old->cost_changed && Money::compare($p->cost, $old->cost_after) !== 0))) {
@@ -75,7 +88,11 @@ class StockAdjustmentService
                     }
                 }
                 $changed = $changed || Money::compare($delta, 0) !== 0 || $priceChanged || $costChanged;
-                $rows[] = compact('p', 'old', 'delta', 'after', 'price', 'cost', 'priceChanged', 'costChanged');
+                if (($priceChanged || $costChanged) && ! $user->hasPermission('products.manage_prices')) {
+                    $this->fail('You do not have permission to change stock prices or costs.');
+                }
+                $layerId = $input['stock_layer_id'] ?? null;
+                $rows[] = compact('layerId', 'p', 'old', 'delta', 'after', 'price', 'cost', 'priceChanged', 'costChanged');
             }
             if (! $id && ! $changed) {
                 $this->fail('Change at least one quantity, selling price or cost.');
@@ -87,7 +104,7 @@ class StockAdjustmentService
                 $batch->revision++;
             }
             $batch->save();
-            foreach ($rows as ['p' => $p, 'old' => $old, 'delta' => $delta, 'after' => $after, 'price' => $price, 'cost' => $cost, 'priceChanged' => $priceChanged, 'costChanged' => $costChanged]) {
+            foreach ($rows as ['layerId' => $layerId, 'p' => $p, 'old' => $old, 'delta' => $delta, 'after' => $after, 'price' => $price, 'cost' => $cost, 'priceChanged' => $priceChanged, 'costChanged' => $costChanged]) {
                 $priceBefore = $old?->price_before ?? $p->price;
                 $costBefore = $old?->cost_before ?? $p->cost;
                 // If this batch first changes a price in a later revision, snapshot the current price.
@@ -99,7 +116,7 @@ class StockAdjustmentService
                 }
                 $snapshot = ['name' => $p->name, 'sku' => $p->sku, 'unit_id' => $p->unit_id, 'unit' => $p->unit->short_name, 'stock_before' => $old?->stock_before ?? $p->stock, 'stock_after' => $after, 'quantity_change' => Money::quantity($old?->quantity_change ?? '0', $delta), 'price_before' => $priceBefore, 'price_after' => $priceChanged ? $price : ($old?->price_after ?? $p->price), 'cost_before' => $costBefore, 'cost_after' => $costChanged ? $cost : ($old?->cost_after ?? $p->cost), 'price_changed' => $priceChanged || ($old?->price_changed ?? false), 'cost_changed' => $costChanged || ($old?->cost_changed ?? false)];
                 if (Money::compare($delta, 0) !== 0) {
-                    $this->stock->move($p, $delta, 'ADJUSTMENT: '.Str::limit($batch->reason, 240, ''), $batch->reference, $user->id);
+                    app(StockLayerService::class)->adjust($p, $delta, $layerId, $cost, $price, $batch->reference, 'ADJUSTMENT: '.Str::limit($batch->reason, 240, ''), $user->id);
                 }
                 if ($priceChanged || $costChanged) {
                     $p->update(['price' => $price, 'cost' => $cost]);
@@ -135,7 +152,7 @@ class StockAdjustmentService
                     $this->fail($p->name.' has a newer price or cost. Restore that value before reversing this batch.');
                 }
                 if (Money::compare($delta, 0) !== 0) {
-                    $this->stock->move($p, $delta, 'REVERSE ADJUSTMENT: '.Str::limit($reason, 235, ''), $batch->reference, $user->id);
+                    app(StockLayerService::class)->reverseSource($p, $batch->reference, 'REVERSE ADJUSTMENT: '.Str::limit($reason, 235, ''), $user->id);
                 }
                 $changes = [];
                 if ($item->price_changed) {

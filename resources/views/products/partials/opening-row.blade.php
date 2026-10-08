@@ -1,0 +1,6 @@
+<div class="opening-price-row" data-opening-row>
+<label class="field"><span>Quantity <b class="required">*</b></span><input type="number" name="opening_layers[{{ $index }}][quantity]" value="{{ $row['quantity'] }}" min="{{ $first?'0':'0.001' }}" max="999999" step="0.001" inputmode="decimal" required><small>In the primary stock unit</small></label>
+@can('products.view_cost')<label class="field"><span>Cost price <b class="required">*</b></span><input type="number" name="opening_layers[{{ $index }}][cost]" value="{{ $row['cost'] }}" min="0" max="999999999" step="0.01" inputmode="decimal" required></label>@else<input type="hidden" name="opening_layers[{{ $index }}][cost]" value="0">@endcan
+<label class="field"><span>Selling price <b class="required">*</b></span><input @if($first)id="primary-price"@endif type="number" name="opening_layers[{{ $index }}][selling_price]" value="{{ $row['selling_price'] }}" min="0" max="999999999" step="0.01" inputmode="decimal" required><small class="text-warning" data-margin-warning hidden>Selling price is below cost.</small></label>
+@if(!$first)<button type="button" class="icon-button text-danger" data-remove-opening aria-label="Remove price row"><x-icon name="trash-2"/></button>@endif
+</div>

@@ -101,7 +101,7 @@ class CustomerDueTest extends TestCase
         $quote = $this->postJson(route('pos.quote'), $data)->assertOk()->assertJsonPath('customer_payable', '1000.00')->json();
         $this->postJson(route('pos.complete'), $data + ['amount_paid' => '1000', 'quote_hash' => $quote['quote_hash'], 'checkout_token' => Str::uuid()->toString()])->assertOk();
         $this->assertSame('350.00', $customer->fresh()->due_balance);
-        $this->get(route('manage.show', ['customers', $customer->id]))->assertOk()->assertSee('350.00')->assertSee('1,000.00')->assertSee('Invoiced purchases')->assertSee('INV-000001');
+        $this->get(route('manage.show', ['customers', $customer->id]))->assertOk()->assertSee('350.00')->assertSee('1,000.00')->assertSee('Invoiced purchases')->assertSee('INV-'.now()->format('Ymd').'-00001');
         $this->assertSame('2000.00', app(RegisterService::class)->summary(app(RegisterService::class)->current($this->cashier->id))['expected']);
     }
 

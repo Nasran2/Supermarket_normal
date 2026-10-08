@@ -34,4 +34,9 @@ class Product extends Model
     {
         return $this->hasMany(PurchaseItem::class);
     }
+
+    public function stockLayers()
+    {
+        return $this->hasMany(ProductStockLayer::class);
+    }
 }

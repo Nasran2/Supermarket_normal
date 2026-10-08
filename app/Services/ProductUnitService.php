@@ -46,24 +46,25 @@ class ProductUnitService
         return $value;
     }
 
-    public function options(Product $product): array
+    public function options(Product $product, ?string $basePrice = null): array
     {
         $product->loadMissing(['unit', 'conversions.unit']);
-        $options = [['id' => $product->unit_id, 'name' => $product->unit->name, 'short_name' => $product->unit->short_name, 'decimal' => $product->unit->allow_decimal, 'price' => $product->price, 'cost' => $product->cost, 'base_quantity' => '1', 'converted_quantity' => '1']];
+        $basePrice ??= $product->price;
+        $options = [['id' => $product->unit_id, 'name' => $product->unit->name, 'short_name' => $product->unit->short_name, 'decimal' => $product->unit->allow_decimal, 'price' => $basePrice, 'cost' => $product->cost, 'base_quantity' => '1', 'converted_quantity' => '1']];
         foreach ($product->conversions as $row) {
             if (! $row->unit->active) {
                 continue;
             }
-            $options[] = ['id' => $row->unit_id, 'name' => $row->unit->name, 'short_name' => $row->unit->short_name, 'decimal' => $row->unit->allow_decimal, 'price' => $row->price ?? $this->rate($product->price, $row->base_quantity, $row->converted_quantity), 'cost' => $this->rate($product->cost, $row->base_quantity, $row->converted_quantity), 'base_quantity' => $row->base_quantity, 'converted_quantity' => $row->converted_quantity];
+            $options[] = ['id' => $row->unit_id, 'name' => $row->unit->name, 'short_name' => $row->unit->short_name, 'decimal' => $row->unit->allow_decimal, 'price' => $row->price ?? $this->rate($basePrice, $row->base_quantity, $row->converted_quantity), 'cost' => $this->rate($product->cost, $row->base_quantity, $row->converted_quantity), 'base_quantity' => $row->base_quantity, 'converted_quantity' => $row->converted_quantity];
         }
 
         return $options;
     }
 
-    public function resolve(Product $product, ?int $unitId, string $quantity): array
+    public function resolve(Product $product, ?int $unitId, string $quantity, ?string $basePrice = null): array
     {
         $unitId ??= $product->unit_id;
-        $option = collect($this->options($product))->firstWhere('id', $unitId);
+        $option = collect($this->options($product, $basePrice))->firstWhere('id', $unitId);
         if (! $option) {
             throw ValidationException::withMessages(['items' => 'The selected unit is unavailable for '.$product->name.'.']);
         }

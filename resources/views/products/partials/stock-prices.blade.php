@@ -1,0 +1,20 @@
+<div class="stock-pricing-summary">
+<div class="card"><span>Current stock</span><strong>{{ (float)$record->stock }} {{ $record->unit->short_name }}</strong></div>
+<div class="card"><span>Available selling prices</span><strong>{{ $pricing->prices??0 }}</strong></div>
+@can('products.view_cost')<div class="card"><span>Stock value at cost</span><strong>{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($pricing->cost_value??0) }}</strong></div>@endcan
+<div class="card"><span>Potential sales value</span><strong>{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($pricing->selling_value??0) }}</strong></div>
+</div>
+<section class="card stock-pricing-section" id="stock-prices">
+<div class="customer-section-heading"><span class="customer-section-icon"><x-icon name="tags"/></span><div><h2>Stock by price</h2><p>{{ auth()->user()->hasPermission('products.view_cost')?'Available quantities and the delivery they came from.':'Available selling prices and quantities.' }}</p></div></div>
+@if(auth()->user()->hasPermission('products.view_cost') || auth()->user()->hasPermission('products.manage_prices'))
+<div class="stock-price-filter">@foreach(['available'=>'In stock','depleted'=>'Depleted','all'=>'All stock'] as $key=>$label)<a class="{{ $stockStatus===$key?'selected':'' }}" href="{{ route('manage.show',['products',$record->id]) }}?stock_status={{ $key }}#stock-prices">{{ $label }}</a>@endforeach</div>
+<div class="table-wrap"><table><thead><tr><th>Selling price</th>@can('products.view_cost')<th>Cost price</th>@endcan<th>Available</th>@can('products.view_cost')<th>Margin / unit</th>@endcan<th>Source</th><th>Received</th>@can('products.manage_prices')<th>Manage stock prices</th>@endcan</tr></thead><tbody>
+@forelse($layers as $layer)<tr class="stock-price-row"><td><strong>{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($layer->selling_price) }}</strong></td>@can('products.view_cost')<td>{{ \App\Support\Money::display($layer->cost_price) }}</td>@endcan<td><strong>{{ (float)$layer->remaining_quantity }} {{ $record->unit->short_name }}</strong><small>Originally {{ (float)$layer->original_quantity }} {{ $record->unit->short_name }}</small></td>@can('products.view_cost')<td class="{{ \App\Support\Money::compare($layer->selling_price,$layer->cost_price)<0?'text-warning':'' }}">{{ \App\Support\Money::display(\App\Support\Money::sub($layer->selling_price,$layer->cost_price)) }}</td>@endcan<td>{{ \Illuminate\Support\Str::headline(strtolower($layer->source_type)) }}<small>{{ $layer->source_reference }}</small></td><td>{{ $layer->received_at->format($settings['date_format']??'d/m/Y') }}</td>@can('products.manage_prices')<td>@if(\App\Support\Money::compare($layer->remaining_quantity,0)>0)<details><summary class="text-link">Change selling price</summary><form method="POST" action="{{ route('stock-prices.update',$layer) }}" data-confirm="Change the selling price for the remaining {{ (float)$layer->remaining_quantity }} {{ $record->unit->short_name }}? Historical sales stay unchanged.">@csrf @method('PUT')<input type="hidden" name="confirmed" value="1"><input type="number" name="selling_price" step="0.01" min="0" max="999999999" value="{{ $layer->selling_price }}" aria-label="New selling price for stock row {{ $layer->id }}" required><button class="btn primary small">Save price</button></form></details>@else<span class="badge slate">Depleted</span>@endif</td>@endcan</tr>
+@empty<tr><td colspan="7" class="empty-cell">No stock rows match this view.</td></tr>@endforelse
+</tbody></table></div>
+@else
+<div class="table-wrap"><table><thead><tr><th>Selling price</th><th>Available</th></tr></thead><tbody>
+@forelse($priceGroups as $group)<tr><td><strong>{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($group['stock_price']) }}</strong></td><td>{{ (float)$group['quantity'] }} {{ $record->unit->short_name }}</td></tr>@empty<tr><td colspan="2" class="empty-cell">No available stock.</td></tr>@endforelse
+</tbody></table></div>
+@endif
+</section>

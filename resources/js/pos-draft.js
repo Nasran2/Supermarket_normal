@@ -24,7 +24,7 @@ export function draftStore(storage, key) {
         if (
           !Number.isSafeInteger(item.id) ||
           item.id < 1 ||
-          ids.has(item.id) ||
+          ids.has(`${item.id}:${item.stock_price ?? ''}:${item.unit_id}`) ||
           !Number.isSafeInteger(item.unit_id) ||
           item.unit_id < 1 ||
           !/^\d+(?:\.\d{1,3})?$/.test(String(item.quantity)) ||
@@ -38,7 +38,8 @@ export function draftStore(storage, key) {
           (item.unit_price !== null && !/^\d+(?:\.\d{1,2})?$/.test(String(item.unit_price)))
         )
           throw new Error('Invalid saved item');
-        ids.add(item.id);
+        ids.add(`${item.id}:${item.stock_price ?? ''}:${item.unit_id}`);
+        if (item.stock_price != null && !/^\d+(?:\.\d{1,2})?$/.test(String(item.stock_price))) throw new Error('Invalid saved stock price');
       }
       return value;
     },

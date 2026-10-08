@@ -33,6 +33,7 @@
 </aside>
 
 </div>
+@include('pos.partials.price-choice')
 @include('pos.partials.line-editor')
 @include('pos.partials.bill-discount')
 @can('sales.create')

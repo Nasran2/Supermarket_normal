@@ -20,10 +20,11 @@ class ProfitLossService
         $cogs = Money::sub($cogs, (string) $returns->sum('cost_total'));
         $gross = Money::sub($revenue, $cogs);
         $manual = Money::round((string) (clone $expenses)->where('type', 'MANUAL')->sum('amount'));
-        $processing = Money::round((string) $expenses->where('type', 'AUTOMATIC')->sum('amount'));
-        $totalExpenses = Money::add($manual, $processing);
+        $processing = Money::round((string) (clone $expenses)->where('type', 'AUTOMATIC')->sum('amount'));
+        $purchaseCharges = Money::round((string) (clone $expenses)->where('type', 'PURCHASE_CHARGE')->sum('amount'));
+        $totalExpenses = Money::add(Money::add($manual, $processing), $purchaseCharges);
         $net = Money::sub($gross, $totalExpenses);
 
-        return compact('revenue', 'cogs', 'gross', 'manual', 'processing', 'net') + ['expenses' => $totalExpenses];
+        return compact('revenue', 'cogs', 'gross', 'manual', 'processing', 'purchaseCharges', 'net') + ['expenses' => $totalExpenses];
     }
 }

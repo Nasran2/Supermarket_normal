@@ -48,10 +48,10 @@ if (form) {
         ]
           .map(
             (field) =>
-              `<input type="hidden" name="${prefix}[${field}]" value="${escape(p[field])}">`,
+              `<input type="hidden" name="${prefix}[${field}]" value="${escape(p[field] ?? '')}">`,
           )
           .join('');
-        return `<tr data-row="${p.product_id}"><td>${hidden}<strong>${escape(p.name)}</strong><small>${escape(p.sku)} · ${escape(p.unit)}</small></td><td>${escape(p.expected_stock)} ${escape(p.unit)}</td><td><select name="${prefix}[mode]" data-field="mode" aria-label="Adjustment for ${escape(p.name)}">${[
+        return `<tr data-row="${p.product_id}"><td>${hidden}<strong>${escape(p.name)}</strong><small>${escape(p.sku)} · ${escape(p.unit)}</small><label class="field"><span>Stock price row</span><select name="${prefix}[stock_layer_id]" data-field="stock_layer_id" aria-label="Stock price row for ${escape(p.name)}"><option value="">New incoming stock / select row</option>${(p.layers || []).map((layer) => `<option value="${layer.id}" ${String(layer.id) === String(p.stock_layer_id) ? 'selected' : ''}>${escape(form.dataset.currency)} ${escape(layer.selling_price)}${layer.cost_price !== null ? ` / cost ${escape(layer.cost_price)}` : ''} · ${Number(layer.quantity)} ${escape(p.unit)}</option>`).join('')}</select></label></td><td>${escape(p.expected_stock)} ${escape(p.unit)}</td><td><select name="${prefix}[mode]" data-field="mode" aria-label="Adjustment for ${escape(p.name)}">${[
           ['ADD', 'Add stock'],
           ['REMOVE', 'Remove stock'],
           ['SET', 'Set counted stock'],
@@ -62,7 +62,7 @@ if (form) {
           )
           .join(
             '',
-          )}</select></td><td><input type="number" data-field="quantity" name="${prefix}[quantity]" value="${escape(p.quantity || '0')}" min="0" max="999999999999" step="${p.decimal ? 10 ** -Number(form.dataset.precision) : 1}" inputmode="decimal" required aria-label="Quantity for ${escape(p.name)}"></td><td><strong data-stock-preview class="${preview(p) < 0 ? 'text-danger' : ''}">${preview(p).toFixed(3)} ${escape(p.unit)}</strong></td><td><input type="number" data-field="price" name="${prefix}[price]" value="${escape(p.price ?? '')}" placeholder="${escape(p.expected_price)}" min="0" max="999999999" step="0.01" inputmode="decimal" aria-label="Selling price for ${escape(p.name)}"><small>Current ${escape(form.dataset.currency)} ${escape(p.expected_price)}</small></td><td><input type="number" data-field="cost" name="${prefix}[cost]" value="${escape(p.cost ?? '')}" placeholder="${escape(p.expected_cost)}" min="0" max="999999999" step="0.01" inputmode="decimal" aria-label="Cost for ${escape(p.name)}"><small>Current ${escape(form.dataset.currency)} ${escape(p.expected_cost)}</small></td><td><button class="icon-button text-danger" type="button" data-remove="${p.product_id}" ${p.locked ? 'disabled' : ''} aria-label="Remove ${escape(p.name)}" title="${p.locked ? 'Original products remain in this batch' : 'Remove product'}"><i data-lucide="x"></i></button></td></tr>`;
+          )}</select></td><td><input type="number" data-field="quantity" name="${prefix}[quantity]" value="${escape(p.quantity || '0')}" min="0" max="999999999999" step="${p.decimal ? 10 ** -Number(form.dataset.precision) : 1}" inputmode="decimal" required aria-label="Quantity for ${escape(p.name)}"></td><td><strong data-stock-preview class="${preview(p) < 0 ? 'text-danger' : ''}">${preview(p).toFixed(3)} ${escape(p.unit)}</strong></td><td><input type="number" data-field="price" name="${prefix}[price]" value="${escape(p.price ?? '')}" placeholder="${escape(p.expected_price)}" min="0" max="999999999" step="0.01" inputmode="decimal" aria-label="Selling price for ${escape(p.name)}" ${form.dataset.canPrices !== '1' || p.stock_layer_id ? 'readonly' : ''}><small>Current ${escape(form.dataset.currency)} ${escape(p.expected_price)}</small></td>${form.dataset.canCost === '1' ? `<td><input type="number" data-field="cost" name="${prefix}[cost]" value="${escape(p.cost ?? '')}" placeholder="${escape(p.expected_cost)}" min="0" max="999999999" step="0.01" inputmode="decimal" aria-label="Cost for ${escape(p.name)}" ${form.dataset.canPrices !== '1' || p.stock_layer_id ? 'readonly' : ''}><small>Current ${escape(form.dataset.currency)} ${escape(p.expected_cost)}</small></td>` : ''}<td><button class="icon-button text-danger" type="button" data-remove="${p.product_id}" ${p.locked ? 'disabled' : ''} aria-label="Remove ${escape(p.name)}" title="${p.locked ? 'Original products remain in this batch' : 'Remove product'}"><i data-lucide="x"></i></button></td></tr>`;
       })
       .join('');
     window.refreshIcons?.();
@@ -150,6 +150,14 @@ if (form) {
     const row = input.closest('[data-row]'),
       p = rows.get(Number(row.dataset.row));
     p[input.dataset.field] = input.value;
+    if (input.dataset.field === 'stock_layer_id') {
+      p.price = ''; p.cost = '';
+      const selectedLayer = (p.layers || []).find((layer) => String(layer.id) === input.value);
+      for (const field of ['price', 'cost']) {
+        const control = row.querySelector(`[data-field="${field}"]`);
+        if (control) { control.value = ''; control.readOnly = Boolean(selectedLayer) || form.dataset.canPrices !== '1'; control.placeholder = selectedLayer ? selectedLayer[field === 'price' ? 'selling_price' : 'cost_price'] ?? '' : p[`expected_${field}`] ?? ''; }
+      }
+    }
     row.querySelector('[data-stock-preview]').textContent = `${preview(p).toFixed(3)} ${p.unit}`;
     row.querySelector('[data-stock-preview]').classList.toggle('text-danger', preview(p) < 0);
   });

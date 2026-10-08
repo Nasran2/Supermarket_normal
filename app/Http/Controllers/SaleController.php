@@ -22,6 +22,7 @@ use App\Support\Audit;
 use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class SaleController extends Controller
@@ -71,11 +72,12 @@ class SaleController extends Controller
             'billDiscount' => ['type' => 'AMOUNT', 'value' => Money::sub($sale->discount, $sale->line_discount_total)],
             'payments' => $sale->payments->map(fn ($p) => ['id' => $p->payment_method_id, 'name' => $p->method_name, 'amount' => $p->sale_amount, 'collected' => Money::sub($p->amount_paid, $p->change), 'reference' => $p->reference ?? ''])->all(),
             'items' => $sale->items->map(function ($i) {
-                $options = app(ProductUnitService::class)->options($i->product);
+                $stockPrice = $i->stock_price ?? app(ProductUnitService::class)->rate($i->catalog_price ?? $i->price, $i->quantity, $i->base_quantity ?? $i->quantity);
+                $options = array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->options($i->product, $stockPrice));
                 $id = $i->unit_id ?? $i->product->unit_id;
                 $selected = collect($options)->firstWhere('id', $id);
 
-                return ['id' => $i->product_id, 'name' => $i->name, 'units' => $options, 'unit_id' => $id, 'unit' => $i->unit, 'decimal' => $selected['decimal'] ?? false, 'price' => $i->catalog_price ?? $i->price, 'unit_price' => $i->price, 'quantity' => $i->quantity, 'discount_type' => $i->discount_type ?? 'AMOUNT', 'discount_value' => $i->discount_value ?? '0', 'unavailable' => ! $selected || ! $i->product->active || ! $i->product->unit->active];
+                return ['stock_price' => $stockPrice, 'line_key' => (string) Str::uuid(), 'id' => $i->product_id, 'name' => $i->name, 'units' => $options, 'unit_id' => $id, 'unit' => $i->unit, 'decimal' => $selected['decimal'] ?? false, 'price' => $i->catalog_price ?? $i->price, 'unit_price' => $i->price, 'quantity' => $i->quantity, 'discount_type' => $i->discount_type ?? 'AMOUNT', 'discount_value' => $i->discount_value ?? '0', 'unavailable' => ! $selected || ! $i->product->active || ! $i->product->unit->active];
             })->all()];
 
         return view('pos.index', compact('register', 'methods', 'customers', 'categories', 'editingSale', 'editSeed'));
@@ -97,7 +99,7 @@ class SaleController extends Controller
 
     public function editQuote(SaleRevisionRequest $request, Sale $sale, SaleRevisionService $service)
     {
-        return response()->json($service->quote($sale, $request->validated(), $request->user()));
+        return response()->json(app(SaleService::class)->publicQuote($service->quote($sale, $request->validated(), $request->user()), $request->user()));
     }
 
     public function revise(SaleRevisionRequest $request, Sale $sale, SaleRevisionService $service)

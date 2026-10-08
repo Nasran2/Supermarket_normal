@@ -276,9 +276,10 @@ class PosWorkflowTest extends TestCase
         $this->postJson(route('pos.quote'), $data)->assertUnprocessable()->assertJsonValidationErrors('payment_method_id');
     }
 
-    public function test_duplicate_cart_lines_are_rejected(): void
+    public function test_duplicate_cart_lines_cannot_exceed_combined_available_stock(): void
     {
         $data = $this->data($this->product());
+        $data['items'][0]['quantity'] = '60';
         $data['items'][] = $data['items'][0];
         $this->postJson(route('pos.quote'), $data)->assertUnprocessable();
     }
@@ -353,7 +354,7 @@ class PosWorkflowTest extends TestCase
         $this->postJson(route('manage.store', 'products'), $data)->assertUnprocessable();
         $this->assertDatabaseCount('products', 0);
         $data['unit_id'] = Unit::where('short_name', 'kg')->value('id');
-        $this->postJson(route('manage.store', 'products'), $data)->assertRedirect();
+        $this->postJson(route('manage.store', 'products'), $data)->assertCreated();
         $this->assertDatabaseHas('products', ['sku' => 'RICE', 'stock' => '1.500']);
     }
 
@@ -379,7 +380,7 @@ class PosWorkflowTest extends TestCase
     {
         $method = PaymentMethod::where('type', 'QR')->first();
         $data = ['payment_method_id' => $method->id, 'name' => 'No fee low tier', 'minimum_amount' => '0', 'maximum_amount' => '5000', 'comparison_operator' => 'GTE', 'charge_type' => 'PERCENTAGE', 'charge_value' => '0', 'charge_bearer' => 'CUSTOMER', 'priority' => 10, 'active' => true];
-        $this->postJson(route('manage.store', 'payment-rules'), $data)->assertRedirect();
+        $this->postJson(route('manage.store', 'payment-rules'), $data)->assertCreated();
         $this->rule('QR', 'CUSTOMER', '5000', 'GT', 'PERCENTAGE', '1', 10);
         $sale = $this->complete($this->data($this->product(price: '5000'), 'QR'));
         $this->assertSame('0.00', $sale->processing_charge);
@@ -433,7 +434,7 @@ class PosWorkflowTest extends TestCase
         $this->postJson(route('pos.quote'), $this->data($this->product('kg'), 'CASH', '1.251'))->assertUnprocessable();
     }
 
-    public function test_stock_settings_require_explicit_zero_and_negative_stock_configuration(): void
+    public function test_price_layers_prevent_overselling_even_when_legacy_negative_stock_setting_is_enabled(): void
     {
         $p = $this->product();
         $p->update(['stock' => '0']);
@@ -442,8 +443,8 @@ class PosWorkflowTest extends TestCase
         app(SettingsService::class)->put('stock', ['sell_zero_stock' => true, 'negative_stock' => false]);
         $this->postJson(route('pos.quote'), $data)->assertUnprocessable();
         app(SettingsService::class)->put('stock', ['negative_stock' => true]);
-        $this->complete($data);
-        $this->assertSame('-1.000', $p->fresh()->stock);
+        $this->postJson(route('pos.quote'), $data)->assertUnprocessable();
+        $this->assertSame('0.000', $p->fresh()->stock);
     }
 
     public function test_custom_payment_methods_are_usable_and_reported(): void
@@ -521,7 +522,9 @@ class PosWorkflowTest extends TestCase
     {
         $p = $this->product();
         $cashier = User::create(['name' => 'Limit Cashier', 'email' => 'limit@example.test', 'password' => 'a-secure-test-password', 'role_id' => Role::where('name', 'Cashier')->value('id')]);
+        $this->flushSession();
         $this->actingAs($cashier);
+        app(RegisterService::class)->open($cashier->id, '0');
         $data = $this->data($p, 'CASH');
         $data['discount'] = '1001';
         $this->postJson(route('pos.quote'), $data)->assertUnprocessable()->assertJsonValidationErrors('discount');

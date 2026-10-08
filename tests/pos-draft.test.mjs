@@ -44,6 +44,18 @@ test('cancelling or successful payment clears only this cashier draft', () => {
   assert.equal(draftStore(storage, 'cashier:1').read(), null);
   assert.deepEqual(draftStore(storage, 'cashier:2').read().items, order.items);
 });
+test('one product retains separate selected stock prices across reloads', () => {
+  const store = draftStore(memory(), 'cart');
+  const items = ['130.00', '140.00'].map((stock_price) => ({
+    ...order.items[0], stock_price, price: stock_price, unit_price: null,
+  }));
+  store.write({ ...order, items });
+  assert.deepEqual(store.read().items, items);
+  store.write({ ...order, items: [items[0], items[0]] });
+  assert.throws(() => store.read());
+  store.write({ ...order, items: [{ ...items[0], stock_price: '-1' }] });
+  assert.throws(() => store.read());
+});
 test('malformed or incompatible saved carts are rejected before restoration', () => {
   for (const invalid of [
     '{broken',

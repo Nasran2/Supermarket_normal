@@ -61,7 +61,7 @@ class ResourceService
                 }
                 $before = $record->getAttributes();
                 $values = $data;
-                unset($values['conversions']);
+                unset($values['conversions'], $values['opening_layers']);
                 if (in_array($resource, ['products', 'unit-presets']) && $id) {
                     $before['conversions'] = $record->conversions->toArray();
                 }
@@ -81,6 +81,9 @@ class ResourceService
                 }
                 if ($resource === 'roles' && $id) {
                     $before['permissions'] = $record->permissions->pluck('id')->all();
+                }
+                if ($resource === 'units' && $id && $record->default_slot === 1 && ! $data['active']) {
+                    throw ValidationException::withMessages(['active' => 'Choose another default unit before disabling this one.']);
                 }
                 if ($resource === 'units' && $id && $record->allow_decimal && ! $data['allow_decimal']) {
                     foreach ([SaleItem::class, PurchaseItem::class] as $itemModel) {
@@ -114,6 +117,16 @@ class ResourceService
                     }
                 }
                 if ($resource === 'products') {
+                    if ($id && ! auth()->user()->hasPermission('products.view_cost')) {
+                        $data['cost'] = $record->cost;
+                        $values['cost'] = $record->cost;
+                    }
+                    if ($id && ! auth()->user()->hasPermission('products.manage_prices') && (Money::compare($data['price'], $record->price) !== 0 || Money::compare($data['cost'], $record->cost) !== 0)) {
+                        throw ValidationException::withMessages(['price' => 'You do not have permission to change default prices or costs.']);
+                    }
+                    if (! $id && ! auth()->user()->hasPermission('products.view_cost') && collect($data['opening_layers'] ?? [['cost' => $data['cost']]])->contains(fn ($row) => Money::compare($row['cost'], 0) !== 0)) {
+                        throw ValidationException::withMessages(['cost' => 'You do not have permission to enter stock costs.']);
+                    }
                     $unit = Unit::whereKey($data['unit_id'])->lockForUpdate()->firstOrFail();
                     if ($id && $record->unit_id != $unit->id && ($record->saleItems()->exists() || $record->purchaseItems()->exists() || StockMovement::where('product_id', $record->id)->exists() || StockAdjustmentItem::where('product_id', $record->id)->exists() || Money::compare($record->stock, 0) !== 0)) {
                         throw ValidationException::withMessages(['unit_id' => 'Units cannot change after stock or transactions exist.']);
@@ -206,10 +219,20 @@ class ResourceService
                 if ($resource === 'roles') {
                     $record->permissions()->sync($permissionIds);
                 }
-                if ($resource === 'products' && ! $id && Money::compare((string) $data['stock'], 0) > 0) {
+                if ($resource === 'products' && ! $id) {
                     $record->load('unit');
-                    app(StockService::class)->validateQuantity($record, (string) $data['stock']);
-                    app(StockService::class)->move($record, (string) $data['stock'], 'OPENING STOCK', $record->sku, auth()->id());
+                    $opening = $data['opening_layers'] ?? [['quantity' => $data['stock'], 'cost' => $data['cost'], 'selling_price' => $data['price']]];
+                    foreach ($opening as $index => $row) {
+                        if ($index > 0 && Money::compare((string) $row['quantity'], 0) <= 0) {
+                            throw ValidationException::withMessages(['opening_layers.'.$index.'.quantity' => 'Additional stock rows need a quantity greater than zero.']);
+                        }
+                        if (Money::compare((string) $row['quantity'], 0) > 0) {
+                            app(StockLayerService::class)->receive($record, (string) $row['quantity'], (string) $row['cost'], (string) $row['selling_price'], 'OPENING_STOCK', $record->sku, auth()->id());
+                        }
+                    }
+                }
+                if ($resource === 'units' && ! app(DefaultUnitService::class)->current() && $record->active) {
+                    app(DefaultUnitService::class)->set($record->id);
                 }
                 unset($before['password']);
                 $after = $record->getAttributes();
@@ -225,6 +248,7 @@ class ResourceService
                 }
                 unset($after['password']);
                 Audit::record($resource.'.save', $record, $before, $after);
+
                 return $record;
             }, 3);
         } catch (\Throwable $e) {
@@ -233,6 +257,7 @@ class ResourceService
             }
             throw $e;
         }
+
         return $result;
     }
 
@@ -242,6 +267,9 @@ class ResourceService
         DB::transaction(function () use ($resource, $def, $id) {
             $record = $def['model']::whereKey($id)->lockForUpdate()->firstOrFail();
             $this->guardEditable($resource, $record);
+            if ($resource === 'units' && $record->default_slot === 1) {
+                throw ValidationException::withMessages(['delete' => 'Choose another default unit before deleting this one.']);
+            }
             if ($resource === 'customers' && Money::compare($record->due_balance, 0) > 0) {
                 throw ValidationException::withMessages(['delete' => 'This customer has an outstanding due. Deactivate the account to preserve its balance.']);
             }

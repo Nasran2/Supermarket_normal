@@ -191,3 +191,9 @@ Stock adjustments support up to 100 products at once, Add/Remove/Set stock, opti
 Sales actions use the full available row with larger text. Edit opens the shared POS catalogue and cart, with existing items, prices, line discounts, bill discount, customer and notes. Review payment shows per-method collection/refund differences against the saved invoice; repeated payment entries are supported. Saving revises the same invoice, updates stock and fees atomically, and retains before/after history. Unsaved edits reset on refresh or navigation back; new-sale draft persistence remains separate. Original register must be open under the current cashier and the invoice cannot have returns or later due collections.
 
 Scoped verification: 42 tests / 474 assertions on SQLite; 8 invoice revision tests / 104 assertions on MySQL/MariaDB. Browser QA confirmed reset on refresh and Back, item-price/discount editing, a 120.00 refund adjustment and saving the same invoice. Main business invoices were only viewed. Production build and Blade compilation passed. See [workflow](SALES-WORKFLOW.md).
+
+## Due checkout and product stock history
+
+Partial and fully unpaid checkout requires a named customer, with selection and creation in a popup. Fully paid walk-in sales may continue without one. Successful due checkout clears the cart; invoice Pay due remains available. Product profiles include paginated stock changes and invoice links.
+
+Focused verification passed 8 tests / 101 assertions on SQLite and MySQL/MariaDB, plus the earlier 45 related tests / 547 assertions on SQLite. Browser QA verified partial payment/new customer, fully unpaid/existing customer, the paid walk-in prompt and product history invoice links. Test financial records stayed in the isolated QA database. See [workflow and previews](POS-DUE-SALES.md).

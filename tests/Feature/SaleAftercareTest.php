@@ -223,7 +223,7 @@ class SaleAftercareTest extends TestCase
         $conversion->update(['base_quantity' => '5']);
         $this->post(route('sales.returns.store', $sale), $this->returnData($sale, '0.5'))->assertRedirect();
         $this->assertSame('19.834', $this->product->fresh()->stock);
-        $this->assertSame('6.66', SaleReturn::first()->cost_total);
+        $this->assertSame('6.68', SaleReturn::first()->cost_total);
         $this->post(route('sales.returns.store', $sale), $this->returnData($sale, '0.5'))->assertRedirect();
         $this->assertSame('20.000', $this->product->fresh()->stock);
         $this->assertSame('13.32', Money::sum(SaleReturn::pluck('cost_total')));

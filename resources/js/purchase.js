@@ -4,18 +4,57 @@ let index = 0;
 const allProducts = JSON.parse(document.getElementById('all-products-data')?.textContent || '[]');
 
 function total() {
-  let amount = 0;
+  let amount = 0n;
   container.querySelectorAll('.purchase-line').forEach((line) => {
-    const qty = Number(line.querySelector('[data-field=quantity]').value) || 0;
-    const cost = Number(line.querySelector('[data-field=cost]').value) || 0;
-    const lineTotal = qty * cost;
-    line.querySelector('[data-field-display=line_total]').textContent = lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const qty = line.querySelector('[data-field=quantity]').value;
+    const cost = line.querySelector('[data-field=cost]').value;
+    const selling = line.querySelector('[data-field=selling_price]').value;
+    line.querySelector('[data-field-display=price_warning]').hidden = moneyCents(selling) >= moneyCents(cost);
+    const lineTotal = lineCostCents(qty, cost);
+    line.querySelector('[data-field-display=line_total]').textContent = displayCents(lineTotal);
     amount += lineTotal;
   });
-  document.getElementById('purchase-total').textContent = amount.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const currency = document.getElementById('purchase-form').dataset.currency;
+  const subtotal = amount;
+  let charges = 0n;
+  document.querySelectorAll('[data-charge=amount]').forEach(input => { charges += moneyCents(input.value); });
+  amount += charges;
+  document.getElementById('purchase-subtotal').textContent = `${currency} ${displayCents(subtotal)}`;
+  document.getElementById('purchase-charges-total').textContent = `${currency} ${displayCents(charges)}`;
+  document.getElementById('purchase-total').textContent = `${currency} ${displayCents(amount)}`;
+  const count = container.querySelectorAll('.purchase-line').length;
+  document.getElementById('purchase-line-count').textContent = `${count} ${count === 1 ? 'item' : 'items'}`;
+  document.getElementById('purchase-empty').hidden = count > 0;
+  document.getElementById('save-purchase').disabled = !count;
+  const paidInput = document.getElementById('purchase-amount-paid');
+  const given = paidInput ? moneyCents(paidInput.value) : moneyCents(document.getElementById('purchase-summary-paid').dataset.recordedPaid);
+  const {paid,due,change,status} = paymentBalance(amount,given);
+  if (paidInput) {
+    const method = document.getElementById('purchase-payment-method');
+    method.required = given > 0n;
+    const badge = document.getElementById('purchase-auto-status');
+    badge.textContent = count === 0 ? 'Unpaid' : status;
+    badge.className = `badge ${status === 'Paid' ? 'green' : 'amber'}`;
+    document.querySelector('#purchase-payment-note span').textContent = given === 0n ? 'No payment now. The full supplier bill remains due.' : !method.value ? 'Choose the method used to pay this supplier.' : method.selectedOptions[0]?.dataset.type === 'CASH' ? 'Your register records the payment after any change is returned.' : 'Record the amount given and any change returned. Your cash register is unchanged.';
+  }
+  const tracked = document.getElementById('purchase-form').dataset.paymentTracked !== '0';
+  document.getElementById('purchase-summary-paid').textContent = tracked ? `${currency} ${displayCents(paidInput ? paid : given)}` : 'Unrecorded';
+  document.getElementById('purchase-summary-due').textContent = tracked ? `${currency} ${displayCents(due)}` : 'Unrecorded';
+  document.getElementById('purchase-change-row').hidden = !paidInput || change === 0n;
+  document.getElementById('purchase-summary-change').textContent = `${currency} ${displayCents(change)}`;
+  const invalid = !paidInput && given > amount;
+  const error = document.getElementById('purchase-payment-validation');
+  error.textContent = 'The new bill total is below the recorded payments. Record a supplier refund before saving.';
+  error.hidden = !invalid;
+  const preview = document.getElementById('purchase-allocation-preview');
+  const allocate = document.querySelector('input[name=charge_treatment]:checked')?.value === 'COST';
+  preview.hidden = !allocate || charges === 0n || count === 0;
+  preview.replaceChildren();
+  if (!preview.hidden) {
+    const rows = [...container.querySelectorAll('.purchase-line')];
+    const parts = allocateCharges(rows.map(row => lineCostCents(row.querySelector('[data-field=quantity]').value,row.querySelector('[data-field=cost]').value)),charges);
+    rows.forEach((row,i)=>{ const entry=document.createElement('p'); const name=document.createElement('span'); name.textContent=row.querySelector('[data-field-display=name]').textContent; const value=document.createElement('strong'); value.textContent=`+ ${currency} ${displayCents(parts[i])}`; entry.append(name,value); preview.append(entry); });
+  }
 }
 
 function add(initial = {}, prepend = false) {
@@ -41,6 +80,7 @@ function add(initial = {}, prepend = false) {
   const productInput = line.querySelector('[data-field=product_id]'),
     qty = line.querySelector('[data-field=quantity]'),
     cost = line.querySelector('[data-field=cost]'),
+    selling = line.querySelector('[data-field=selling_price]'),
     unitSelect = line.querySelector('[data-field=unit_id]');
     
   productInput.value = product.id;
@@ -55,6 +95,7 @@ function add(initial = {}, prepend = false) {
       option.textContent = u.name + ' (' + u.short_name + ')';
       option.dataset.decimal = u.decimal ? '1' : '0';
       option.dataset.cost = u.cost;
+      option.dataset.price = u.price;
       unitSelect.append(option);
     });
     if (selectedId) {
@@ -87,6 +128,7 @@ function add(initial = {}, prepend = false) {
 
   unitSelect.addEventListener('change', () => {
     cost.value = unitSelect.selectedOptions[0]?.dataset.cost ?? 0;
+    selling.value = unitSelect.selectedOptions[0]?.dataset.price ?? 0;
     qty.value = '1';
     updatePrecision();
     total();
@@ -104,17 +146,36 @@ function add(initial = {}, prepend = false) {
       container.append(line);
   }
   
-  if (!initial.cost) {
+  if (initial.cost == null) {
       cost.value = product.cost || 0;
   }
   
   unit(true);
+  if (initial.selling_price == null) selling.value = unitSelect.selectedOptions[0]?.dataset.price ?? product.price ?? 0;
+  line.querySelector('[data-field-display=prices]').textContent = (product.prices || []).map((group) => `${group.stock_price} · ${Number(group.quantity)} ${product.unit}`).join(' / ');
   window.refreshIcons?.();
   total();
 }
 
+let chargeIndex = 0;
+function addCharge(initial={}) {
+  const row = document.getElementById('purchase-charge-template').content.firstElementChild.cloneNode(true);
+  row.querySelectorAll('[data-charge]').forEach(input=>{input.name=`charges[${chargeIndex}][${input.dataset.charge}]`;input.value=initial[input.dataset.charge]??'';});
+  chargeIndex++;
+  row.addEventListener('input',total);
+  row.querySelector('button').addEventListener('click',()=>{row.remove();document.getElementById('purchase-charges-empty').hidden=!!document.getElementById('purchase-charges').children.length;total();});
+  document.getElementById('purchase-charges').append(row);
+  document.getElementById('purchase-charges-empty').hidden=true;
+  window.refreshIcons?.();total();
+}
+document.getElementById('add-purchase-charge').addEventListener('click',()=>addCharge());
+document.querySelectorAll('input[name=charge_treatment]').forEach(input=>input.addEventListener('change',total));
+JSON.parse(document.getElementById('purchase-charges-initial')?.textContent||'[]').forEach(row=>addCharge(row));
 const initialData = JSON.parse(document.getElementById('purchase-initial')?.textContent || '[]');
 if (initialData.length) initialData.forEach(i => add(i, false));
+document.getElementById('purchase-payment-inputs')?.addEventListener('input', total);
+document.getElementById('purchase-payment-method')?.addEventListener('change', total);
+total();
 
 // --- Supplier Dropdown ---
 const supSearch = document.getElementById('supplier-search');
@@ -125,6 +186,7 @@ if (supSearch) {
         if(!e.target.closest('#supplier-search-container')) supDrop.classList.remove('show');
     });
     supSearch.addEventListener('input', (e) => {
+        document.getElementById('supplier_id').value = '';
         const val = e.target.value.toLowerCase();
         supDrop.querySelectorAll('.supplier-option').forEach(opt => {
             opt.style.display = opt.dataset.name.toLowerCase().includes(val) ? 'block' : 'none';
@@ -150,7 +212,7 @@ if (prodSearch) {
     prodSearch.addEventListener('input', (e) => {
         const val = e.target.value.toLowerCase();
         prodDrop.querySelectorAll('.product-option').forEach(opt => {
-            opt.style.display = opt.dataset.name.toLowerCase().includes(val) ? 'block' : 'none';
+            opt.style.display = `${opt.dataset.name} ${opt.dataset.sku} ${opt.dataset.barcode}`.toLowerCase().includes(val) ? 'block' : 'none';
         });
     });
     document.querySelectorAll('.product-option').forEach(opt => {
@@ -162,3 +224,4 @@ if (prodSearch) {
         });
     });
 }
+import {moneyCents, lineCostCents, displayCents, paymentBalance, allocateCharges} from './purchase-totals.js';

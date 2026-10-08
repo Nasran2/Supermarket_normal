@@ -7,10 +7,13 @@ use App\Http\Requests\ResourceRequest;
 use App\Models\Customer;
 use App\Models\Permission;
 use App\Models\Product;
+use App\Models\ProductStockLayer;
 use App\Models\StockMovement;
 use App\Models\Unit;
 use App\Models\UnitPreset;
+use App\Services\DefaultUnitService;
 use App\Services\ResourceService;
+use App\Services\StockLayerService;
 use App\Support\Resources;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -54,6 +57,9 @@ class ResourceController extends Controller
                 $query->where('type', $request->input('type'));
             }
         }
+        if ($resource === 'products') {
+            $query->with(['stockLayers' => fn ($q) => $q->available()]);
+        }
         $rows = $query->orderByDesc('id')->paginate(20)->withQueryString();
 
         if ($resource === 'customers') {
@@ -64,7 +70,9 @@ class ResourceController extends Controller
         }
 
         if ($resource === 'products') {
-            $stats = Product::selectRaw('COUNT(*) as total, SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_count, SUM(CASE WHEN active = 1 AND stock <= low_stock THEN 1 ELSE 0 END) as low_count, SUM(stock * cost) as stock_value')->first();
+            $stats = Product::selectRaw('COUNT(*) as total, SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_count, SUM(CASE WHEN active = 1 AND stock <= low_stock THEN 1 ELSE 0 END) as low_count, 0 as stock_value')->first();
+
+            $stats->stock_value = ProductStockLayer::available()->selectRaw('SUM(COALESCE(remaining_cost_total, remaining_quantity * cost_price)) as value')->value('value') ?? '0';
 
             return view('products.index', compact('resource', 'def', 'rows', 'stats'));
         }
@@ -106,9 +114,14 @@ class ResourceController extends Controller
         }
 
         if ($resource === 'products') {
-            $movements = $record->hasMany(StockMovement::class)->with('user', 'sale', 'saleReturn.sale')->latest('created_at')->latest('id')->paginate(20, ['*'], 'movements')->withQueryString();
+            $movements = $record->hasMany(StockMovement::class)->with('user', 'sale', 'saleReturn.sale', 'layers.layer')->latest('created_at')->latest('id')->paginate(20, ['*'], 'movements')->withQueryString();
 
-            return view('products.show', compact('record', 'movements'));
+            app(StockLayerService::class)->ensureLegacy($record);
+            $stockStatus = request()->validate(['stock_status' => 'nullable|in:available,depleted,all'])['stock_status'] ?? 'available';
+            $layers = $record->stockLayers()->where('status', 'ACTIVE')->when($stockStatus === 'available', fn ($q) => $q->where('remaining_quantity', '>', 0))->when($stockStatus === 'depleted', fn ($q) => $q->where('remaining_quantity', '<=', 0))->orderBy('selling_price')->orderBy('received_at')->get();
+            $pricing = $record->stockLayers()->available()->selectRaw('COUNT(DISTINCT selling_price) as prices, SUM(COALESCE(remaining_cost_total, remaining_quantity * cost_price)) as cost_value, SUM(remaining_quantity * selling_price) as selling_value')->first();
+
+            return view('products.show', compact('record', 'movements', 'layers', 'pricing', 'stockStatus'));
         }
         if ($resource === 'unit-presets') {
             return view('products.presets.show', compact('record'));
@@ -127,6 +140,9 @@ class ResourceController extends Controller
             }
         }
         if (in_array($resource, ['products', 'unit-presets'])) {
+            if ($resource === 'products' && ! $record->exists) {
+                $record->unit_id = app(DefaultUnitService::class)->current()?->id;
+            }
             $units = Unit::where('active', true)->orderBy('name')->get();
             $presets = UnitPreset::with(['unit', 'conversions.unit'])->orderBy('name')->get();
             $record->loadMissing('conversions.unit');
@@ -144,7 +160,7 @@ class ResourceController extends Controller
         $record = $service->save($resource, $request->validated());
 
         if ($request->wantsJson()) {
-            return response()->json($record);
+            return response()->json($record, 201);
         }
 
         return redirect()->route('manage.index', $resource)->with('success', 'Changes saved.');

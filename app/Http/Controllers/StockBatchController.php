@@ -6,6 +6,7 @@ use App\Http\Requests\StockBatchRequest;
 use App\Models\Product;
 use App\Models\StockAdjustment;
 use App\Services\StockAdjustmentService;
+use App\Services\StockLayerService;
 use Illuminate\Http\Request;
 
 class StockBatchController extends Controller
@@ -44,7 +45,9 @@ class StockBatchController extends Controller
 
     private function productRow(Product $p): array
     {
-        return ['product_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit_id' => $p->unit_id, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'expected_stock' => $p->stock, 'expected_price' => $p->price, 'expected_cost' => $p->cost];
+        app(StockLayerService::class)->ensureLegacy($p);
+
+        return ['layers' => $p->stockLayers()->available()->get(['id', 'selling_price', 'cost_price', 'remaining_quantity'])->map(fn ($l) => ['id' => $l->id, 'selling_price' => $l->selling_price, 'cost_price' => auth()->user()->hasPermission('products.view_cost') ? $l->cost_price : null, 'quantity' => $l->remaining_quantity])->all(), 'product_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit_id' => $p->unit_id, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'expected_stock' => $p->stock, 'expected_price' => $p->price, 'expected_cost' => auth()->user()->hasPermission('products.view_cost') ? $p->cost : null];
     }
 
     public function create()

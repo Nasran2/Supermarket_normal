@@ -17,7 +17,8 @@ class CheckoutRequest extends FormRequest
         $activeMethod = Rule::exists('payment_methods', 'id')->where('active', true);
         $r = [
             'items' => ['required', 'array', 'min:1', 'max:300'],
-            'items.*.product_id' => ['required', 'integer', 'distinct', 'exists:products,id'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.stock_price' => ['nullable', 'numeric', 'min:0', 'max:9999999999999', 'decimal:0,2'],
             'items.*.unit_id' => ['nullable', 'integer', 'exists:units,id'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0', 'max:999999999', 'decimal:0,2'],
             'items.*.discount_type' => ['nullable', 'in:AMOUNT,PERCENT'],

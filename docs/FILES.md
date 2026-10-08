@@ -290,3 +290,13 @@ Added in the sales workflow update:
 - `docs/screenshots/sales-actions-row.jpg`
 - `docs/screenshots/sale-pos-editor.jpg`
 - `docs/screenshots/sale-edit-payment.jpg`
+
+Added in the due-checkout and product-history update:
+
+- `resources/views/pos/partials/checkout-customer.blade.php`
+- `resources/views/products/partials/stock-history.blade.php`
+- `tests/Feature/DueCheckoutTest.php`
+- `tests/Feature/ProductMovementHistoryTest.php`
+- `docs/POS-DUE-SALES.md`
+- `docs/screenshots/due-customer-selection.jpg`
+- `docs/screenshots/product-stock-history.jpg`

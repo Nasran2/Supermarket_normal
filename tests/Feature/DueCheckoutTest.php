@@ -131,11 +131,11 @@ class DueCheckoutTest extends TestCase
         $unused = $this->quoted($this->data('0', '10'));
         $this->postJson(route('pos.complete'), $unused)->assertUnprocessable()->assertJsonValidationErrors('payments.0.amount_paid');
         $stale = $this->quoted($this->data());
-        $this->product->update(['price' => '811']);
+        $this->product->stockLayers()->update(['selling_price' => '811']);
         $this->postJson(route('pos.complete'), $stale)->assertUnprocessable()->assertJsonValidationErrors('payment');
         app(RegisterService::class)->close(app(RegisterService::class)->current($this->cashier->id), '1000', null);
-        $this->postJson(route('pos.complete'),$stale)->assertUnprocessable()->assertJsonValidationErrors('register');
-        $this->assertDatabaseCount('sales',0);
-        $this->assertSame('10.000',$this->product->fresh()->stock);
+        $this->postJson(route('pos.complete'), $stale)->assertUnprocessable()->assertJsonValidationErrors('register');
+        $this->assertDatabaseCount('sales', 0);
+        $this->assertSame('10.000', $this->product->fresh()->stock);
     }
 }

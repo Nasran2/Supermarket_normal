@@ -168,6 +168,7 @@ class SaleLineTest extends TestCase
         $data['items'][0]['quantity'] = '3';
         $this->postJson(route('pos.quote'), $data)->assertOk()->assertJsonPath('invoice_discount', '28.00')->assertJsonPath('sale_amount', '252.00');
         $this->product->update(['unit_id' => Unit::where('short_name', 'kg')->value('id'), 'price' => '8.02']);
+        $this->product->stockLayers()->update(['selling_price' => '8.02', 'primary_unit_id' => $this->product->unit_id]);
         $data['items'][0] = ['product_id' => $this->product->id, 'quantity' => '1.25'];
         $data['bill_discount_value'] = '50';
         $this->postJson(route('pos.quote'), $data)->assertOk()->assertJsonPath('invoice_discount', '5.02')->assertJsonPath('sale_amount', '5.01');

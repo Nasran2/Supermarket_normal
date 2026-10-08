@@ -15,6 +15,10 @@ import {
   CircleDollarSign,
   ChartNoAxesCombined,
   Users,
+  User,
+  Lock,
+  PackagePlus,
+  FileText,
   ShieldCheck,
   Settings2,
   PanelLeft,
@@ -53,6 +57,7 @@ import {
   Menu,
 } from 'lucide';
 const icons = {
+  AlertCircle: CircleAlert,
   ShoppingBasket,
   LayoutDashboard,
   ScanLine,
@@ -67,6 +72,10 @@ const icons = {
   CircleDollarSign,
   ChartNoAxesCombined,
   Users,
+  User,
+  Lock,
+  PackagePlus,
+  FileText,
   ShieldCheck,
   Settings2,
   PanelLeft,
@@ -162,3 +171,5 @@ document.querySelectorAll('.nav-group > summary').forEach((summary) => {
     }
   });
 });
+
+import './module-editor.js';

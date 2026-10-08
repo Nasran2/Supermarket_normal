@@ -9,7 +9,7 @@ use App\Models\StockAdjustment;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\ReportService;
-use App\Services\StockService;
+use App\Services\StockLayerService;
 use App\Support\Sidebar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -80,7 +80,7 @@ class StockBatchTest extends TestCase
     public function test_revision_and_reversal_preserve_intervening_stock_movements_and_restore_prices(): void
     {
         $batch = $this->create([$this->row($this->a, ['quantity' => '5', 'price' => '120', 'cost' => '45'])]);
-        app(StockService::class)->move($this->a->fresh(), '-3', 'SALE', 'QA SALE', $this->admin->id);
+        app(StockLayerService::class)->adjust($this->a->fresh(), '-3', $this->a->stockLayers()->where('selling_price', '100')->value('id'), '60', '100', 'QA SALE', 'SALE', $this->admin->id);
         $this->put(route('adjustments.update', $batch), ['reason' => 'Corrected count', 'revision' => 1, 'items' => [$this->row($this->a, ['mode' => 'SET', 'quantity' => '24', 'price' => '125'])]])->assertSessionHasNoErrors()->assertRedirect();
         $this->assertSame('24.000', $this->a->fresh()->stock);
         $this->assertSame('7.000', $batch->fresh()->items->first()->quantity_change);

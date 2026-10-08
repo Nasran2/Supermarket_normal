@@ -16,7 +16,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $names = ['dashboard.view', 'pos.access', 'sales.void', 'register.open', 'register.close', 'register.view', 'settings.view', 'settings.business', 'settings.pos', 'settings.receipt', 'settings.payment_methods', 'settings.payment_rules'];
+        $names = ['products.view_cost', 'products.manage_prices', 'purchases.manage_prices', 'dashboard.view', 'pos.access', 'sales.void', 'register.open', 'register.close', 'register.view', 'settings.view', 'settings.business', 'settings.pos', 'settings.receipt', 'settings.payment_methods', 'settings.payment_rules'];
         foreach (['sales', 'products', 'units', 'purchases', 'expenses', 'users', 'roles'] as $module) {
             foreach (['view', 'create', 'edit', 'delete'] as $action) {
                 $names[] = $module.'.'.$action;
@@ -42,6 +42,9 @@ class DatabaseSeeder extends Seeder
             if (! Unit::where('short_name', $short)->orWhere('name', $name)->exists()) {
                 Unit::create(['short_name' => $short, 'name' => $name, 'allow_decimal' => $decimal, 'active' => true]);
             }
+        }
+        if (! Unit::where('default_slot', 1)->exists()) {
+            Unit::where('short_name', 'pcs')->update(['default_slot' => 1]);
         }
         foreach ([['Cash', 'CASH'], ['Card', 'CARD'], ['QR', 'QR'], ['Bank Transfer', 'BANK_TRANSFER']] as $i => [$name,$type]) {
             if (! PaymentMethod::where('code', $type)->orWhere('name', $name)->orWhere('type', $type)->exists()) {

@@ -39,11 +39,11 @@ class SampleProductSeeder extends Seeder
             foreach ($samples as [$code, $name, $category, $unit, $cost, $price, $quantity]) {
                 $product = Product::firstOrCreate(['sku' => 'DEMO-'.$code], [
                     'name' => $name, 'barcode' => '2000000000'.$code,
-                    'category_id' => Category::firstOrCreate(['name' => $category])->id,
                     'unit_id' => Unit::where('short_name', $unit)->where('active', true)->firstOrFail()->id,
                     'cost' => $cost, 'price' => $price, 'stock' => '0', 'low_stock' => '5', 'active' => true,
                     'created_by' => $user->id, 'updated_by' => $user->id,
                 ]);
+                $product->categories()->syncWithoutDetaching([Category::firstOrCreate(['name' => $category])->id]);
                 if ($product->wasRecentlyCreated) {
                     app(StockService::class)->move($product, $quantity, 'SAMPLE OPENING STOCK', 'DEMO-'.$code, $user->id);
                     Audit::record('product.sample-created', $product, [], $product->fresh()->toArray());

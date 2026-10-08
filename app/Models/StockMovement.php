@@ -29,4 +29,9 @@ class StockMovement extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function layers()
+    {
+        return $this->hasMany(StockLayerMovement::class);
+    }
 }
