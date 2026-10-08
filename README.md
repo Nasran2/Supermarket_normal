@@ -6,7 +6,7 @@ A working Laravel 12 + PHP + Blade + MySQL supermarket POS with Tailwind CSS, va
 
 App: **http://localhost/Super%20market/public/** (XAMPP Apache and MySQL must be running).
 
-Sign in with username `admin` **or** email `admin@twinsofte.local`, using the same password. Its generated password is in the private, Git-ignored `.local-credentials.md` file in this directory. There is no hardcoded default password. The main database is `twinsofte_supermarket`; it contains configuration and the initial administrator, with no test products or transactions.
+Sign in with username `admin` **or** email `admin@twinsofte.local`, using the same password. Its current local password is in the private, Git-ignored `.local-credentials.md` file in this directory. There is no hardcoded default password. The main database is `twinsofte_supermarket`; it contains configuration and the initial administrator, with no test products or transactions.
 
 Usernames can be added or changed under **Users**. They are unique, case-insensitive and allow letters, numbers, dots, underscores and hyphens. Upgrades assign existing accounts names based on their email prefix, adding a numeric suffix when needed; passwords remain unchanged.
 
@@ -71,8 +71,34 @@ DB_CONNECTION=mysql DB_DATABASE=twinsofte_supermarket_test php artisan test --co
 
 Never target the operational database with test commands. Browser fixture setup is guarded to the separate `twinsofte_supermarket_ui` database; see `tests/Support/browser-bootstrap.php`.
 
+## POS payments
+
+The selling screen uses a full-width workspace with hamburger navigation, a right-hand cart and a touch payment popup. A sale can use one method or split across Cash, Card, QR and other configured methods, including repeated entries such as two card payments. The POS stays locked until its opening-register popup is completed; closing shows the sales, method totals, customer/business fees and cash reconciliation in a popup. Sixteen sample products with audited opening stock are installed here; `php artisan db:seed --class=SampleProductSeeder` adds them on another installation without resetting existing stock. See [cashier instructions, fee behavior and verification](docs/POS-SPLIT-PAYMENTS.md).
+
 ## Delivery details
 
 See [complete delivery and verification notes](docs/DELIVERY.md), [database schema](docs/SCHEMA.md), [schema-only SQL](docs/schema.sql), [settings](docs/SETTINGS.md), [permissions](docs/PERMISSIONS.md), [route inventory](docs/routes.json), and [source file manifest](docs/FILES.md).
 
 Thermal receipts support 80mm and 58mm with print-only layouts and measured roll lengths. Select the matching paper size, 100% scale, no margins, and disable browser headers/footers in the printer dialog. Physical printer calibration remains a device check.
+
+In the POS cart, tap **+** beside Customer to open **Add customer**. Name is required; phone, email and address are optional. **Save & select customer** saves an active customer and selects them for the current order without reloading or clearing the cart. Existing customer-create permission (`sales.create`) applies.
+
+Enter **Old balance (due)** in the popup or customer create/edit page to record money already owed from earlier purchases. Customer pages show outstanding totals, balance filters, contacts and purchase history; the selected customer's due is also visible in the POS. This opening due stays separate from today's paid sale and register cash. Collection of old dues is not part of this change. Existing customers start at zero; run `php artisan migrate` on another installation to add the opening-due column.
+
+## Product units
+
+Products now have a primary stock unit and additional units with explicit conversions and optional selling prices. Load a matching preset from **Multiple units**, or add conversions directly. Stock stays in the primary unit; POS and purchase unit selectors convert each transaction automatically. Receipts keep the selected unit, while voids restore the saved primary quantity. Starter presets for pieces/dozen, kilograms/grams and liters/milliliters are installed here; `php artisan db:seed --class=UnitPresetSeeder` adds them elsewhere without replacing existing presets. See [multiple-unit workflow and verification](docs/PRODUCT-UNITS.md).
+
+## Saved POS carts
+
+The cart uses single-row items. Tap an item name to change its unit/price or add a fixed/percentage line discount; the cart displays its final amount. Drafts save automatically for each cashier in the same browser and survive refresh/navigation. **Clear order** or a successful payment clears the saved draft. Customer receipts show the final price and amount, while pricing/discount snapshots remain audited. See [cart workflow and checks](docs/POS-CART.md).
+
+Use **Bill discount** below the subtotal for a fixed amount or percentage on the full bill after item discounts. The discount saves with the cart, updates the payment total and prints once on the receipt.
+
+## Sidebar and stock adjustments
+
+Expandable sidebar groups provide list/create links for existing modules and links to all 16 available reports, filtered by permission. Products → Stock adjustments supports selecting up to 100 products, Add/Remove/Set stock and optional primary-unit selling-price/cost changes. Batches can be viewed, filtered, printed, revised and reversed with their audit history preserved. See [workflow and validation](docs/STOCK-ADJUSTMENTS.md).
+
+Sales now include labeled View, Edit, Delete/reversal, item Return and conditional Pay due actions. Returns and later payments update stock, invoice balances, register reconciliation and reports, with historical invoices retained. See [sales workflow](docs/SALES-WORKFLOW.md).
+
+Invoice **Edit** now opens the POS screen for products, quantities, units, prices, line/bill discounts and payments. Review payment displays collection/refund adjustments; saving retains the invoice number and date with revision history. Unsaved edits reset on refresh or leaving and returning; new-sale carts continue to persist. See [eligibility and workflow](docs/SALES-WORKFLOW.md).

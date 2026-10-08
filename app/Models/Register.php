@@ -34,4 +34,14 @@ class Register extends Model
     {
         return $this->hasMany(Expense::class);
     }
+
+    public function returns()
+    {
+        return $this->hasMany(SaleReturn::class);
+    }
+
+    public function collections()
+    {
+        return $this->hasMany(SaleCollection::class);
+    }
 }

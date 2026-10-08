@@ -20,7 +20,7 @@ The [file manifest](FILES.md) lists source files. Dependencies, secrets, logs, c
 
 ## 2. Migrations
 
-Laravel's normal users/sessions, cache and queue migrations accompany five POS migrations:
+Laravel's normal users/sessions, cache and queue migrations accompany fifteen POS migrations:
 
 | Migration | Effect |
 | --- | --- |
@@ -29,20 +29,30 @@ Laravel's normal users/sessions, cache and queue migrations accompany five POS m
 | `2026_10_07_000300_add_product_search_indexes` | Product active/name composite and MySQL FULLTEXT name index; sales status/sold_at composite |
 | `2026_10_07_000400_allow_payment_rule_bearer_inheritance` | Nullable payment_charge_rules.charge_bearer lets a rule use its method's default payer |
 | `2026_10_07_000500_add_usernames_to_users` | Unique users.username and collision-safe backfill for existing accounts; passwords are preserved |
+| `2026_10_08_000600_allow_split_sale_payments` | Allows multiple payment methods per sale while retaining old records and foreign keys |
+| `2026_10_08_000700_allow_repeated_payment_methods` | Allows multiple entries for the same payment method |
+| `2026_10_08_000800_preserve_register_opening_time` | Preserves shift opening timestamps when closing on MariaDB |
+| `2026_10_08_000900_add_customer_opening_due` | Adds existing customer debt with zero defaults; preserves existing accounts |
+| `2026_10_08_001000_add_multiple_product_units` | Product unit conversions, reusable presets and historic stock/cost snapshots |
+| `2026_10_08_001100_add_sale_line_adjustments` | Catalogue/edited price and line-discount snapshots; existing sales preserved |
+| `2026_10_08_001200_add_stock_adjustment_batches` | Multi-product quantity/price/cost corrections, revisions and reversal snapshots |
+| `2026_10_08_001300_add_sale_returns_and_collections` | Item returns, due collections and their register/cashier history |
+| `2026_10_08_001400_preserve_sale_invoice_time` | Preserves original invoice dates when editing/voiding on MariaDB |
+| `2026_10_08_001500_add_sale_revisions` | Complete before/after invoice revision snapshots and unique retry tokens |
 
 Migrations do not seed sample sales/products or reset business settings. Changes to schema use migrations.
 
 ## 3. Tables and columns
 
-New business tables: roles, permissions, permission_role, settings, units, categories, suppliers, customers, products, payment_methods, payment_charge_rules, registers, register_movements, sales, sale_items, sale_payments, expense_categories, expenses, purchases, purchase_items, stock_movements and audit_logs.
+New business tables: roles, permissions, permission_role, settings, units, categories, suppliers, customers, products, payment_methods, payment_charge_rules, registers, register_movements, sales, sale_items, sale_payments, expense_categories, expenses, purchases, purchase_items, stock_movements, audit_logs, unit_presets, unit_preset_conversions and product_units.
 
-`users` gains a role foreign key, indexed active flag and unique username. Subsequent migrations add `purchase_items.previous_cost`, search/status indexes, and nullable rule bearer. The installed schema contains 31 tables including Laravel's framework tables. See [every column and type](SCHEMA.md) and [all indexes/foreign keys in schema-only SQL](schema.sql).
+`users` gains a role foreign key, indexed active flag and unique username. Subsequent migrations add `purchase_items.previous_cost`, search/status indexes, and nullable rule bearer. The installed schema contains 40 tables including Laravel's framework tables. See [every column and type](SCHEMA.md) and [all indexes/foreign keys in schema-only SQL](schema.sql).
 
 Money is DECIMAL(15,2), quantities DECIMAL(15,3), and configurable rule values DECIMAL(15,4). Sale/payment/item snapshots preserve original prices, costs, unit names, method metadata and applied charge rules even when configuration changes. Used records cannot be deleted through CRUD; deactivate them instead. Sales and purchases are voided, and manual expenses reversed, keeping history.
 
 ## 4. Routes
 
-The [machine-readable route inventory](routes.json) contains the current 45 routes including framework health/storage routes. Application groups:
+The [machine-readable route inventory](routes.json) contains the current 63 routes including framework health/storage routes. Application groups:
 
 | Area | Endpoints |
 | --- | --- |
@@ -54,10 +64,10 @@ The [machine-readable route inventory](routes.json) contains the current 45 rout
 | Register | GET `/register`, POST `/register/open`, `/register/movement`, `/register/close`, GET `/register/{register}` |
 | Settings | GET `/settings`, GET/PUT `/settings/{group}` |
 | Reports | GET `/reports`, `/reports/{report}`, `/reports/{report}/export` |
-| Stock | GET/PUT `/stock/{product}/adjust` |
+| Stock | GET/PUT `/stock/{product}/adjust`; GET/POST `/stock-adjustments`, GET `/stock-adjustments/create`, `/stock-adjustments/products`, `/{adjustment}/edit`, GET/PUT/DELETE `/{adjustment}` |
 | CRUD | GET/POST `/manage/{resource}`, GET `/manage/{resource}/create`, GET `/manage/{resource}/{id}/edit`, GET/PUT/DELETE `/manage/{resource}/{id}` |
 
-Resource names are allowlisted: products, categories, units, suppliers, customers, expense-categories, expenses, payment-methods, payment-rules, users and roles. Reports are allowlisted: sales, purchases, expenses, profit, stock, product-sales, payments, register, cash, payment-charges, card-charges, qr-charges, bank-charges and audit. Unknown resource/report names return 404. Authenticated endpoints apply permission checks through middleware, controllers and Form Requests; the absence of a route-level permission string does not imply unrestricted access.
+Resource names are allowlisted: products, categories, units, unit-presets, suppliers, customers, expense-categories, expenses, payment-methods, payment-rules, users and roles. Reports are allowlisted: sales, purchases, expenses, profit, stock, product-sales, payments, register, cash, payment-charges, card-charges, qr-charges, bank-charges and audit. Unknown resource/report names return 404. Authenticated endpoints apply permission checks through middleware, controllers and Form Requests; the absence of a route-level permission string does not imply unrestricted access.
 
 ## 5. Permissions
 
@@ -122,7 +132,7 @@ The current local database is `twinsofte_supermarket`, and APP_URL is the XAMPP 
 
 ## 10. Verification
 
-- **63 tests, 392 assertions passed on SQLite and on MySQL/MariaDB** after the username-login update. Username/email sign-in, case/whitespace normalization, legacy email submissions, disabled users, shared alias throttling and unique username management are covered. Includes all nine specified fee/quantity/P&L cases, fixed/prioritized/inherited rules, thresholds, zero tiers, exact rounding, tampered/stale/duplicate checkout, inactive methods/users, financial rollback, stock restoration, purchase corrections, expense reversal, closed-register protection, permissions/session security, upload type/size validation, audit redaction, streamed CSV exports, custom methods and immutable snapshots.
+- **75 tests, 513 assertions passed on SQLite and on MySQL/MariaDB** after the POS split-payment update. Username/email sign-in, case/whitespace normalization, legacy email submissions, disabled users, shared alias throttling and unique username management are covered. Includes all nine specified fee/quantity/P&L cases, fixed/prioritized/inherited rules, thresholds, zero tiers, exact rounding, tampered/stale/duplicate checkout, inactive methods/users, financial rollback, stock restoration, purchase corrections, expense reversal, closed-register protection, permissions/session security, upload type/size validation, audit redaction, streamed CSV exports, custom methods and immutable snapshots.
 - Vite production build, Blade compilation, PHP formatting/lint, Composer validation and dependency audits completed. Composer and npm report no known dependency vulnerabilities after removing the unused concurrently development dependency.
 - Browser login, logo change/removal, business/POS settings, barcode/quantity/discount/cash, customer- and business-paid card fees, QR below/exact/above threshold, purchase receipt and linked real reports were checked in an isolated QA database. A cash checkout with 1.250kg and discount 50 showed payable 950, paid 1,000, change 50 and an embedded receipt; Next sale cleared the cart.
 - Dashboard, POS, business settings, product form, purchase form, payment-charge report and P&L were checked at **1920, 1366, 1024, 768, 430 and 390px**. No root horizontal overflow remained; wide tables scroll inside their containers.
@@ -136,10 +146,48 @@ Browser evidence: [test checkout receipt](screenshots/receipt-checkout.jpg), [lo
 
 No known blocking application issue remained in the completed checks. **Physical 80mm/58mm printer output still needs verification on the customer's printer/driver**; a browser render cannot verify feed/cut behavior or hardware margins. Select the proper roll size, scale 100%, disable headers/footers and calibrate as needed. Barcode testing used keyboard-style scanner input; confirm the actual scanner sends Enter.
 
-One payment method per sale is supported; split tender and refunds/returns are outside this implementation. Completed financial records use void/reversal rather than hard deletion, and financial sale correction is limited to the open register. The app operates in one configured currency with two-decimal money storage; changing currency labels does not convert historic amounts. Choose currency/timezone before live trading. Number-decimal settings control minimum display precision while retaining significant cents. Inventory is current-state reporting; reporting does not reconstruct historical stock valuation.
+One or multiple payment entries per sale, including repeated methods, are supported; refunds/returns remain outside this implementation. Completed financial records use void/reversal rather than hard deletion, and financial sale correction is limited to the open register. The app operates in one configured currency with two-decimal money storage; changing currency labels does not convert historic amounts. Choose currency/timezone before live trading. Number-decimal settings control minimum display precision while retaining significant cents. Inventory is current-state reporting; reporting does not reconstruct historical stock valuation.
 
 Routine operational backups, a dedicated production database user, a public/ document root and actual business/payment settings should be established when delivering this local installation to another customer environment.
 
 ## Username login update
 
 Login accepts username or email and the existing password. The field is plain text, so entering `admin` no longer triggers browser email validation. Existing accounts receive a unique username from their email prefix; duplicate prefixes receive numeric suffixes. Username values normalize to lowercase and remain editable in Users. The administrator here can use `admin` or `admin@twinsofte.local`. The CLI accepts `--username` for new administrators. Apply the update elsewhere using `php artisan migrate` and `php artisan optimize:clear`. Both login modes were verified through the browser in the isolated QA environment; the current port-8002 login displays the updated form. [Login screenshot](screenshots/login.jpg).
+
+## Full-width POS and split-payment update
+
+The POS hides its sidebar behind a hamburger, places the cart on the right and provides a touch keypad in its payment popup. Split payments are saved, printed and reported across all selected methods. Fees apply to each allocated share, with thresholds selected using the whole discounted bill. Registers count each sale once, and voids reverse every linked processing expense. See [workflow, schema change and complete verification](POS-SPLIT-PAYMENTS.md).
+
+## Register popup and repeated-payment correction
+
+Open/close register controls use touch popups. The POS workspace and selling APIs require an open register. Closing shows all invoices, sales/discount totals, method collections and customer/business fees, plus counted cash and its difference. Repeated methods preserve each amount, fee and reference. Opening timestamps are protected on MariaDB. Sixteen sample products with audited positive opening stock have been added to this installation. Verification for this correction was limited to **7 focused tests / 85 assertions on SQLite and MySQL/MariaDB**, plus browser checks of opening, repeated payments, closing and responsive popup behavior. The full suite was not rerun.
+
+## Customer opening due update
+
+Customer creation from the POS and customer management now accepts an old balance as an outstanding opening due. The new customer directory, forms and profiles show balances, contacts and purchase history, with due/status filters and overview totals. The POS displays the selected customer's opening due separately from today's order; paid sales do not settle this old debt. Customer creation/corrections are audited, and positive-due customers cannot be deleted. No debt collection workflow is introduced. Migration `2026_10_08_000900_add_customer_opening_due` is applied locally; existing accounts default to zero.
+
+**11 focused customer tests / 121 assertions** passed on SQLite and MySQL/MariaDB. Desktop and phone browser checks covered creation from both forms, automatic POS selection, separate order/due totals and responsive customer views. Browser test balances were created only in the isolated QA database. [Customer form](screenshots/customer-form.jpg), [directory](screenshots/customers-directory.jpg), [profile](screenshots/customer-profile.jpg) and [POS opening due](screenshots/pos-customer-due.jpg).
+
+## Product catalogue and multiple units
+
+Product create/edit, directory and profile pages have dedicated responsive designs with clearer pricing and stock sections. **Multiple units** manages reusable conversion presets. Additional product units can derive their price from the primary price or use an override. POS and purchases select a unit, calculate amounts in that unit and move stock in the primary unit. Existing transactions receive their original quantity/cost as primary snapshots, and existing product stock is preserved. Historical voids/reversals use saved primary quantities and purchase costs, even after conversion edits. Unit permissions govern presets; product permissions govern product conversions.
+
+The local installation includes three starter presets, without changing any existing product's units. Focused verification passed 13 multiple-unit tests (127 assertions) on SQLite and MySQL/MariaDB, plus the affected split-payment/register regression checks on SQLite. Browser QA saved a three-unit product, loaded a preset, completed INV-000014 as 2 dozen × 1,100 = 2,200, and confirmed the 24-piece stock deduction and selected-unit receipt. All transaction fixtures remained in the isolated QA database. See [workflow and limits](PRODUCT-UNITS.md).
+
+## Compact cart and saved orders
+
+Cart items now occupy one row with plus/minus quantities and a final amount. Clicking the name opens a touch popup for unit, quantity, price and a fixed or percentage line discount. Price overrides are recorded separately and do not display as discounts. The cart and customer receipt show net amounts; internal sale/register/audit totals retain actual line discounts. Existing discount settings/limits also apply to price reductions.
+
+The same browser keeps a local draft for each cashier, preserving items, units, quantity, customer, edited prices and discounts across refresh/navigation. Cancel-order confirmation and successful payment clear it. Product/unit metadata is refreshed before restored orders can pay; unavailable entries require editing or removal. The original checkout token is retained, and `/pos/checkout-status` can detect an already-completed payment after a refresh. Drafts do not sync across devices and depend on browser storage. [Workflow and verification](POS-CART.md).
+
+## Grouped navigation and batch stock corrections
+
+The existing palette is retained. Sidebar groups expose permission-filtered list/create links for every resource and all 16 report links under Reports. Current groups open automatically; the POS drawer and mobile hamburger retain their behavior. Financial deletion continues to use reversal/void flows.
+
+Stock adjustments support up to 100 products at once, Add/Remove/Set stock, optional primary-unit selling-price/cost changes, filtered history, detail snapshots, editing revisions and reversal. See [workflow and scoped validation](STOCK-ADJUSTMENTS.md).
+
+## POS invoice editing (8 October 2026)
+
+Sales actions use the full available row with larger text. Edit opens the shared POS catalogue and cart, with existing items, prices, line discounts, bill discount, customer and notes. Review payment shows per-method collection/refund differences against the saved invoice; repeated payment entries are supported. Saving revises the same invoice, updates stock and fees atomically, and retains before/after history. Unsaved edits reset on refresh or navigation back; new-sale draft persistence remains separate. Original register must be open under the current cashier and the invoice cannot have returns or later due collections.
+
+Scoped verification: 42 tests / 474 assertions on SQLite; 8 invoice revision tests / 104 assertions on MySQL/MariaDB. Browser QA confirmed reset on refresh and Back, item-price/discount editing, a 120.00 refund adjustment and saving the same invoice. Main business invoices were only viewed. Production build and Blade compilation passed. See [workflow](SALES-WORKFLOW.md).

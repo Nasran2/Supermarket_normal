@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class PurchaseItem extends Model
 {
-    protected $fillable = ['purchase_id', 'product_id', 'name', 'unit', 'quantity', 'cost', 'total', 'previous_cost'];
+    protected $fillable = ['purchase_id', 'product_id', 'unit_id', 'base_quantity', 'base_cost', 'name', 'unit', 'quantity', 'cost', 'total', 'previous_cost'];
 
-    protected $casts = ['quantity' => 'decimal:3', 'cost' => 'decimal:2', 'total' => 'decimal:2', 'previous_cost' => 'decimal:2'];
+    protected $casts = ['base_quantity' => 'decimal:3', 'base_cost' => 'decimal:2', 'quantity' => 'decimal:3', 'cost' => 'decimal:2', 'total' => 'decimal:2', 'previous_cost' => 'decimal:2'];
 
     public function purchase()
     {

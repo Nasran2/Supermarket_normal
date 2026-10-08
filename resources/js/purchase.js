@@ -23,8 +23,39 @@ function add(initial = {}) {
   const product = line.querySelector('[data-field=product_id]'),
     qty = line.querySelector('[data-field=quantity]'),
     cost = line.querySelector('[data-field=cost]');
-  function unit() {
-    const opt = product.selectedOptions[0];
+  const unitSelect = line.querySelector('[data-field=unit_id]');
+  function unit(keepInitial = false) {
+    const options = JSON.parse(product.selectedOptions[0]?.dataset.units || '[]');
+    const selectedId = keepInitial ? initial.unit_id : null;
+    unitSelect.replaceChildren();
+    options.forEach((u) => {
+      const option = document.createElement('option');
+      option.value = u.id;
+      option.textContent = u.name + ' (' + u.short_name + ')';
+      option.dataset.decimal = u.decimal ? '1' : '0';
+      option.dataset.cost = u.cost;
+      unitSelect.append(option);
+    });
+    if (selectedId) {
+      if (options.some((u) => String(u.id) === String(selectedId))) unitSelect.value = selectedId;
+      else {
+        const missing = document.createElement('option');
+        missing.value = '';
+        missing.textContent = 'Previous unit unavailable — select a unit';
+        unitSelect.prepend(missing);
+        unitSelect.value = '';
+      }
+    }
+    if (!options.length) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'Select unit';
+      unitSelect.append(option);
+    }
+    updatePrecision();
+  }
+  function updatePrecision() {
+    const opt = unitSelect.selectedOptions[0];
     qty.step =
       opt?.dataset.decimal === '1'
         ? String(10 ** -Number(document.getElementById('purchase-form').dataset.quantityPrecision))
@@ -32,8 +63,15 @@ function add(initial = {}) {
     qty.min = qty.step;
   }
   product.addEventListener('change', () => {
-    cost.value = product.selectedOptions[0]?.dataset.cost ?? 0;
+    qty.value = '1';
     unit();
+    cost.value = unitSelect.selectedOptions[0]?.dataset.cost ?? 0;
+    total();
+  });
+  unitSelect.addEventListener('change', () => {
+    cost.value = unitSelect.selectedOptions[0]?.dataset.cost ?? 0;
+    qty.value = '1';
+    updatePrecision();
     total();
   });
   line.addEventListener('input', total);
@@ -42,7 +80,7 @@ function add(initial = {}) {
     total();
   });
   container.append(line);
-  unit();
+  unit(true);
   window.refreshIcons?.();
   total();
 }

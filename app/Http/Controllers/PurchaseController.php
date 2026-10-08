@@ -46,7 +46,7 @@ class PurchaseController extends Controller
     private function form(Purchase $purchase)
     {
         $suppliers = Supplier::where('active', true)->orderBy('name')->get();
-        $products = Product::with('unit')->where('active', true)->orderBy('name')->get();
+        $products = Product::with(['unit', 'conversions.unit'])->where('active', true)->orderBy('name')->get();
 
         return view('purchases.form', compact('purchase', 'suppliers', 'products'));
     }

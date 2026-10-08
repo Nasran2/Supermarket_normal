@@ -10,6 +10,11 @@ class Product extends Model
 
     protected $casts = ['active' => 'boolean', 'cost' => 'decimal:2', 'price' => 'decimal:2', 'stock' => 'decimal:3', 'low_stock' => 'decimal:3'];
 
+    public function conversions()
+    {
+        return $this->hasMany(ProductUnit::class);
+    }
+
     public function unit()
     {
         return $this->belongsTo(Unit::class);

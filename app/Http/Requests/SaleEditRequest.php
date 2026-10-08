@@ -13,6 +13,6 @@ class SaleEditRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['customer_id' => 'nullable|integer|exists:customers,id', 'reference' => 'nullable|string|max:255', 'notes' => 'nullable|string|max:1000'];
+        return ['customer_id' => 'nullable|integer|exists:customers,id', 'reference' => 'nullable|string|max:255', 'notes' => 'nullable|string|max:1000', 'payment_references' => 'nullable|array|max:10', 'payment_references.*' => 'nullable|string|max:255'];
     }
 }

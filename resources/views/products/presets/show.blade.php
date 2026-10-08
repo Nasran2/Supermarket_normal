@@ -1,0 +1,6 @@
+@extends('layouts.app')
+@section('title',$record->name)
+@section('content')
+<div class="page-heading"><div><span class="eyebrow">UNIT PRESET</span><h1>{{ $record->name }}</h1><p>Primary stock unit: {{ $record->unit->name }} ({{ $record->unit->short_name }})</p></div><div class="heading-actions"><a class="btn secondary" href="{{ route('manage.index','unit-presets') }}">Multiple units</a>@can('units.edit')<a class="btn primary" href="{{ route('manage.edit',['unit-presets',$record->id]) }}"><x-icon name="pencil"/>Edit preset</a>@endcan</div></div>
+<section class="card product-unit-details"><div class="customer-section-heading"><span class="customer-section-icon"><x-icon name="ruler"/></span><div><h2>Conversion group</h2><p>Load this preset into products using the same primary stock unit.</p></div></div><div class="table-wrap"><table><thead><tr><th>Primary quantity</th><th>Additional quantity</th><th>Additional unit</th></tr></thead><tbody>@foreach($record->conversions as $row)<tr><td>{{ (float)$row->base_quantity }} {{ $record->unit->short_name }}</td><td>{{ (float)$row->converted_quantity }}</td><td>{{ $row->unit->name }} ({{ $row->unit->short_name }})</td></tr>@endforeach</tbody></table></div><div class="conversion-note"><x-icon name="info" :size="16"/>Changing this preset does not alter conversions already saved on products.</div></section>
+@endsection

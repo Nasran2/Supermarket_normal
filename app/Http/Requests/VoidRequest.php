@@ -8,7 +8,7 @@ class VoidRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission($this->routeIs('sales.void') ? 'sales.void' : 'purchases.delete');
+        return $this->user()?->hasPermission($this->routeIs('sales.void', 'sales.destroy') ? 'sales.void' : 'purchases.delete');
     }
 
     public function rules(): array

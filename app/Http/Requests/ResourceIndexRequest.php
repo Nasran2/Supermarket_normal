@@ -14,6 +14,6 @@ class ResourceIndexRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['q' => 'nullable|string|max:150', 'active' => 'nullable|boolean', 'low_stock' => 'nullable|boolean', 'from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d', 'type' => 'nullable|in:MANUAL,AUTOMATIC'];
+        return ['q' => 'nullable|string|max:150', 'active' => 'nullable|boolean', 'balance' => 'nullable|in:due,clear', 'low_stock' => 'nullable|boolean', 'from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d', 'type' => 'nullable|in:MANUAL,AUTOMATIC'];
     }
 }

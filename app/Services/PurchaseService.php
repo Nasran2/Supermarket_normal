@@ -30,10 +30,13 @@ class PurchaseService
                 $this->reverseItems($purchase, $userId);
                 $purchase->items()->delete();
             }
-            $products = Product::with('unit')->whereIn('id', array_column($data['items'], 'product_id'))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-            $units = Unit::whereIn('id', $products->pluck('unit_id')->unique())->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $products = Product::with(['unit', 'conversions.unit'])->whereIn('id', array_column($data['items'], 'product_id'))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $units = Unit::whereIn('id', $products->pluck('unit_id')->merge($products->flatMap(fn ($p) => $p->conversions->pluck('unit_id')))->unique())->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             foreach ($products as $product) {
                 $product->setRelation('unit', $units[$product->unit_id]);
+                foreach ($product->conversions as $conversion) {
+                    $conversion->setRelation('unit', $units[$conversion->unit_id]);
+                }
             }
             $total = '0.00';
             $lines = [];
@@ -42,10 +45,14 @@ class PurchaseService
                 if (! $p || ! $p->active || ! $p->unit->active) {
                     throw ValidationException::withMessages(['items' => 'Choose active products and units.']);
                 }
-                $this->stock->validateQuantity($p, (string) $item['quantity']);
+                $selected = app(ProductUnitService::class)->resolve($p, $item['unit_id'] ?? null, (string) $item['quantity']);
+                $baseCost = app(ProductUnitService::class)->rate((string) $item['cost'], $selected['converted_quantity'], $selected['base_quantity']);
+                if (Money::compare($baseCost, '9999999999999.99') > 0) {
+                    throw ValidationException::withMessages(['items' => 'Converted cost exceeds the supported range.']);
+                }
                 $lineTotal = Money::mul((string) $item['cost'], (string) $item['quantity']);
                 $total = Money::add($total, $lineTotal);
-                $lines[] = ['product_id' => $p->id, 'name' => $p->name, 'unit' => $p->unit->short_name, 'quantity' => $item['quantity'], 'cost' => $item['cost'], 'total' => $lineTotal];
+                $lines[] = ['product_id' => $p->id, 'name' => $p->name, 'unit' => $selected['short_name'], 'unit_id' => $selected['id'], 'base_quantity' => $selected['base_stock_quantity'], 'base_cost' => $baseCost, 'quantity' => $item['quantity'], 'cost' => $item['cost'], 'total' => $lineTotal];
             }
             if (Money::compare($total, '9999999999999.99') > 0) {
                 throw ValidationException::withMessages(['items' => 'The purchase total exceeds the supported range.']);
@@ -60,8 +67,8 @@ class PurchaseService
                 $line['previous_cost'] = $products[$line['product_id']]->cost;
                 $purchase->items()->create($line);
                 $p = $products[$line['product_id']];
-                $this->stock->move($p, (string) $line['quantity'], 'PURCHASE', $purchase->reference, $userId);
-                $p->update(['cost' => $line['cost']]);
+                $this->stock->move($p, (string) $line['base_quantity'], 'PURCHASE', $purchase->reference, $userId);
+                $p->update(['cost' => $line['base_cost']]);
             }
             Audit::record('purchase.save', $purchase, $before, $purchase->load('items')->toArray());
 
@@ -73,13 +80,13 @@ class PurchaseService
     {
         foreach ($purchase->items()->orderBy('product_id')->get() as $item) {
             $p = Product::whereKey($item->product_id)->lockForUpdate()->firstOrFail();
-            if (Money::compare($p->stock, $item->quantity) < 0) {
+            if (Money::compare($p->stock, $item->base_quantity ?? $item->quantity) < 0) {
                 throw ValidationException::withMessages(['items' => 'Cannot reverse '.$p->name.': purchased stock has already been sold.']);
             }
-            $this->stock->move($p, '-'.$item->quantity, 'PURCHASE REVERSAL', $purchase->reference, $userId);
-            if (Money::compare($p->cost, $item->cost) === 0) {
+            $this->stock->move($p, '-'.($item->base_quantity ?? $item->quantity), 'PURCHASE REVERSAL', $purchase->reference, $userId);
+            if (Money::compare($p->cost, $item->base_cost ?? $item->cost) === 0) {
                 $prior = PurchaseItem::where('product_id', $p->id)->where('purchase_id', '!=', $purchase->id)->whereHas('purchase', fn ($q) => $q->where('status', 'ACTIVE'))->latest('id')->first();
-                $restoredCost = $prior?->cost ?? $item->previous_cost;
+                $restoredCost = $prior?->base_cost ?? $prior?->cost ?? $item->previous_cost;
                 if ($restoredCost !== null) {
                     $p->update(['cost' => $restoredCost]);
                 }

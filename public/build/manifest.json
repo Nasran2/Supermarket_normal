@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-jSLhfonT.css",
+    "file": "assets/app-DIzUJDaG.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -9,21 +9,39 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-CM1zwuTL.js",
+    "file": "assets/app-C9agjl3g.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
   },
   "resources/js/pos.js": {
-    "file": "assets/pos-DktpNoY0.js",
+    "file": "assets/pos-CL0IJCc6.js",
     "name": "pos",
     "src": "resources/js/pos.js",
     "isEntry": true
   },
+  "resources/js/product-units.js": {
+    "file": "assets/product-units-r8KRWtin.js",
+    "name": "product-units",
+    "src": "resources/js/product-units.js",
+    "isEntry": true
+  },
   "resources/js/purchase.js": {
-    "file": "assets/purchase-iZG_9vMY.js",
+    "file": "assets/purchase-CMWOmR6z.js",
     "name": "purchase",
     "src": "resources/js/purchase.js",
+    "isEntry": true
+  },
+  "resources/js/sales.js": {
+    "file": "assets/sales-CPJKppA4.js",
+    "name": "sales",
+    "src": "resources/js/sales.js",
+    "isEntry": true
+  },
+  "resources/js/stock-adjustments.js": {
+    "file": "assets/stock-adjustments-7j7tf9JZ.js",
+    "name": "stock-adjustments",
+    "src": "resources/js/stock-adjustments.js",
     "isEntry": true
   }
 }

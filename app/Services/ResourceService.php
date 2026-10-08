@@ -4,10 +4,15 @@ namespace App\Services;
 
 use App\Models\PaymentChargeRule;
 use App\Models\PaymentMethod;
+use App\Models\ProductUnit;
+use App\Models\PurchaseItem;
 use App\Models\Register;
 use App\Models\Role;
+use App\Models\SaleItem;
+use App\Models\StockAdjustmentItem;
 use App\Models\StockMovement;
 use App\Models\Unit;
+use App\Models\UnitPresetConversion;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\Money;
@@ -56,16 +61,44 @@ class ResourceService
                 }
                 $before = $record->getAttributes();
                 $values = $data;
+                unset($values['conversions']);
+                if (in_array($resource, ['products', 'unit-presets']) && $id) {
+                    $before['conversions'] = $record->conversions->toArray();
+                }
+                if ($resource === 'unit-presets' || ($resource === 'products' && array_key_exists('conversions', $data))) {
+                    $base = Unit::whereKey($data['unit_id'])->lockForUpdate()->firstOrFail();
+                    app(ProductUnitService::class)->rows($base, $data['conversions'] ?? []);
+                }
+
+                if ($resource === 'customers' && (array_key_exists('opening_due', $values) || ! $id)) {
+                    $values['opening_due'] = Money::round((string) ($values['opening_due'] ?? 0));
+                }
                 if ($resource === 'payment-rules' && ($data['charge_bearer'] ?? null) === 'DEFAULT') {
                     $values['charge_bearer'] = null;
                 }
                 if ($resource === 'roles' && $id) {
                     $before['permissions'] = $record->permissions->pluck('id')->all();
                 }
-                if ($resource === 'units' && $id && ! $data['allow_decimal']) {
+                if ($resource === 'units' && $id && $record->allow_decimal && ! $data['allow_decimal']) {
+                    foreach ([SaleItem::class, PurchaseItem::class] as $itemModel) {
+                        if ($itemModel::where('unit_id', $id)->whereRaw('quantity <> ROUND(quantity, 0)')->exists()) {
+                            throw ValidationException::withMessages(['allow_decimal' => 'This unit has fractional transaction history.']);
+                        }
+                    }
+                    if (StockAdjustmentItem::where('unit_id', $id)->where(fn ($q) => $q->whereRaw('stock_before <> ROUND(stock_before, 0)')->orWhereRaw('stock_after <> ROUND(stock_after, 0)')->orWhereRaw('quantity_change <> ROUND(quantity_change, 0)'))->exists()) {
+                        throw ValidationException::withMessages(['allow_decimal' => 'This unit has fractional stock adjustment history.']);
+                    }
+                    foreach ([ProductUnit::class, UnitPresetConversion::class] as $conversionModel) {
+                        if ($conversionModel::where('unit_id', $id)->whereRaw('converted_quantity <> ROUND(converted_quantity, 0)')->exists()) {
+                            throw ValidationException::withMessages(['allow_decimal' => 'This unit is used in fractional conversions.']);
+                        }
+                    }
                     foreach ($record->products()->cursor() as $p) {
-                        if ($p->saleItems()->whereRaw('quantity <> ROUND(quantity, 0)')->exists() || $p->purchaseItems()->whereRaw('quantity <> ROUND(quantity, 0)')->exists()) {
+                        if ($p->saleItems()->whereRaw('COALESCE(base_quantity, quantity) <> ROUND(COALESCE(base_quantity, quantity), 0)')->exists() || $p->purchaseItems()->whereRaw('COALESCE(base_quantity, quantity) <> ROUND(COALESCE(base_quantity, quantity), 0)')->exists()) {
                             throw ValidationException::withMessages(['allow_decimal' => 'This unit has a history of fractional transactions.']);
+                        }
+                        if ($p->conversions()->whereRaw('base_quantity <> ROUND(base_quantity, 0)')->exists()) {
+                            throw ValidationException::withMessages(['allow_decimal' => 'This unit is used in fractional primary conversions.']);
                         }
                         foreach ([$p->stock, $p->low_stock] as $q) {
                             if (Money::compare($q, (string) intval($q)) !== 0) {
@@ -73,11 +106,21 @@ class ResourceService
                             }
                         }
                     }
+                    if (UnitPresetConversion::whereHas('preset', fn ($q) => $q->where('unit_id', $id))->whereRaw('base_quantity <> ROUND(base_quantity, 0)')->exists()) {
+                        throw ValidationException::withMessages(['allow_decimal' => 'This unit is used in fractional preset conversions.']);
+                    }
                 }
                 if ($resource === 'products') {
                     $unit = Unit::whereKey($data['unit_id'])->lockForUpdate()->firstOrFail();
-                    if ($id && $record->unit_id != $unit->id && ($record->saleItems()->exists() || $record->purchaseItems()->exists() || StockMovement::where('product_id', $record->id)->exists() || Money::compare($record->stock, 0) !== 0)) {
+                    if ($id && $record->unit_id != $unit->id && ($record->saleItems()->exists() || $record->purchaseItems()->exists() || StockMovement::where('product_id', $record->id)->exists() || StockAdjustmentItem::where('product_id', $record->id)->exists() || Money::compare($record->stock, 0) !== 0)) {
                         throw ValidationException::withMessages(['unit_id' => 'Units cannot change after stock or transactions exist.']);
+                    }
+                    if ($id && $record->unit_id != $unit->id && ! array_key_exists('conversions', $data)) {
+                        $record->conversions()->delete();
+                        $record->unsetRelation('conversions');
+                    }
+                    if (! $unit->active) {
+                        throw ValidationException::withMessages(['unit_id' => 'Choose an active primary unit.']);
                     }
                     if (! $unit->allow_decimal && Money::compare($data['low_stock'], (string) intval($data['low_stock'])) !== 0) {
                         throw ValidationException::withMessages(['low_stock' => 'This unit requires a whole quantity.']);
@@ -145,6 +188,15 @@ class ResourceService
                 unset($values['permissions']);
                 $record->fill($values);
                 $record->save();
+                if (in_array($resource, ['products', 'unit-presets']) && (array_key_exists('conversions', $data) || $resource === 'unit-presets')) {
+                    $record->conversions()->delete();
+                    $record->conversions()->createMany($data['conversions'] ?? []);
+                    $record->unsetRelation('conversions');
+                }
+                if ($resource === 'products') {
+                    $record->unsetRelation('unit');
+                    app(ProductUnitService::class)->options($record);
+                }
                 if ($resource === 'roles') {
                     $record->permissions()->sync($permissionIds);
                 }
@@ -155,6 +207,10 @@ class ResourceService
                 }
                 unset($before['password']);
                 $after = $record->getAttributes();
+                if (in_array($resource, ['products', 'unit-presets'])) {
+                    $after['conversions'] = $record->conversions->toArray();
+                }
+
                 if ($resource === 'roles') {
                     $after['permissions'] = $permissionIds;
                 }
@@ -176,6 +232,9 @@ class ResourceService
         DB::transaction(function () use ($resource, $def, $id) {
             $record = $def['model']::whereKey($id)->lockForUpdate()->firstOrFail();
             $this->guardEditable($resource, $record);
+            if ($resource === 'customers' && Money::compare($record->due_balance, 0) > 0) {
+                throw ValidationException::withMessages(['delete' => 'This customer has an outstanding due. Deactivate the account to preserve its balance.']);
+            }
             if ($resource === 'roles' && $record->system) {
                 throw ValidationException::withMessages(['role' => 'System roles cannot be deleted.']);
             }

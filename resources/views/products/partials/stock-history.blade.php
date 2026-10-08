@@ -1,0 +1,12 @@
+<section class="card product-stock-history mt-6" id="stock-history">
+    <div class="card-heading"><div><h2>Stock movement history <span class="badge slate">{{ $movements->total() }}</span></h2><p>Every stock change in {{ $product->unit->short_name }}. Select an invoice to view its bill.</p></div>@can('products.edit')<a class="btn secondary" href="{{ route('stock.edit',$product) }}"><x-icon name="boxes"/>Adjust stock</a>@endcan</div>
+    <div class="table-wrap"><table><thead><tr><th>Date &amp; time</th><th>Movement</th><th>Bill / reference</th><th class="text-right">Quantity change</th><th class="text-right">Stock after</th><th>Recorded by</th></tr></thead><tbody>
+    @forelse($movements as $movement)
+        @php
+            $bill = $movement->reason==='SALE RETURN' ? $movement->saleReturn?->sale : (str_starts_with($movement->reason,'SALE') ? $movement->sale : null);
+            $positive = \App\Support\Money::compare($movement->quantity,0)>0;
+        @endphp
+        <tr><td class="stock-movement-date">{{ $movement->created_at->format(($settings['date_format']??'d/m/Y').' '.($settings['time_format']??'h:i A')) }}</td><td><strong>{{ $movement->reason }}</strong></td><td>@if($bill)@can('sales.view')<a class="text-link stock-bill-link" href="{{ route('sales.show',$bill) }}">{{ $bill->invoice }}<x-icon name="arrow-up-right" :size="14"/></a>@else<strong>{{ $bill->invoice }}</strong>@endcan @if($movement->reference!==$bill->invoice)<small class="cell-note">{{ $movement->reference }}</small>@endif @else{{ $movement->reference ?: '—' }}@endif</td><td class="text-right"><span class="badge {{ $positive?'green':(\App\Support\Money::compare($movement->quantity,0)<0?'red':'slate') }}">{{ $positive?'+':'' }}{{ rtrim(rtrim($movement->quantity,'0'),'.') }} {{ $product->unit->short_name }}</span></td><td class="text-right"><strong>{{ rtrim(rtrim($movement->balance,'0'),'.') }}</strong> {{ $product->unit->short_name }}</td><td>{{ $movement->user?->name ?? 'System' }}</td></tr>
+    @empty<tr><td colspan="6"><div class="empty-state"><x-icon name="history" :size="30"/><h3>No stock movements yet</h3><p>Purchases, sales, returns and stock adjustments will appear here.</p></div></td></tr>@endforelse
+    </tbody></table></div><div class="pagination">{{ $movements->links() }}</div>
+</section>

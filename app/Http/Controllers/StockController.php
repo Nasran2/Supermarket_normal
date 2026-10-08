@@ -16,7 +16,7 @@ class StockController extends Controller
     public function edit(Product $product)
     {
         $product->load('unit');
-        $movements = $product->hasMany(StockMovement::class)->with('user')->latest()->paginate(20);
+        $movements = $product->hasMany(StockMovement::class)->with('user', 'sale', 'saleReturn.sale')->latest('created_at')->latest('id')->paginate(20, ['*'], 'movements');
 
         return view('crud.stock', compact('product', 'movements'));
     }

@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ReportService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ReportRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission('reports.'.$this->route('report'));
+        return $this->user()?->hasPermission(ReportService::permission((string) $this->route('report')));
     }
 
     public function rules(): array

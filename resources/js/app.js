@@ -1,3 +1,4 @@
+import './register.js';
 import {
   createIcons,
   ShoppingBasket,
@@ -49,6 +50,7 @@ import {
   Info,
   SearchX,
   Download,
+  Menu,
 } from 'lucide';
 const icons = {
   ShoppingBasket,
@@ -100,13 +102,15 @@ const icons = {
   Info,
   SearchX,
   Download,
+  Menu,
 };
 window.refreshIcons = () => createIcons({ icons });
 window.refreshIcons();
 const sidebar = document.getElementById('sidebar'),
   overlay = document.getElementById('nav-overlay'),
   toggle = document.getElementById('nav-toggle');
-if (localStorage.getItem('twinsofte-nav') === 'collapsed')
+const posWorkspace = document.body.classList.contains('pos-workspace');
+if (!posWorkspace && localStorage.getItem('twinsofte-nav') === 'collapsed')
   document.body.classList.add('nav-collapsed');
 const closeNav = () => {
   sidebar?.classList.remove('mobile-open');
@@ -114,7 +118,7 @@ const closeNav = () => {
   toggle?.setAttribute('aria-expanded', 'false');
 };
 toggle?.addEventListener('click', () => {
-  if (innerWidth <= 1024) {
+  if (posWorkspace || innerWidth <= 1024) {
     const open = sidebar.classList.toggle('mobile-open');
     overlay.classList.toggle('visible', open);
     toggle.setAttribute('aria-expanded', String(open));
@@ -146,4 +150,15 @@ document.addEventListener('submit', (e) => {
       button.textContent = 'Saving…';
     }, 0);
   }
+});
+
+// Opening a group from the desktop icon rail reveals its sublinks.
+document.querySelectorAll('.nav-group > summary').forEach((summary) => {
+  summary.addEventListener('click', () => {
+    if (document.body.classList.contains('nav-collapsed') && innerWidth > 1024 && !posWorkspace) {
+      document.body.classList.remove('nav-collapsed');
+      localStorage.setItem('twinsofte-nav', 'expanded');
+      toggle?.setAttribute('aria-expanded', 'true');
+    }
+  });
 });

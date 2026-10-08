@@ -67,7 +67,7 @@ class ResourceRequest extends FormRequest
             $r[$key] = $rules;
         }
         $unique = match ($resource) {
-            'products' => ['sku', 'barcode'],'units' => ['name', 'short_name'],'payment-methods' => ['name', 'code'],'users' => ['email', 'username'],'roles','categories','expense-categories' => ['name'],default => []
+            'products' => ['sku', 'barcode'],'units' => ['name', 'short_name'],'payment-methods' => ['name', 'code'],'users' => ['email', 'username'],'roles','categories','expense-categories','unit-presets' => ['name'],default => []
         };
         foreach ($unique as $key) {
             $r[$key][] = Rule::unique($model->getTable(), $key)->ignore($id);
@@ -96,6 +96,20 @@ class ResourceRequest extends FormRequest
         if ($resource === 'expenses') {
             $r['amount'][] = 'gt:0';
         }
+        if (in_array($resource, ['products', 'unit-presets'])) {
+            $r['conversions'] = ['sometimes', 'array', 'max:20'];
+            $r['conversions.*'] = ['array:unit_id,base_quantity,converted_quantity'.($resource === 'products' ? ',price' : '')];
+            $r['conversions.*.unit_id'] = ['required', 'integer', 'distinct', Rule::exists('units', 'id')->where('active', true), 'different:unit_id'];
+            foreach (['base_quantity', 'converted_quantity'] as $quantity) {
+                $r['conversions.*.'.$quantity] = ['required', 'numeric', 'gt:0', 'max:999999', 'decimal:0,6'];
+            }
+            if ($resource === 'unit-presets') {
+                $r['conversions'] = ['required', 'array', 'min:1', 'max:20'];
+            }
+            if ($resource === 'products') {
+                $r['conversions.*.price'] = ['nullable', 'numeric', 'min:0', 'max:999999999', 'decimal:0,2'];
+            }
+        }
         if ($resource === 'products' && $id) {
             unset($r['stock']);
         }
@@ -107,6 +121,9 @@ class ResourceRequest extends FormRequest
     {
         if ($this->route('resource') === 'users' && is_string($this->input('username'))) {
             $this->merge(['username' => strtolower(trim($this->input('username')))]);
+        }
+        if (in_array($this->route('resource'), ['products', 'unit-presets']) && $this->boolean('conversions_present')) {
+            $this->merge(['conversions' => $this->input('conversions', [])]);
         }
         foreach (Resources::get($this->route('resource'))['fields'] as $key => $field) {
             if ($field[1] === 'checkbox') {

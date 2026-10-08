@@ -1,0 +1,27 @@
+@php($currency = $settings['currency_symbol'] ?? 'Rs.')
+<div class="shift-summary">
+    <div class="shift-meta"><strong>REG-{{ $register->id }}</strong><span>{{ $register->opened_at->format('d/m/Y H:i') }}@if($register->closed_at) – {{ $register->closed_at->format('d/m/Y H:i') }}@endif</span><span class="badge {{ $register->closed_at?'slate':'green' }}">{{ $register->closed_at?'Closed':'Open' }}</span></div>
+    <div class="shift-totals">
+        @foreach(['Completed sales'=>$summary['transactions'], 'Voided sales'=>$summary['voided_transactions']] as $label=>$value)<div><span>{{ $label }}</span><strong>{{ $value }}</strong></div>@endforeach
+        @foreach(['Sales total'=>$summary['sales_amount'],'Discounts'=>$summary['discounts'],'Returns'=>$summary['returns'],'Refunds paid'=>$summary['refunds'],'Due payments received'=>$summary['due_collections'],'Net customer collections'=>$summary['collections'],'Processing fees'=>$summary['customer_fees']] as $label=>$value)<div><span>{{ $label }}@if($label==='Processing fees') <small>paid by customer</small>@endif</span><strong>{{ $currency }} {{ \App\Support\Money::display($value) }}</strong></div>@endforeach
+    </div>
+    <h3>Payments and processing fees</h3>
+    <div class="table-wrap shift-payment-table"><table><thead><tr><th>Method</th><th>Payments</th><th>Sale amount</th><th>Collected</th><th>Customer fees</th><th>Business fees</th></tr></thead><tbody>
+        @foreach($summary['payment_totals'] as $payment)<tr><td><strong>{{ $payment['name'] }}</strong></td><td>{{ $payment['entries'] }}</td>@foreach(['base_amount','collected','customer_fees','business_fees'] as $key)<td>{{ $currency }} {{ \App\Support\Money::display($payment[$key]) }}</td>@endforeach</tr>@endforeach
+    </tbody></table></div>
+    <p class="muted text-xs">Collections include customer fees and due payments, less refunds and cash change. Returns keep the original processing fees. Voided sales are excluded.</p>
+    <h3>Cash drawer</h3>
+    <dl class="shift-cash-details">
+        @foreach(['Opening cash'=>$register->opening_cash,'Cash sales collected'=>$summary['cash'],'Cash in'=>$summary['in'],'Cash out'=>$summary['out'],'Cash expenses'=>$summary['expenses'],'Expected cash'=>$register->closed_at?$register->expected_cash:$summary['expected']] as $label=>$value)<div><dt>{{ $label }}</dt><dd>{{ $currency }} {{ \App\Support\Money::display($value) }}</dd></div>@endforeach
+        @if($register->closed_at)@foreach(['Actual cash counted'=>$register->actual_cash,'Cash difference'=>$register->difference] as $label=>$value)<div class="shift-reconciliation"><dt>{{ $label }}</dt><dd>{{ $currency }} {{ \App\Support\Money::display($value) }}</dd></div>@endforeach @endif
+    </dl>
+    <details class="shift-sales" open><summary>All sales in this register <span>{{ $sales->count() }}</span></summary><div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Time</th><th>Methods</th><th>Sale total</th><th>Collected</th><th>Status</th></tr></thead><tbody>
+        @forelse($sales as $sale)<tr><td>@can('sales.view')<a class="text-link" href="{{ route('sales.show',$sale) }}" target="_blank">{{ $sale->invoice }}</a>@else{{ $sale->invoice }}@endcan</td><td>{{ $sale->sold_at->format('H:i') }}</td><td>{{ $sale->payment_names }}</td><td>{{ $currency }} {{ \App\Support\Money::display($sale->sale_amount) }}</td><td>{{ $currency }} {{ \App\Support\Money::display(\App\Support\Money::sub(\App\Support\Money::sum($sale->payments->pluck('amount_paid')),\App\Support\Money::sum($sale->payments->pluck('change')))) }}</td><td><span class="badge {{ $sale->status==='ACTIVE'?'green':'slate' }}">{{ $sale->status==='ACTIVE'?'Completed':'Voided' }}</span></td></tr>@empty<tr><td colspan="6" class="empty-cell">No sales in this register yet.</td></tr>@endforelse
+    </tbody></table></div></details>
+    @if($summary['return_records']->isNotEmpty() || $summary['collection_records']->isNotEmpty())
+    <h3>Returns and due collections in this shift</h3><div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Activity</th><th>Method</th><th>Amount</th><th>Cashier</th></tr></thead><tbody>
+    @foreach($summary['return_records'] as $activity)<tr><td>{{ $activity->sale->invoice }}</td><td>{{ $activity->reference }}<small class="cell-note">Return {{ \App\Support\Money::display($activity->amount) }} · Due reduction {{ \App\Support\Money::display($activity->due_reduction) }}</small></td><td>{{ $activity->method_name ?? 'No refund' }}</td><td>−{{ \App\Support\Money::display($activity->refund_amount) }}</td><td>{{ $activity->user->name }}</td></tr>@endforeach
+    @foreach($summary['collection_records'] as $activity)<tr><td>{{ $activity->sale->invoice }}</td><td>Due payment</td><td>{{ $activity->method_name }}</td><td>{{ \App\Support\Money::display($activity->amount) }}</td><td>{{ $activity->user->name }}</td></tr>@endforeach
+    </tbody></table></div>@endif
+    @if($register->notes)<p class="shift-notes"><strong>Closing notes:</strong> {{ $register->notes }}</p>@endif
+</div>

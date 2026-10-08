@@ -25,9 +25,9 @@ class PaymentChargeService
         });
     }
 
-    public function calculateCharge(PaymentMethod $method, string $amount, bool $lock = false): array
+    public function calculateCharge(PaymentMethod $method, string $amount, bool $lock = false, ?string $ruleAmount = null): array
     {
-        $rule = $this->getApplicableRule($method, $amount, $lock);
+        $rule = $this->getApplicableRule($method, $ruleAmount ?? $amount, $lock);
         $charge = $rule ? ($rule->charge_type === 'PERCENTAGE' ? Money::percent($amount, $rule->charge_value) : Money::round($rule->charge_value)) : '0.00';
         $bearer = $rule?->charge_bearer ?? $method->charge_bearer;
 
