@@ -20,6 +20,7 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ReportService
 {
@@ -242,6 +243,11 @@ class ReportService
             $xp = SalesVisibility::apply(DB::table('expenses'), 'expenses.user_id')->where(fn ($q) => $q->whereNull('sale_id')->orWhereIn('sale_id', Sale::visibleTo()->select('id')))->selectRaw("'Expense' as type, id as reference_id, reference, expense_date as date, payment_method_id, 0 as in_amount, amount as out_amount")->whereNotNull('payment_method_id')->where('status', 'ACTIVE');
 
             $unionQuery = $sp->unionAll($cp)->unionAll($sc)->unionAll($sr)->unionAll($pp)->unionAll($xp);
+            if (Schema::hasTable('hr_payments')) {
+                $hrDate = DB::getDriverName() === 'sqlite' ? "date || ' 00:00:00'" : "CONCAT(date, ' 00:00:00')";
+                $hp = SalesVisibility::apply(DB::table('hr_payments'), 'hr_payments.user_id')->selectRaw("'Staff payment' as type, id as reference_id, reference, $hrDate as date, payment_method_id, 0 as in_amount, amount as out_amount")->where('status', 'ACTIVE');
+                $unionQuery->unionAll($hp);
+            }
 
             $query = DB::table($unionQuery, 'transactions')
                 ->whereBetween('date', [$start, $end])
@@ -286,7 +292,7 @@ class ReportService
                 'Closing balance' => (string) $closing,
             ];
         } elseif ($kind === 'audit') {
-            $query = SalesVisibility::apply(AuditLog::with('user'), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
+            $query = SalesVisibility::apply(AuditLog::with('user')->where('action', 'not like', 'hr.%'), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
             if (SalesVisibility::mode() !== 'ALL') {
                 $subjects = [Sale::class => Sale::visibleTo()->select('id')];
                 foreach ([SaleReturn::class, SaleCollection::class, SaleRevision::class] as $subject) {

@@ -575,3 +575,7 @@ Generated from the installed MySQL/MariaDB database. Money is DECIMAL(15,2), qua
 | role_id | bigint(20) unsigned | Yes |
 | active | tinyint(1) | No |
 | username | varchar(64) | Yes |
+
+## Optional HR tables
+
+The `2026_10_10_000000_create_hr_module` migration adds `hr_options`, `hr_staff`, `hr_employment_events`, `hr_attendances`, `hr_leaves`, `hr_payrolls` and `hr_payments`. They use foreign keys that preserve historical records. Staff/date attendance is unique; a nullable unique payroll `live_key` permits one non-voided payroll per employee/month; payment tokens prevent duplicate retries. Payroll approval links to an `HR_PAYROLL` expense, while cash payment records link to the original register. Turning HR off does not remove these tables or posted accounting entries. See `HR-MODULE.md` for calculation policies.

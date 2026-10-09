@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="HgIRXBzUzjLBKqmb4M88lnVNkXQtrb7bwU3l4PBR"><title>Payroll summary report · Twinsofte Supermarket</title><link rel="preload" as="style" href="http://127.0.0.1:8011/build/assets/app-oiowFZTn.css" /><link rel="modulepreload" as="script" href="http://127.0.0.1:8011/build/assets/app-DqPubnqB.js" /><link rel="stylesheet" href="http://127.0.0.1:8011/build/assets/app-oiowFZTn.css" /><script type="module" src="http://127.0.0.1:8011/build/assets/app-DqPubnqB.js"></script></head>
+<body class="">
+<div class="nav-overlay" id="nav-overlay"></div>
+<aside class="sidebar" id="sidebar">
+ <a class="brand" href="http://127.0.0.1:8011"><img src="http://127.0.0.1:8011/storage/branding/0YMIEM4XaO63FiKTFpvOCp15LqJ9qNHxPEKBuH32.png" alt="Business logo"><div class="brand-copy"><strong>Twinsofte Supermarket</strong><span>SUPERMARKET POS</span></div></a>
+ <nav class="nav-links" aria-label="Main navigation">
+ <a href="http://127.0.0.1:8011" class="nav-link " title="Dashboard"><i data-lucide="layout-dashboard" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Dashboard</span></a><a href="http://127.0.0.1:8011/pos" class="nav-link " title="Point of sale"><i data-lucide="scan-line" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Point of sale</span></a><details class="nav-group" >
+    <summary class="nav-link " title="Sales"><i data-lucide="receipt-text" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Sales</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/sales" >All sales</a><a class="nav-child " href="http://127.0.0.1:8011/pos" >New sale</a><a class="nav-child " href="http://127.0.0.1:8011/reports/sales" >Sales report</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Purchases"><i data-lucide="package-open" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Purchases</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/purchases" >All purchases</a><a class="nav-child " href="http://127.0.0.1:8011/purchases/create" >Add purchase</a><a class="nav-child " href="http://127.0.0.1:8011/reports/purchases" >Purchase report</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Daily register"><i data-lucide="wallet" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Daily register</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/register" >Register &amp; history</a><a class="nav-child " href="http://127.0.0.1:8011/reports/register" >Register report</a><a class="nav-child " href="http://127.0.0.1:8011/reports/cash" >Cash summary</a></div>
+</details>
+<div class="nav-section">INVENTORY</div><details class="nav-group" >
+    <summary class="nav-link " title="Products"><i data-lucide="package" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Products</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/manage/products" >All products</a><a class="nav-child " href="http://127.0.0.1:8011/manage/products/create" >Add product</a><a class="nav-child " href="http://127.0.0.1:8011/stock-adjustments" >Stock adjustments</a><a class="nav-child " href="http://127.0.0.1:8011/stock-adjustments/create" >New adjustment</a><a class="nav-child " href="http://127.0.0.1:8011/manage/products?low_stock=1" >Low stock</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Categories"><i data-lucide="tags" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Categories</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/manage/categories" >All categories</a><a class="nav-child " href="http://127.0.0.1:8011/manage/categories/create" >Add category</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Units"><i data-lucide="ruler" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Units</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/manage/units" >All units</a><a class="nav-child " href="http://127.0.0.1:8011/manage/units/create" >Add unit</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Multiple units"><i data-lucide="boxes" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Multiple units</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/manage/unit-presets" >All multiple units</a><a class="nav-child " href="http://127.0.0.1:8011/manage/unit-presets/create" >Add unit preset</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Suppliers"><i data-lucide="truck" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Suppliers</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/manage/suppliers" >All suppliers</a><a class="nav-child " href="http://127.0.0.1:8011/manage/suppliers/create" >Add supplier</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Customers"><i data-lucide="contact" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Customers</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/manage/customers" >All customers</a><a class="nav-child " href="http://127.0.0.1:8011/manage/customers/create" >Add customer</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Expenses"><i data-lucide="circle-dollar-sign" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Expenses</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/manage/expenses" >All expenses</a><a class="nav-child " href="http://127.0.0.1:8011/manage/expenses/create" >Add expense</a><a class="nav-child " href="http://127.0.0.1:8011/manage/expense-categories" >Expense categories</a><a class="nav-child " href="http://127.0.0.1:8011/manage/expense-categories/create" >Add expense category</a></div>
+</details>
+<div class="nav-section">MANAGEMENT</div><details class="nav-group"  open >
+    <summary class="nav-link active" title="Human resources"><i data-lucide="users-round" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Human resources</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/hr" >Overview</a><a class="nav-child " href="http://127.0.0.1:8011/hr/staff" >Staff</a><a class="nav-child " href="http://127.0.0.1:8011/hr/attendance" >Attendance</a><a class="nav-child " href="http://127.0.0.1:8011/hr/leave" >Leave requests</a><a class="nav-child " href="http://127.0.0.1:8011/hr/payroll" >Payroll</a><a class="nav-child " href="http://127.0.0.1:8011/hr/payments" >Payments &amp; advances</a><a class="nav-child " href="http://127.0.0.1:8011/hr/setup" >HR setup</a><a class="nav-child active" href="http://127.0.0.1:8011/hr/reports" aria-current="page">HR reports</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Reports"><i data-lucide="chart-no-axes-combined" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Reports</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/reports" >All reports</a><a class="nav-child " href="http://127.0.0.1:8011/reports/sales" >Sales</a><a class="nav-child " href="http://127.0.0.1:8011/reports/purchases" >Purchases</a><a class="nav-child " href="http://127.0.0.1:8011/reports/expenses" >Expenses</a><a class="nav-child " href="http://127.0.0.1:8011/reports/profit" >Profit &amp; loss</a><a class="nav-child " href="http://127.0.0.1:8011/reports/stock" >Stock</a><a class="nav-child " href="http://127.0.0.1:8011/reports/product-sales" >Product sales</a><a class="nav-child " href="http://127.0.0.1:8011/reports/payments" >Payment methods</a><a class="nav-child " href="http://127.0.0.1:8011/reports/register" >Register</a><a class="nav-child " href="http://127.0.0.1:8011/reports/cash" >Cash summary</a><a class="nav-child " href="http://127.0.0.1:8011/reports/payment-charges" >Payment processing charges</a><a class="nav-child " href="http://127.0.0.1:8011/reports/card-charges" >Card charges</a><a class="nav-child " href="http://127.0.0.1:8011/reports/qr-charges" >QR charges</a><a class="nav-child " href="http://127.0.0.1:8011/reports/bank-charges" >Bank charges</a><a class="nav-child " href="http://127.0.0.1:8011/reports/returns" >Sales returns</a><a class="nav-child " href="http://127.0.0.1:8011/reports/collections" >Due collections</a><a class="nav-child " href="http://127.0.0.1:8011/reports/audit" >Audit log</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Users"><i data-lucide="users" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Users</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/manage/users" >All users</a><a class="nav-child " href="http://127.0.0.1:8011/manage/users/create" >Add user</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Roles &amp; permissions"><i data-lucide="shield-check" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Roles &amp; permissions</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/manage/roles" >All roles &amp; permissions</a><a class="nav-child " href="http://127.0.0.1:8011/manage/roles/create" >Add role</a></div>
+</details>
+<details class="nav-group" >
+    <summary class="nav-link " title="Settings"><i data-lucide="settings-2" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+<span>Settings</span><i data-lucide="chevron-down" class="icon nav-chevron" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary>
+    <div class="nav-children"><a class="nav-child " href="http://127.0.0.1:8011/settings" >Overview</a><a class="nav-child " href="http://127.0.0.1:8011/settings/business" >Business</a><a class="nav-child " href="http://127.0.0.1:8011/settings/pos" >Point of sale</a><a class="nav-child " href="http://127.0.0.1:8011/settings/receipt" >Receipt</a><a class="nav-child " href="http://127.0.0.1:8011/settings/stock" >Stock controls</a><a class="nav-child " href="http://127.0.0.1:8011/settings/system" >System</a><a class="nav-child " href="http://127.0.0.1:8011/manage/payment-methods" >Payment methods</a><a class="nav-child " href="http://127.0.0.1:8011/manage/payment-methods/create" >Add payment method</a></div>
+</details>
+ </nav><div class="sidebar-footer"><span class="status-dot"></span><span class="brand-copy">Twinsofte · Store workspace</span></div>
+</aside>
+<div class="app-shell"><header class="topbar"><div class="flex items-center gap-3 min-w-0"><button class="icon-button" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="true" aria-controls="sidebar"><i data-lucide="panel-left" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+</button><div class="breadcrumb"><span>Workspace</span><i data-lucide="chevron-right" class="icon" style="width:14px;height:14px" aria-hidden="true"></i>
+<strong>Payroll summary report</strong></div></div><div class="topbar-actions">
+ <a href="http://127.0.0.1:8011/register" data-register-toggle class="register-badge open"><span class="status-dot"></span><span>Register open</span></a> <details class="notifications"><summary class="icon-button" aria-label="Notifications"><i data-lucide="bell" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+</summary><div class="popover"><strong>Stock alerts</strong><p>16 products are at or below their stock alert level.</p><a class="text-link" href="http://127.0.0.1:8011/manage/products?low_stock=1">Review low stock <i data-lucide="arrow-right" class="icon" style="width:14px;height:14px" aria-hidden="true"></i>
+</a></div></details> <details class="user-menu"><summary><span class="avatar">B</span><span class="user-info"><strong>Browser Test Admin</strong><small>Administrator</small></span><i data-lucide="chevron-down" class="icon" style="width:14px;height:14px" aria-hidden="true"></i>
+</summary><div class="popover"><a href="http://127.0.0.1:8011/profile">Change password</a><form method="POST" action="http://127.0.0.1:8011/logout"><input type="hidden" name="_token" value="HgIRXBzUzjLBKqmb4M88lnVNkXQtrb7bwU3l4PBR" autocomplete="off"><button class="text-danger">Sign out</button></form></div></details>
+ </div></header>
+<main class="main-content "><div class="print-brand"><img src="http://127.0.0.1:8011/storage/branding/0YMIEM4XaO63FiKTFpvOCp15LqJ9qNHxPEKBuH32.png" alt="Logo"><strong>Twinsofte Supermarket</strong><p>Receipt verification address 0000000000</p></div>
+   <div class="page-heading"><div><span class="eyebrow">HR REPORTS</span><h1>Payroll summary</h1><p>All history to today</p></div><div class="heading-actions"><a class="btn primary" href="http://127.0.0.1:8011/hr/reports/payroll/pdf?range=all"><i data-lucide="download" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+Download PDF</a> <a class="btn secondary" href="http://127.0.0.1:8011/hr/reports/payroll/csv?range=all">Export CSV</a></div></div><nav class="hr-nav" aria-label="Human resources">
+<a href="http://127.0.0.1:8011/hr" class=""><i data-lucide="layout-dashboard" class="icon" style="width:17px;height:17px" aria-hidden="true"></i>
+Overview</a> <a href="http://127.0.0.1:8011/hr/staff" class=""><i data-lucide="users-round" class="icon" style="width:17px;height:17px" aria-hidden="true"></i>
+Staff</a> <a href="http://127.0.0.1:8011/hr/attendance" class=""><i data-lucide="calendar-check" class="icon" style="width:17px;height:17px" aria-hidden="true"></i>
+Attendance</a> <a href="http://127.0.0.1:8011/hr/leave" class=""><i data-lucide="calendar-days" class="icon" style="width:17px;height:17px" aria-hidden="true"></i>
+Leave</a> <a href="http://127.0.0.1:8011/hr/payroll" class=""><i data-lucide="wallet" class="icon" style="width:17px;height:17px" aria-hidden="true"></i>
+Payroll</a> <a href="http://127.0.0.1:8011/hr/payments" class=""><i data-lucide="credit-card" class="icon" style="width:17px;height:17px" aria-hidden="true"></i>
+Payments</a> <a href="http://127.0.0.1:8011/hr/setup" class=""><i data-lucide="settings-2" class="icon" style="width:17px;height:17px" aria-hidden="true"></i>
+Setup</a> <a href="http://127.0.0.1:8011/hr/reports" class="active"><i data-lucide="chart-no-axes-combined" class="icon" style="width:17px;height:17px" aria-hidden="true"></i>
+Reports</a></nav>
+<div class="stat-grid mb-6"><div class="card stat-card"><div class="stat-top">Net salaries</div><strong>Rs. 48,100.00</strong></div><div class="card stat-card"><div class="stat-top">Paid</div><strong>Rs. 20,000.00</strong></div><div class="card stat-card"><div class="stat-top">Due</div><strong>Rs. 28,100.00</strong></div><div class="card stat-card"><div class="stat-top">Advance recovery</div><strong>Rs. 0.00</strong></div></div><section class="card"><form method="GET" class="hr-report-filter"><div class="hr-quick-ranges"><a href="http://127.0.0.1:8011/hr/reports/payroll?range=today" class="">Today</a><a href="http://127.0.0.1:8011/hr/reports/payroll?range=yesterday" class="">Yesterday</a><a href="http://127.0.0.1:8011/hr/reports/payroll?range=week" class="">This week</a><a href="http://127.0.0.1:8011/hr/reports/payroll?range=month" class="">This month</a><a href="http://127.0.0.1:8011/hr/reports/payroll?range=last_month" class="">Last month</a><a href="http://127.0.0.1:8011/hr/reports/payroll?range=year" class="">This year</a><a href="http://127.0.0.1:8011/hr/reports/payroll?range=all" class="selected">All history</a></div><div class="filter-bar"><label class="field compact">Range<select name="range"><option value="custom" >Custom dates</option><option value="today" >Today</option><option value="yesterday" >Yesterday</option><option value="week" >This week</option><option value="month" >This month</option><option value="last_month" >Last month</option><option value="year" >This year</option><option value="all" selected>All history</option></select></label><label class="field compact">From<input type="date" name="from" value=""></label><label class="field compact">To<input type="date" name="to" value=""></label><label class="field compact">Staff<select name="staff_id"><option value="">All staff</option><option value="25" >STF-00025 · Sample - Amina Hassan</option><option value="30" >STF-00030 · Sample - Farhan Iqbal</option><option value="26" >STF-00026 · Sample - Mohamed Ali</option><option value="29" >STF-00029 · Sample - Nisha Kumar</option><option value="28" >STF-00028 · Sample - Omar Mohamed</option><option value="27" >STF-00027 · Sample - Sara Ahmed</option></select></label><label class="field compact">Department<select name="department_id"><option value="">All departments</option><option value="1" >Store</option></select></label><label class="field compact">Status<select name="status"><option value="">All statuses</option><option >DRAFT</option><option >APPROVED</option><option >VOIDED</option></select></label><button class="btn secondary">Apply filters</button></div></form><div class="card-heading"><h2>1 matching records</h2><span class="muted">Downloads include every page</span></div><div class="table-wrap"><table><thead><tr><th>Period</th><th>Payroll</th><th>Staff</th><th>Earnings</th><th>Deductions</th><th>Advance recovery</th><th>Net salary</th><th>Paid</th><th>Due</th><th>Status</th></tr></thead><tbody><tr><td>2026-09</td><td>PAY-202609-00005</td><td>Sample - Amina Hassan</td><td>48600.00</td><td>500.00</td><td>0.00</td><td>48100.00</td><td>20000.00</td><td>28100.00</td><td>APPROVED</td></tr></tbody></table></div><div class="pagination"></div></section>
+</main><footer class="app-footer">Powered by Twinsofte <span>LKR · Asia/Colombo</span></footer></div><script>document.querySelectorAll('.hr-report-filter input[type=date]').forEach(input=>input.addEventListener('change',()=>{document.querySelector('.hr-report-filter select[name=range]').value='custom';}));</script>
+<div id="register-workflow" data-open-url="http://127.0.0.1:8011/register/open" data-close-url="http://127.0.0.1:8011/register/close" data-summary-url="http://127.0.0.1:8011/register/current-summary" data-current="1" data-required="0" data-currency="Rs.">
+    <dialog id="open-register-dialog" class="register-dialog register-opening-dialog" aria-labelledby="open-register-title">
+        <div class="modal-heading"><div><span class="eyebrow">START YOUR SHIFT</span><h2 id="open-register-title">Open register</h2></div><button class="icon-button" type="button" data-dismiss-register aria-label="Close register opening"><i data-lucide="x" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+</button></div>
+        <div class="register-dialog-body"><div class="register-welcome"><span class="register-welcome-icon"><i data-lucide="wallet" class="icon" style="width:26px;height:26px" aria-hidden="true"></i>
+</span><p>Count your opening cash to unlock the POS and start selling.</p></div>
+            <div id="open-register-error" class="notice error" role="alert" hidden></div>
+                                    <form id="open-register-form" method="POST" action="http://127.0.0.1:8011/register/open"><input type="hidden" name="_token" value="HgIRXBzUzjLBKqmb4M88lnVNkXQtrb7bwU3l4PBR" autocomplete="off"><label class="field">Opening cash (Rs.)<input name="opening_cash" type="text" inputmode="decimal" value="2490" data-register-amount aria-label="Opening cash" autocomplete="off" required maxlength="15"></label>
+                <div class="register-keypad" role="group" aria-label="Register cash keypad"><button type="button" data-register-key="7" >7</button><button type="button" data-register-key="8" >8</button><button type="button" data-register-key="9" >9</button><button type="button" data-register-key="4" >4</button><button type="button" data-register-key="5" >5</button><button type="button" data-register-key="6" >6</button><button type="button" data-register-key="1" >1</button><button type="button" data-register-key="2" >2</button><button type="button" data-register-key="3" >3</button><button type="button" data-register-key="." >.</button><button type="button" data-register-key="0" >0</button><button type="button" data-register-key="backspace" aria-label="Delete last cash digit">⌫</button><button type="button" class="register-keypad-clear" data-register-key="clear">Clear amount</button></div>
+                <button class="btn primary w-full" type="submit"><i data-lucide="wallet" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+Open register & start selling</button>
+            </form>            <a class="text-link register-back" href="http://127.0.0.1:8011">Back to workspace</a>
+        </div>
+    </dialog>
+    <dialog id="close-register-dialog" class="register-dialog register-closing-dialog" aria-labelledby="close-register-title">
+        <div class="modal-heading"><div><span class="eyebrow">REVIEW YOUR SHIFT</span><h2 id="close-register-title">Close register</h2></div><button class="icon-button" type="button" data-dismiss-register aria-label="Close register summary"><i data-lucide="x" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+</button></div>
+        <div class="register-dialog-body"><div id="close-register-error" class="notice error" role="alert" hidden></div><div id="register-summary-content" aria-live="polite"></div>
+            <form id="close-register-form" method="POST" action="http://127.0.0.1:8011/register/close"><input type="hidden" name="_token" value="HgIRXBzUzjLBKqmb4M88lnVNkXQtrb7bwU3l4PBR" autocomplete="off"><input name="register_id" type="hidden"><div class="register-count-panel"><div><h3>Count your cash</h3><p class="muted text-sm">Enter the cash physically in your drawer.</p><label class="field">Actual cash counted (Rs.)<input name="actual_cash" type="text" inputmode="decimal" data-register-amount aria-label="Actual cash counted" autocomplete="off" maxlength="15" required></label><div class="register-difference"><span>Cash difference</span><strong id="register-live-difference">—</strong></div><label class="field">Closing notes<textarea name="notes" rows="2" maxlength="2000" placeholder="Optional notes for this shift"></textarea></label></div><div class="register-keypad" role="group" aria-label="Register cash keypad"><button type="button" data-register-key="7" >7</button><button type="button" data-register-key="8" >8</button><button type="button" data-register-key="9" >9</button><button type="button" data-register-key="4" >4</button><button type="button" data-register-key="5" >5</button><button type="button" data-register-key="6" >6</button><button type="button" data-register-key="1" >1</button><button type="button" data-register-key="2" >2</button><button type="button" data-register-key="3" >3</button><button type="button" data-register-key="." >.</button><button type="button" data-register-key="0" >0</button><button type="button" data-register-key="backspace" aria-label="Delete last cash digit">⌫</button><button type="button" class="register-keypad-clear" data-register-key="clear">Clear amount</button></div>
+</div><p class="muted text-xs">Closing locks the sales in this shift. A new register must be opened before selling again.</p><button class="btn primary w-full" type="submit" disabled><i data-lucide="check" class="icon" style="width:18px;height:18px" aria-hidden="true"></i>
+Confirm & close register</button></form>            <button id="register-summary-done" class="btn primary w-full" type="button" hidden>Done</button>
+        </div>
+    </dialog>
+</div>
+</body></html>

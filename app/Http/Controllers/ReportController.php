@@ -69,7 +69,7 @@ class ReportController extends Controller
             abort_unless($request->user()->hasPermission('products.view_cost'), 403);
             $summary = $profit->calculate($filters['from'], $filters['to']);
             $headers = ['Profit & loss statement', 'Amount'];
-            $rows = collect(['revenue' => 'Sales revenue', 'cogs' => 'Cost of goods sold', 'gross' => 'Gross profit', 'manual' => 'Manual expenses', 'processing' => 'Business-paid processing expenses', 'purchaseCharges' => 'Purchase shipping & other charges', 'expenses' => 'Total operating expenses', 'net' => 'Net profit'])->map(fn ($label, $key) => [$label, Money::display($summary[$key])])->values();
+            $rows = collect(['revenue' => 'Sales revenue', 'cogs' => 'Cost of goods sold', 'gross' => 'Gross profit', 'manual' => 'Other operating expenses', 'processing' => 'Business-paid processing expenses', 'purchaseCharges' => 'Purchase shipping & other charges', 'expenses' => 'Total operating expenses', 'net' => 'Net profit'])->map(fn ($label, $key) => [$label, Money::display($summary[$key])])->values();
             $cards = ['Revenue' => $summary['revenue'], 'Gross profit' => $summary['gross'], 'Net profit' => $summary['net']];
             $notes = 'Revenue and cost of goods sold are net of returns. Voided sales and reversed expenses are excluded. Customer-paid processing fees are not product revenue.';
         } else {

@@ -23,6 +23,19 @@ final class Navigation
             return route('reports.index');
         }
 
+        if (Hr::enabled()) {
+            foreach (['hr.view' => 'hr.index', 'hr.staff.view' => 'hr.staff.index', 'hr.attendance.view' => 'hr.attendance', 'hr.leave.view' => 'hr.leave', 'hr.payroll.view' => 'hr.payroll.index', 'hr.payments.view' => 'hr.payments', 'hr.setup.view' => 'hr.setup'] as $permission => $route) {
+                if ($user->hasPermission($permission)) {
+                    return route($route);
+                }
+            }
+            foreach (Hr::REPORTS as $kind => $label) {
+                if ($user->hasPermission('hr.reports.'.$kind.'.view')) {
+                    return route('hr.reports.show', $kind);
+                }
+            }
+        }
+
         return route('profile');
     }
 }

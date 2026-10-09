@@ -3,6 +3,9 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Hr\PayrollController;
+use App\Http\Controllers\Hr\StaffController;
+use App\Http\Controllers\Hr\WorkforceController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\PurchasePaymentController;
@@ -15,6 +18,7 @@ use App\Http\Controllers\StockBatchController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockPriceController;
 use App\Http\Controllers\SupplierAccountController;
+use App\Http\Middleware\HrEnabled;
 use App\Http\Middleware\SaleVisibility;
 use Illuminate\Support\Facades\Route;
 
@@ -99,4 +103,37 @@ Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(functi
 
     Route::post('/manage/customers/{customer}/payments', [CustomerPaymentController::class, 'store'])->name('manage.customers.payments.store');
     Route::get('/manage/customers/{customer}/ledger', [CustomerPaymentController::class, 'ledger'])->name('manage.customers.ledger');
+});
+
+Route::middleware(['auth', 'auth.session', HrEnabled::class])->prefix('hr')->name('hr.')->group(function () {
+    Route::get('/', [WorkforceController::class, 'index'])->middleware('permission:hr.view')->name('index');
+    Route::get('/staff', [StaffController::class, 'index'])->middleware('permission:hr.staff.view')->name('staff.index');
+    Route::get('/staff/create', [StaffController::class, 'create'])->middleware(['permission:hr.staff.view', 'permission:hr.staff.create'])->name('staff.create');
+    Route::post('/staff', [StaffController::class, 'store'])->middleware(['permission:hr.staff.view', 'permission:hr.staff.create'])->name('staff.store');
+    Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->middleware(['permission:hr.staff.view', 'permission:hr.staff.edit'])->name('staff.edit');
+    Route::put('/staff/{staff}', [StaffController::class, 'update'])->middleware(['permission:hr.staff.view', 'permission:hr.staff.edit'])->name('staff.update');
+    Route::get('/staff/{staff}/ledger', [StaffController::class, 'ledger'])->middleware('permission:hr.ledger.view')->name('staff.ledger');
+    Route::post('/staff/{staff}/employment', [StaffController::class, 'employment'])->middleware(['permission:hr.staff.view', 'permission:hr.staff.exit'])->name('staff.employment');
+    Route::get('/staff/{staff}', [StaffController::class, 'show'])->middleware('permission:hr.staff.view')->name('staff.show');
+    Route::get('/attendance', [WorkforceController::class, 'attendance'])->middleware('permission:hr.attendance.view')->name('attendance');
+    Route::post('/attendance', [WorkforceController::class, 'mark'])->middleware(['permission:hr.attendance.view', 'permission:hr.attendance.mark'])->name('attendance.mark');
+    Route::get('/leave', [WorkforceController::class, 'leaves'])->middleware('permission:hr.leave.view')->name('leave');
+    Route::post('/leave', [WorkforceController::class, 'leaveStore'])->middleware(['permission:hr.leave.view', 'permission:hr.leave.create'])->name('leave.store');
+    Route::post('/leave/{leave}/decision', [WorkforceController::class, 'decide'])->middleware(['permission:hr.leave.view', 'permission:hr.leave.approve'])->name('leave.decide');
+    Route::post('/leave/{leave}/cancel', [WorkforceController::class, 'cancel'])->middleware(['permission:hr.leave.view', 'permission:hr.leave.cancel'])->name('leave.cancel');
+    Route::get('/payroll', [PayrollController::class, 'index'])->middleware('permission:hr.payroll.view')->name('payroll.index');
+    Route::get('/payroll/create', [PayrollController::class, 'create'])->middleware(['permission:hr.payroll.view', 'permission:hr.payroll.create'])->name('payroll.create');
+    Route::post('/payroll', [PayrollController::class, 'store'])->middleware(['permission:hr.payroll.view', 'permission:hr.payroll.create'])->name('payroll.store');
+    Route::post('/payroll/{payroll}/approve', [PayrollController::class, 'approve'])->middleware(['permission:hr.payroll.view', 'permission:hr.payroll.approve'])->name('payroll.approve');
+    Route::post('/payroll/{payroll}/void', [PayrollController::class, 'void'])->middleware(['permission:hr.payroll.view', 'permission:hr.payroll.void'])->name('payroll.void');
+    Route::get('/payroll/{payroll}/payslip', [PayrollController::class, 'payslip'])->middleware(['permission:hr.payroll.view', 'permission:hr.reports.payroll.pdf'])->name('payroll.payslip');
+    Route::get('/payroll/{payroll}', [PayrollController::class, 'show'])->middleware('permission:hr.payroll.view')->name('payroll.show');
+    Route::get('/payments', [PayrollController::class, 'payments'])->middleware('permission:hr.payments.view')->name('payments');
+    Route::post('/payments', [PayrollController::class, 'pay'])->middleware(['permission:hr.payments.view', 'permission:hr.payments.create'])->name('payments.store');
+    Route::post('/payments/{payment}/reverse', [PayrollController::class, 'reverse'])->middleware(['permission:hr.payments.view', 'permission:hr.payments.reverse'])->name('payments.reverse');
+    Route::get('/setup', [WorkforceController::class, 'setup'])->middleware('permission:hr.setup.view')->name('setup');
+    Route::post('/setup', [WorkforceController::class, 'setupSave'])->middleware(['permission:hr.setup.view', 'permission:hr.setup.manage'])->name('setup.save');
+    Route::get('/reports', [App\Http\Controllers\Hr\ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/{kind}/{format}', [App\Http\Controllers\Hr\ReportController::class, 'show'])->where('format', 'pdf|csv')->name('reports.download');
+    Route::get('/reports/{kind}', [App\Http\Controllers\Hr\ReportController::class, 'show'])->name('reports.show');
 });

@@ -132,3 +132,9 @@ Run `php artisan db:seed --class=BulkSampleProductSeeder` to add 120 clearly lab
 Roles & permissions now lists independent dashboard cards, module CRUD and transaction/report functions with descriptions, search and selection counts. Administrator receives full access automatically. Existing role access is preserved by the permission upgrade migration, and later revocations are respected. See [permission reference](docs/PERMISSIONS.md).
 
 Roles can choose All sales, Sales from the same role, or Only this person’s sales. This setting applies to invoice access, sales totals, related history and report downloads, while action permissions remain separate. Administrator always has all-sales access. The upgrade preserves existing role scopes; new roles default to own sales. See `docs/PERMISSIONS.md` for scope and accounting details.
+
+## Optional human resources
+
+Set `hr_module=true` in `.env` and run `php artisan optimize:clear` to show **Human resources**. `false` hides every HR page, report and role-editor permission, and blocks direct HR URLs while preserving history. Administrator gets all HR access automatically; assign individual permissions to other roles. Customers stay in the existing customer module.
+
+HR includes staff intake/exit/rehire and optional user accounts, departments/job titles/shifts/holidays, attendance/overnight shifts/overtime, paid and unpaid leave approvals, monthly/daily payroll with allowances/deductions, partial salary payments/advances/reversals, staff ledgers and six filtered PDF/CSV reports with company letterhead. Approved payroll records salary cost once and locks attendance; cash payouts update register reconciliation. See [HR setup, payroll policies and verification](docs/HR-MODULE.md).

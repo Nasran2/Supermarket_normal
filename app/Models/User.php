@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Hr;
 use App\Support\Permissions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -36,6 +37,9 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
+        if (str_starts_with($permission, 'hr.') && ! Hr::enabled()) {
+            return false;
+        }
         if (! $this->active || ! $this->role) {
             return false;
         }

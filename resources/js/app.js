@@ -56,6 +56,13 @@ import {
   SearchX,
   Download,
   Menu,
+  UsersRound,
+  UserPlus,
+  CalendarCheck,
+  CalendarDays,
+  BriefcaseBusiness,
+  BookOpen,
+  Calculator,
 } from 'lucide';
 const icons = {
   AlertCircle: CircleAlert,
@@ -113,6 +120,13 @@ const icons = {
   SearchX,
   Download,
   Menu,
+  UsersRound,
+  UserPlus,
+  CalendarCheck,
+  CalendarDays,
+  BriefcaseBusiness,
+  BookOpen,
+  Calculator,
 };
 window.refreshIcons = () => createIcons({ icons });
 window.refreshIcons();

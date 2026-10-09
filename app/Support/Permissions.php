@@ -89,7 +89,16 @@ class Permissions
             }
         }
 
+        foreach (Hr::permissions() as $name => [$group, $label]) {
+            $add($name, $group, $label, $label.'.', []);
+        }
+
         return $cached = $catalog;
+    }
+
+    public static function visible(): array
+    {
+        return array_filter(self::all(), fn ($info, $name) => Hr::enabled() || ! str_starts_with($name, 'hr.'), ARRAY_FILTER_USE_BOTH);
     }
 
     public static function info(string $name): array

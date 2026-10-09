@@ -50,6 +50,15 @@ class Sidebar
         if (! collect(array_keys(ReportService::TITLES))->contains(fn ($kind) => $user->hasPermission(ReportService::permission($kind)))) {
             $reports = [];
         }
+        $hr = [];
+        if (Hr::enabled()) {
+            foreach (['hr.view' => ['Overview', 'hr.index'], 'hr.staff.view' => ['Staff', 'hr.staff.index'], 'hr.attendance.view' => ['Attendance', 'hr.attendance'], 'hr.leave.view' => ['Leave requests', 'hr.leave'], 'hr.payroll.view' => ['Payroll', 'hr.payroll.index'], 'hr.payments.view' => ['Payments & advances', 'hr.payments'], 'hr.setup.view' => ['HR setup', 'hr.setup']] as $permission => [$label,$route]) {
+                $hr[] = $link($label, $route, [], $permission, request()->routeIs($route) || (in_array($route, ['hr.staff.index', 'hr.payroll.index']) && request()->routeIs(str_replace('.index', '', $route).'.*')));
+            }
+        }
+        if (Hr::enabled() && collect(array_keys(Hr::REPORTS))->contains(fn ($kind) => $user->hasPermission('hr.reports.'.$kind.'.view'))) {
+            $hr[] = $link('HR reports', 'hr.reports.index', [], [], request()->routeIs('hr.reports.*'));
+        }
         $settings = [$link('Overview', 'settings.index', [], 'settings.view', request()->routeIs('settings.index'))];
         foreach (['business' => ['Business', 'settings.business'], 'pos' => ['Point of sale', 'settings.pos'], 'receipt' => ['Receipt', 'settings.receipt'], 'stock' => ['Stock controls', 'settings.stock'], 'system' => ['System', 'settings.system']] as $key => [$title, $permission]) {
             $settings[] = $link($title, 'settings.edit', $key, $permission, request()->route('group') === $key);
@@ -59,6 +68,6 @@ class Sidebar
             $settings[] = $link('Add '.$singular, 'manage.create', $key, Resources::permission($key, 'create'), request()->route('resource') === $key && request()->routeIs('manage.create'));
         }
 
-        return ['WORKSPACE' => $workspace, 'INVENTORY' => $inventory, 'MANAGEMENT' => [$group('Reports', 'chart-no-axes-combined', $reports), $resource('users', 'Users', 'users', 'user'), $resource('roles', 'Roles & permissions', 'shield-check', 'role'), $group('Settings', 'settings-2', $settings)]];
+        return ['WORKSPACE' => $workspace, 'INVENTORY' => $inventory, 'MANAGEMENT' => [$group('Human resources', 'users-round', $hr), $group('Reports', 'chart-no-axes-combined', $reports), $resource('users', 'Users', 'users', 'user'), $resource('roles', 'Roles & permissions', 'shield-check', 'role'), $group('Settings', 'settings-2', $settings)]];
     }
 }

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\PaymentChargeRule;
 use App\Models\PaymentMethod;
+use App\Models\Permission;
 use App\Models\ProductUnit;
 use App\Models\PurchaseItem;
 use App\Models\Register;
@@ -15,6 +16,7 @@ use App\Models\Unit;
 use App\Models\UnitPresetConversion;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\Hr;
 use App\Support\Money;
 use App\Support\Resources;
 use App\Support\SalesVisibility;
@@ -228,6 +230,15 @@ class ResourceService
                     }
                 }
                 $permissionIds = $values['permissions'] ?? [];
+                if ($resource === 'roles' && ! Hr::enabled()) {
+                    $hiddenIds = Permission::where('name', 'like', 'hr.%')->pluck('id')->all();
+                    if (array_intersect($permissionIds, $hiddenIds)) {
+                        throw ValidationException::withMessages(['permissions' => 'HR is disabled. Enable the module before changing HR permissions.']);
+                    }
+                    if ($id) {
+                        $permissionIds = array_unique(array_merge($permissionIds, $record->permissions->whereIn('id', $hiddenIds)->pluck('id')->all()));
+                    }
+                }
                 $categoryIds = $values['categories'] ?? [];
                 if ($resource === 'roles') {
                     if (strcasecmp(trim($values['name']), 'Administrator') === 0) {

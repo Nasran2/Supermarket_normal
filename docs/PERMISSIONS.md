@@ -1,6 +1,6 @@
 # Roles and permissions
 
-The central catalog in `app/Support/Permissions.php` defines 150 permissions across 34 groups. The role list, role editor, authorization checks, initial seeder and upgrade migration use the same catalog. All changes are checked by middleware, Form Requests or controllers/services before records are written. Hiding a button is not the authorization boundary.
+The central catalog in `app/Support/Permissions.php` defines 150 core permissions plus 41 optional HR permissions. The role list, role editor, authorization checks, initial seeder and upgrade migration use the same catalog. All changes are checked by middleware, Form Requests or controllers/services before records are written. Hiding a button is not the authorization boundary.
 
 ## Administrator
 
@@ -89,3 +89,7 @@ Feature coverage includes automatic Administrator access with an empty pivot, in
 Validation on 9 October 2026: all 17 role/permission feature tests and all 20 JavaScript tests pass. The production asset build and PHP lint of 119 compiled Blade templates pass. The full feature suite reports 191 passing tests and 28 payment-fee failures; the same 28 failures were reproduced against unchanged HEAD before this permissions work (174 passing tests). Those older fee-rule expectations are outside this access-control change.
 
 Sales visibility validation on 9 October 2026: 40 focused tests pass (693 assertions), including 10 new scope tests; the full suite has 207 passes and the same 28 existing payment-fee failures. Production build and lint of 162 compiled templates pass. Existing Administrator, Manager and Cashier scopes were verified as All sales after migration. The read-only editor preview is saved in `docs/screenshots/role-sales-visibility.png`.
+
+## Optional HR access
+
+`hr_module=false` hides HR controls and denies every HR route, even for Administrator. When enabled, Administrator receives HR access automatically. Existing non-administrator role grants are preserved; upgrades do not automatically give those roles HR access. HR permissions separate staff, account management, attendance, leave approval/cancellation, payroll approval/void, payments/reversal, ledgers, setup and individual PDF/CSV reports. Linked login management also requires the existing Users action permission and obeys role-escalation protections. See [HR reference](HR-MODULE.md).

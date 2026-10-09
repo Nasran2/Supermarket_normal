@@ -3,8 +3,8 @@
 @section('content')
 @php
 $admin=$record->system && $record->name==='Administrator';
-$catalog=\App\Support\Permissions::all();
-$canManage=auth()->user()->isAdministrator() || (\App\Support\SalesVisibility::canGrant($record->sales_visibility??'ALL',$record) && $record->permissions->every(fn($p)=>auth()->user()->hasPermission($p->name)));
+$catalog=\App\Support\Permissions::visible();
+$canManage=auth()->user()->isAdministrator() || (\App\Support\SalesVisibility::canGrant($record->sales_visibility??'ALL',$record) && $record->permissions->whereIn('name',array_keys(\App\Support\Permissions::visible()))->every(fn($p)=>auth()->user()->hasPermission($p->name)));
 $enabled=$admin?array_keys($catalog):$record->permissions->pluck('name')->intersect(array_keys($catalog))->all();
 $groups=collect($enabled)->groupBy(fn($name)=>$catalog[$name]['group']);
 @endphp
