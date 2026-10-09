@@ -2,9 +2,9 @@
 @section('title','Customer profile')
 @section('content')
 @php($currency = $settings['currency_symbol']??'Rs.')
-<div class="page-heading"><div class="customer-profile-identity"><span class="customer-avatar large">{{ mb_strtoupper(mb_substr($record->name,0,1)) }}</span><div><span class="eyebrow">CUS-{{ str_pad($record->id,5,'0',STR_PAD_LEFT) }}</span><h1>{{ $record->name }}</h1><span class="badge {{ $record->active?'green':'slate' }}">{{ $record->active?'Active customer':'Inactive customer' }}</span></div></div><div class="heading-actions"><a class="btn secondary" href="{{ route('manage.index','customers') }}"><x-icon name="arrow-left"/>Customers</a><a class="btn secondary" href="{{ route('manage.customers.ledger', $record->id) }}"><x-icon name="file-text"/>Ledger</a>@can('sales.edit')<a class="btn primary" href="{{ route('manage.edit',['customers',$record->id]) }}"><x-icon name="pencil"/>Edit customer</a>@endcan</div></div>
+<div class="page-heading"><div class="customer-profile-identity"><span class="customer-avatar large">{{ mb_strtoupper(mb_substr($record->name,0,1)) }}</span><div><span class="eyebrow">CUS-{{ str_pad($record->id,5,'0',STR_PAD_LEFT) }}</span><h1>{{ $record->name }}</h1><span class="badge {{ $record->active?'green':'slate' }}">{{ $record->active?'Active customer':'Inactive customer' }}</span></div></div><div class="heading-actions"><a class="btn secondary" href="{{ route('manage.index','customers') }}"><x-icon name="arrow-left"/>Customers</a>@can('customers.ledger')<a class="btn secondary" href="{{ route('manage.customers.ledger', $record->id) }}"><x-icon name="file-text"/>Ledger</a>@endcan @can('customers.edit')<a class="btn primary" href="{{ route('manage.edit',['customers',$record->id]) }}"><x-icon name="pencil"/>Edit customer</a>@endcan</div></div>
 <div class="customer-profile-stats">
-    <div class="card customer-profile-due"><span class="eyebrow">OUTSTANDING DUE</span><strong>{{ $currency }} {{ \App\Support\Money::display($record->due_balance) }}</strong><div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;"><span>{{ \App\Support\Money::compare($record->due_balance,0)>0?'Opening balance + unpaid invoices':'No outstanding balance' }}</span>@if(\App\Support\Money::compare($record->due_balance,0)>0)<button class="btn primary" onclick="document.getElementById('payment-modal').showModal()">Collect Payment</button>@endif</div></div>
+    <div class="card customer-profile-due"><span class="eyebrow">OUTSTANDING DUE</span><strong>{{ $currency }} {{ \App\Support\Money::display($record->due_balance) }}</strong><div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;"><span>{{ \App\Support\Money::compare($record->due_balance,0)>0?'Opening balance + unpaid invoices':'No outstanding balance' }}</span>@if(\App\Support\Money::compare($record->due_balance,0)>0)@can('customers.collect_payment')<button class="btn primary" onclick="document.getElementById('payment-modal').showModal()">Collect Payment</button>@endcan @endif</div></div>
     <div class="card customer-profile-stat"><span>Invoiced purchases</span><strong>{{ $currency }} {{ \App\Support\Money::display($record->paid_purchases??0) }}</strong><small>Completed POS sales, including customer fees</small></div>
     <div class="card customer-profile-stat"><span>Completed purchases</span><strong>{{ $record->completed_sales_count }}</strong><small>Voided sales are excluded</small></div>
 </div>
@@ -19,7 +19,7 @@
                     <thead><tr><th>Invoice</th><th>Date</th><th>Payment</th><th>Amount collected</th><th>Due</th><th>Status</th></tr></thead>
                     <tbody>
                         @forelse($sales as $sale)
-                        <tr><td><a class="text-link" href="{{ route('sales.show',$sale) }}">{{ $sale->invoice }}</a></td><td>{{ $sale->sold_at->format('d/m/Y H:i') }}</td><td>{{ $sale->payment_names ?: 'On account (unpaid)' }}</td><td>{{ $currency }} {{ \App\Support\Money::display(\App\Support\Money::sub($sale->collected_total,$sale->refunded_total)) }}</td><td>{{ $currency }} {{ \App\Support\Money::display($sale->due_balance) }}</td><td><span class="badge {{ $sale->status==='ACTIVE'?(\App\Support\Money::compare($sale->due_balance,0)>0?'amber':'green'):'slate' }}">{{ $sale->payment_status }}</span></td></tr>
+                        <tr><td>@can('sales.view')<a class="text-link" href="{{ route('sales.show',$sale) }}">{{ $sale->invoice }}</a>@else{{ $sale->invoice }}@endcan </td><td>{{ $sale->sold_at->format('d/m/Y H:i') }}</td><td>{{ $sale->payment_names ?: 'On account (unpaid)' }}</td><td>{{ $currency }} {{ \App\Support\Money::display(\App\Support\Money::sub($sale->collected_total,$sale->refunded_total)) }}</td><td>{{ $currency }} {{ \App\Support\Money::display($sale->due_balance) }}</td><td><span class="badge {{ $sale->status==='ACTIVE'?(\App\Support\Money::compare($sale->due_balance,0)>0?'amber':'green'):'slate' }}">{{ $sale->payment_status }}</span></td></tr>
                         @empty
                         <tr><td colspan="6"><div class="empty-state"><x-icon name="receipt-text" :size="34"/><h3>No purchases yet</h3><p>Sales linked to this customer will appear here.</p></div></td></tr>
                         @endforelse
@@ -68,7 +68,7 @@
 </div>
 </div>
 
-<dialog id="payment-modal" class="payment-dialog">
+@can('customers.collect_payment')<dialog id="payment-modal" class="payment-dialog">
     <div class="modal-heading">
         <div>
             <span class="eyebrow">COLLECT PAYMENT</span>
@@ -173,5 +173,5 @@
         // Remove hash so it doesn't reopen on reload
         history.replaceState(null, null, ' ');
     }
-</script>
+</script>@endcan
 @endsection

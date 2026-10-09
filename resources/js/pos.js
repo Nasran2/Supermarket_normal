@@ -227,7 +227,7 @@ function renderSummary() {
   const amount = billDiscountCents();
   $('discount').value = (Number(amount) / 100).toFixed(2);
   if ($('edit-bill-discount')) {
-    $('edit-bill-discount').disabled = !cart.length || orderLoading;
+    $('edit-bill-discount').disabled = pos.dataset.canDiscount !== '1' || !cart.length || orderLoading;
     $('bill-discount-label').textContent =
       amount > 0n
         ? billDiscount.type === 'PERCENT'
@@ -395,7 +395,7 @@ function render(persist = true) {
         .join('')
     : '<div class="cart-empty"><i data-lucide="shopping-basket" style="width:35px;height:35px"></i><strong>Your order is empty</strong><small>Scan a barcode or choose a product.</small></div>';
   renderSummary();
-  $('open-payment').disabled =
+  $('open-payment').disabled = pos.dataset.canCheckout !== '1' ||
     invalidBillDiscount() ||
     !cart.length ||
     orderLoading ||
@@ -498,7 +498,7 @@ $('cart-items').addEventListener('input', (e) => {
       Number(lineCents(p)) / 100,
     );
     renderSummary();
-    $('open-payment').disabled =
+    $('open-payment').disabled = pos.dataset.canCheckout !== '1' ||
       invalidBillDiscount() ||
       lineCents(p) < 0n ||
       cart.some((item) => item.unavailable || lineCents(item) < 0n);
@@ -985,9 +985,9 @@ function updateBalance() {
   $('payment-balance').classList.toggle('settled', due === 0n);
   $('confirm-payment').disabled = pending || !ready || (editMode && checkoutAttempted);
   if ($('confirm-due')) {
-    $('confirm-due').hidden = due === 0n;
-    $('credit-checkout-note').hidden = due === 0n;
-    $('confirm-due').disabled = pending || !creditReady || due <= 0n;
+    $('confirm-due').hidden = pos.dataset.canDue !== '1' || due === 0n;
+    $('credit-checkout-note').hidden = pos.dataset.canDue !== '1' || due === 0n;
+    $('confirm-due').disabled = pos.dataset.canDue !== '1' || pending || !creditReady || due <= 0n;
     $('confirm-due').textContent = `Complete with due · ${money(Number(due) / 100)}`;
   }
 }
@@ -1355,12 +1355,15 @@ async function completeCheckout(mode) {
     message.replaceChildren();
     const label = document.createElement('span');
     label.textContent = `Sale ${result.invoice} completed.${scaled(result.due_balance, 2) > 0n ? ` Balance due ${money(result.due_balance)}.` : ''} `;
-    const link = document.createElement('a');
-    link.href = result.receipt_url;
-    link.target = '_blank';
-    link.className = 'text-link';
-    link.textContent = 'Open receipt';
-    message.append(label, link);
+    message.append(label);
+    if (result.receipt_url) {
+      const link = document.createElement('a');
+      link.href = result.receipt_url;
+      link.target = '_blank';
+      link.className = 'text-link';
+      link.textContent = 'Open receipt';
+      message.append(link);
+    }
     search();
     if (result.show_receipt || result.auto_print) showReceipt(result);
   } catch (e) {
@@ -1396,6 +1399,7 @@ async function completeCheckout(mode) {
 }
 
 function showReceipt(result) {
+  if (!result.receipt_url) return;
   let frame;
   if (result.show_receipt) {
     $('receipt-invoice').textContent = result.invoice;

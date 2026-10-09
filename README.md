@@ -81,7 +81,7 @@ See [complete delivery and verification notes](docs/DELIVERY.md), [database sche
 
 Thermal receipts support 80mm and 58mm with print-only layouts and measured roll lengths. Select the matching paper size, 100% scale, no margins, and disable browser headers/footers in the printer dialog. Physical printer calibration remains a device check.
 
-In the POS cart, tap **+** beside Customer to open **Add customer**. Name is required; phone, email and address are optional. **Save & select customer** saves an active customer and selects them for the current order without reloading or clearing the cart. Existing customer-create permission (`sales.create`) applies.
+In the POS cart, tap **+** beside Customer to open **Add customer**. Name is required; phone, email and address are optional. **Save & select customer** saves an active customer and selects them for the current order without reloading or clearing the cart. Customer creation requires `customers.create`; POS access is checked separately.
 
 Enter **Old balance (due)** in the popup or customer create/edit page to record money already owed from earlier purchases. Customer pages show outstanding totals, balance filters, contacts and purchase history; the selected customer's due is also visible in the POS. This opening due stays separate from today's paid sale and register cash. Existing customers start at zero; run `php artisan migrate` on another installation to add the opening-due column.
 
@@ -124,3 +124,7 @@ All 16 reports offer formatted PDF downloads with company letterhead from Busine
 ## Larger sample catalog
 
 Run `php artisan db:seed --class=BulkSampleProductSeeder` to add 120 clearly labelled sample products (`SAMPLE-001` through `SAMPLE-120`) with unique EAN-13 barcodes across six categories. Samples include low/out-of-stock products, kilogram quantities, same-price deliveries and different-price deliveries. Stock is recorded through the normal stock-layer and movement services. Rerunning skips existing sample SKUs without replenishing stock or overwriting edits; existing products are untouched. POS initially shows up to 60 matches, so search or select a category to find the remaining products. Product management uses pagination.
+
+### Granular team access
+
+Roles & permissions now lists independent dashboard cards, module CRUD and transaction/report functions with descriptions, search and selection counts. Administrator receives full access automatically. Existing role access is preserved by the permission upgrade migration, and later revocations are respected. See [permission reference](docs/PERMISSIONS.md).

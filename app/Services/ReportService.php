@@ -25,9 +25,7 @@ class ReportService
 
     public static function permission(string $kind): string
     {
-        return 'reports.'.match ($kind) {
-            'returns' => 'sales', 'collections' => 'payments', default => $kind
-        };
+        return 'reports.'.$kind;
     }
 
     public function build(string $kind, array $filters): array

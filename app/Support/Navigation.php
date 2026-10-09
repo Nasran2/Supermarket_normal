@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\User;
+use App\Services\ReportService;
 
 final class Navigation
 {
@@ -13,12 +14,12 @@ final class Navigation
                 return route($route);
             }
         }
-        foreach (['products' => 'products.view', 'expenses' => 'expenses.view', 'users' => 'users.view', 'roles' => 'roles.view', 'units' => 'units.view'] as $resource => $permission) {
+        foreach (collect(Resources::all())->map(fn ($def, $resource) => Resources::permission($resource, 'view'))->all() as $resource => $permission) {
             if ($user->hasPermission($permission)) {
                 return route('manage.index', $resource);
             }
         }
-        if ($user->role?->permissions->contains(fn ($p) => str_starts_with($p->name, 'reports.'))) {
+        if (collect(array_keys(ReportService::TITLES))->contains(fn ($kind) => $user->hasPermission(ReportService::permission($kind)))) {
             return route('reports.index');
         }
 

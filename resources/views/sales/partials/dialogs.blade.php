@@ -1,6 +1,6 @@
 <div id="sale-workspace" data-open-action="{{ $openAction }}" data-due="{{ $sale->due_balance }}" data-currency="{{ $currency }}"></div>
 @if($sale->status==='ACTIVE')
-@can('sales.edit')
+@can('sales.collect_payment')
 @if(\App\Support\Money::compare($sale->due_balance,0)>0)
 <dialog id="sale-pay-dialog" class="sale-dialog" aria-labelledby="sale-pay-title">
     <div class="modal-heading"><div><span class="eyebrow">{{ $sale->invoice }}</span><h2 id="sale-pay-title">Receive due payment</h2></div><button type="button" class="icon-button" data-close-sale-dialog aria-label="Close due payment"><x-icon name="x"/></button></div>
@@ -17,12 +17,14 @@
 </dialog>
 @endif
 @endcan
-@can('sales.void')
+@can('sales.delete')
 @if(!$sale->register->closed_at && $sale->returns->isEmpty() && $sale->collections->isEmpty())
 <dialog id="sale-delete-dialog" class="sale-dialog" aria-labelledby="sale-delete-title"><div class="modal-heading"><div><span class="eyebrow">{{ $sale->invoice }}</span><h2 id="sale-delete-title">Delete sale</h2></div><button type="button" class="icon-button" data-close-sale-dialog aria-label="Close delete"><x-icon name="x"/></button></div>
     <form class="sale-dialog-body" action="{{ route('sales.destroy',$sale) }}" method="POST">@csrf @method('DELETE')<input type="hidden" name="_action" value="delete"><p>Reverse this invoice, restore stock and reverse its business-paid processing expenses. The invoice remains in history as voided.</p><label class="field">Reason<textarea name="reason" required minlength="3" maxlength="1000" rows="3" placeholder="Why is this sale being deleted?">{{ old('_action')==='delete'?old('reason'):'' }}</textarea></label><div class="sale-dialog-actions"><button class="btn secondary" type="button" data-close-sale-dialog>Keep sale</button><button class="btn danger"><x-icon name="trash-2"/>Delete sale</button></div></form>
 </dialog>
 @endif
+@endcan
+@can('sales.return')
 @if($itemsRemaining)
 <dialog id="sale-return-dialog" class="sale-dialog sale-return-dialog" aria-labelledby="sale-return-title">
     <div class="modal-heading"><div><span class="eyebrow">{{ $sale->invoice }}</span><h2 id="sale-return-title">Return items</h2></div><button type="button" class="icon-button" data-close-sale-dialog aria-label="Close return"><x-icon name="x"/></button></div>

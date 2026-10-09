@@ -12,7 +12,7 @@ class SettingsRequest extends FormRequest
         $g = $this->route('group');
 
         return $this->user()?->hasPermission(match ($g) {
-            'stock' => 'settings.pos','system' => 'settings.business',default => 'settings.'.$g
+            'stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$g
         });
     }
 

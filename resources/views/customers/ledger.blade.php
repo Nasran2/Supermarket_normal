@@ -24,8 +24,8 @@
             <input type="date" name="end_date" value="{{ $endDate }}">
         </label>
         <button type="submit" class="btn primary">Filter</button>
-        <button type="submit" name="export" value="pdf" class="btn secondary" formtarget="_blank"><x-icon name="printer"/> Print / PDF</button>
-        <button type="submit" name="export" value="csv" class="btn secondary"><x-icon name="download"/> CSV</button>
+        @can('customers.export')<button type="submit" name="export" value="pdf" class="btn secondary" formtarget="_blank"><x-icon name="printer"/> Print / PDF</button>@endcan
+        @can('customers.export')<button type="submit" name="export" value="csv" class="btn secondary"><x-icon name="download"/> CSV</button>@endcan
     </form>
 </div>
 

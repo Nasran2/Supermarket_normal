@@ -13,7 +13,9 @@ class PaymentChargeService
 {
     public function calculateCharge(PaymentMethod $method, string $amount, bool $lock = false, ?string $ruleAmount = null): array
     {
-        if (!$method->has_charge) {
+        $amountToEvaluate = $ruleAmount ?? $amount;
+
+        if (!$method->has_charge || Money::compare($amountToEvaluate, $method->charge_minimum_amount ?? 0) < 0) {
             return ['rule_id' => null, 'rule_name' => null, 'charge_type' => null, 'charge_value' => '0.0000', 'charge_bearer' => $method->charge_bearer, 'processing_charge' => '0.00', 'customer_payable' => $amount, 'business_expense' => '0.00'];
         }
 

@@ -3,34 +3,39 @@ if (editor) {
   const inputs = [...editor.querySelectorAll('input[name="permissions[]"]')];
   const groups = [...editor.querySelectorAll('[data-permission-group]')];
   function update() {
-    const count = editor.querySelector('[data-permission-count]');
-    if (count) count.textContent = inputs.filter((input) => input.checked).length;
+    editor.querySelectorAll('[data-permission-count]').forEach((count) => count.textContent = inputs.filter((input) => input.checked).length);
     groups.forEach((group) => {
       const children = [...group.querySelectorAll('input[name="permissions[]"]')];
       const selected = children.filter((input) => input.checked).length;
       const toggle = group.querySelector('[data-group-toggle]');
+      group.querySelector('[data-group-count]').textContent = `${selected} / ${children.length}`;
+      toggle.disabled = children.every((input) => input.disabled);
       toggle.checked = selected === children.length;
       toggle.indeterminate = selected > 0 && selected < children.length;
     });
   }
   editor.addEventListener('change', (event) => {
     if (event.target.matches('[data-group-toggle]')) {
-      event.target.closest('[data-permission-group]').querySelectorAll('input[name="permissions[]"]').forEach((input) => input.checked = event.target.checked);
+      event.target.closest('[data-permission-group]').querySelectorAll('input[name="permissions[]"]').forEach((input) => input.checked = input.disabled ? input.checked : event.target.checked);
     }
     update();
   });
   editor.querySelectorAll('[data-permissions-all]').forEach((button) => button.addEventListener('click', () => {
-    inputs.forEach((input) => input.checked = button.dataset.permissionsAll === '1');
+    inputs.filter((input) => !input.disabled && input.closest('[data-permission-label]').getClientRects().length).forEach((input) => input.checked = button.dataset.permissionsAll === '1');
     update();
   }));
   editor.querySelector('[data-permission-search]')?.addEventListener('input', (event) => {
     const query = event.target.value.trim().toLowerCase();
+    editor.classList.toggle('permission-search-active', !!query);
+    editor.querySelectorAll('[data-permissions-all]').forEach((button) => button.textContent = button.dataset.permissionsAll === '1' ? (query ? 'Select visible' : 'Select available') : (query ? 'Clear visible' : 'Clear'));
     groups.forEach((group) => {
       const moduleMatches = group.querySelector('legend').textContent.toLowerCase().includes(query);
       const labels = [...group.querySelectorAll('[data-permission-label]')];
       labels.forEach((label) => label.hidden = !moduleMatches && !label.textContent.toLowerCase().includes(query));
       group.hidden = !labels.some((label) => !label.hidden);
     });
+    const empty = editor.querySelector('[data-permission-empty]');
+    if (empty) empty.hidden = groups.some((group) => !group.hidden);
   });
   update();
 }

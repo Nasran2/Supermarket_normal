@@ -20,7 +20,7 @@ class StockController extends Controller
         $product->load('unit');
         app(StockLayerService::class)->ensureLegacy($product);
         $layers = $product->stockLayers()->available()->get();
-        $movements = $product->hasMany(StockMovement::class)->with('user', 'sale', 'saleReturn.sale', 'layers.layer')->latest('created_at')->latest('id')->paginate(20, ['*'], 'movements');
+        $movements = $product->hasMany(StockMovement::class)->when(! auth()->user()->hasPermission('products.view_history'), fn ($q) => $q->whereRaw('1 = 0'))->with('user', 'sale', 'saleReturn.sale', 'layers.layer')->latest('created_at')->latest('id')->paginate(20, ['*'], 'movements');
 
         return view('crud.stock', compact('product', 'movements', 'layers'));
     }

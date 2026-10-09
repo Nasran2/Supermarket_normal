@@ -88,7 +88,7 @@ class ResourceRequest extends FormRequest
             }
         }
         if ($resource === 'roles') {
-            $r['permissions.*'] = ['integer', 'exists:permissions,id'];
+            $r['permissions.*'] = ['integer', 'distinct', 'exists:permissions,id'];
         }
         if ($resource === 'payment-rules') {
             $r['maximum_amount'][] = 'gte:minimum_amount';

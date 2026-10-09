@@ -9,6 +9,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\Unit;
+use App\Support\Permissions;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Cache;
 
@@ -16,23 +17,13 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $names = ['products.view_cost', 'products.manage_prices', 'purchases.manage_prices', 'dashboard.view', 'pos.access', 'sales.void', 'register.open', 'register.close', 'register.view', 'settings.view', 'settings.business', 'settings.pos', 'settings.receipt', 'settings.payment_methods', 'settings.payment_rules'];
-        foreach (['sales', 'products', 'units', 'purchases', 'expenses', 'users', 'roles'] as $module) {
-            foreach (['view', 'create', 'edit', 'delete'] as $action) {
-                $names[] = $module.'.'.$action;
-            }
-        }
-        foreach (['sales', 'purchases', 'expenses', 'profit', 'stock', 'product-sales', 'payments', 'register', 'cash', 'payment-charges', 'card-charges', 'qr-charges', 'bank-charges', 'audit'] as $report) {
-            $names[] = 'reports.'.$report;
-        }
-        foreach ($names as $name) {
-            Permission::firstOrCreate(['name' => $name]);
-        }
+        Permissions::install();
+        $names = array_keys(Permissions::all());
         foreach (['Administrator', 'Manager', 'Cashier'] as $name) {
             $role = Role::firstOrCreate(['name' => $name], ['system' => true]);
             if ($role->wasRecentlyCreated) {
                 $allowed = match ($name) {
-                    'Administrator' => $names,'Manager' => array_values(array_filter($names, fn ($n) => ! str_starts_with($n, 'users.') && ! str_starts_with($n, 'roles.'))),default => ['dashboard.view', 'pos.access', 'sales.view', 'sales.create', 'register.view', 'register.open', 'register.close', 'products.view']
+                    'Administrator' => $names,'Manager' => array_values(array_filter($names, fn ($n) => ! str_starts_with($n, 'users.') && ! str_starts_with($n, 'roles.'))),default => ['dashboard.view', 'pos.access', 'sales.view', 'sales.create', 'register.view', 'register.open', 'register.close', 'products.view', 'customers.create', 'sales.receipt', 'pos.discount', 'pos.override_price', 'pos.split_payment', 'pos.due_sale', 'dashboard.sales', 'dashboard.expenses', 'dashboard.transactions', 'dashboard.collections', 'dashboard.sales_overview', 'dashboard.register', 'dashboard.recent_sales', 'dashboard.low_stock', 'dashboard.top_products', 'dashboard.recent_expenses', 'products.view_history', 'stock-adjustments.view']
                 };
                 $role->permissions()->sync(Permission::whereIn('name', $allowed)->pluck('id'));
             }

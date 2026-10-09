@@ -8,7 +8,7 @@ class PosCustomerRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission('pos.access') && $this->user()?->hasPermission('sales.create');
+        return $this->user()?->hasPermission('pos.access') && $this->user()?->hasPermission('customers.create');
     }
 
     public function rules(): array

@@ -120,7 +120,7 @@ class PosController extends Controller
         $data = $request->validate(['checkout_token' => 'required|uuid']);
         $sale = Sale::where('user_id', $request->user()->id)->where('checkout_token', $data['checkout_token'])->first();
 
-        return response()->json(['completed' => (bool) $sale, 'invoice' => $sale?->invoice, 'receipt_url' => $sale ? route('sales.receipt', $sale) : null]);
+        return response()->json(['completed' => (bool) $sale, 'invoice' => $sale?->invoice, 'receipt_url' => $sale && $request->user()->hasPermission('sales.receipt') ? route('sales.receipt', $sale) : null]);
     }
 
     public function quote(CheckoutRequest $request, SaleService $service, RegisterService $registers)
@@ -141,6 +141,8 @@ class PosController extends Controller
     {
         $sale = $service->complete($request->validated(), $request->user());
 
-        return response()->json(['invoice' => $sale->invoice, 'receipt_url' => route('sales.receipt', $sale), 'sale_url' => route('sales.show', $sale), 'due_balance' => $sale->due_balance, 'customer_id' => $sale->customer_id, 'customer_balance' => $sale->customer?->due_balance, 'auto_print' => $settings->get('auto_print', false), 'show_receipt' => $settings->get('show_receipt', true)]);
+        $canReceipt = $request->user()->hasPermission('sales.receipt');
+
+        return response()->json(['invoice' => $sale->invoice, 'receipt_url' => $canReceipt ? route('sales.receipt', $sale) : null, 'sale_url' => route('sales.show', $sale), 'due_balance' => $sale->due_balance, 'customer_id' => $sale->customer_id, 'customer_balance' => $sale->customer?->due_balance, 'auto_print' => $canReceipt && $settings->get('auto_print', false), 'show_receipt' => $canReceipt && $settings->get('show_receipt', true)]);
     }
 }

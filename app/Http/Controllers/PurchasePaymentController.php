@@ -25,7 +25,7 @@ class PurchasePaymentController extends Controller
 
     public function balance(Request $request, Purchase $purchase, PurchasePaymentService $service)
     {
-        abort_unless($request->user()->hasPermission('purchases.edit'), 403);
+        abort_unless($request->user()->hasPermission('purchases.set_balance'), 403);
         $data = $request->validate(['previously_paid' => ['required', 'numeric', 'min:0', 'max:9999999999999.99', 'decimal:0,2'], 'confirmed' => ['accepted']]);
         $service->startTracking($purchase, (string) $data['previously_paid'], $request->user()->id);
 

@@ -15,6 +15,7 @@ use App\Models\UnitPreset;
 use App\Services\DefaultUnitService;
 use App\Services\ResourceService;
 use App\Services\StockLayerService;
+use App\Support\Permissions;
 use App\Support\Resources;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -68,6 +69,11 @@ class ResourceController extends Controller
 
             return view('suppliers.index', compact('rows', 'stats'));
         }
+        if ($resource === 'roles') {
+            $rows = $query->withCount('users')->orderBy('name')->paginate(20)->withQueryString();
+
+            return view('roles.index', compact('rows'));
+        }
         $rows = $query->orderByDesc('id')->paginate(20)->withQueryString();
 
         if ($resource === 'customers') {
@@ -113,6 +119,9 @@ class ResourceController extends Controller
         $def = $this->definition($resource, 'view');
         $record = $def['model']::with($def['relations'] ?? [])->findOrFail($id);
 
+        if ($resource === 'roles') {
+            return view('roles.show', compact('record'));
+        }
         if ($resource === 'suppliers') {
             return app(SupplierAccountController::class)->show(request(), $record);
         }
@@ -132,7 +141,7 @@ class ResourceController extends Controller
         }
 
         if ($resource === 'products') {
-            $movements = $record->hasMany(StockMovement::class)->with('user', 'sale', 'saleReturn.sale', 'layers.layer')->latest('created_at')->latest('id')->paginate(20, ['*'], 'movements')->withQueryString();
+            $movements = $record->hasMany(StockMovement::class)->when(! auth()->user()->hasPermission('products.view_history'), fn ($q) => $q->whereRaw('1 = 0'))->with('user', 'sale', 'saleReturn.sale', 'layers.layer')->latest('created_at')->latest('id')->paginate(20, ['*'], 'movements')->withQueryString();
 
             app(StockLayerService::class)->ensureLegacy($record);
             $stockStatus = request()->validate(['stock_status' => 'nullable|in:available,depleted,all'])['stock_status'] ?? 'available';
@@ -154,6 +163,9 @@ class ResourceController extends Controller
         foreach ($def['fields'] as $key => $f) {
             if ($f[1] === 'select' || $f[1] === 'multiselect') {
                 $query = $f[3]::query();
+                if ($resource === 'users' && $key === 'role_id' && ! auth()->user()->isAdministrator()) {
+                    $query->where(fn ($q) => $q->where('name', '!=', 'Administrator')->orWhere('system', false));
+                }
                 $options[$key] = $query->orderBy('name')->pluck('name', 'id');
             }
         }
@@ -168,7 +180,8 @@ class ResourceController extends Controller
 
             return view($view, compact('resource', 'def', 'record', 'options', 'units', 'presets'));
         }
-        $permissions = Permission::orderBy('name')->get();
+        $moduleOrder = array_flip(['Dashboard', 'Point of sale', 'Sales', 'Purchases', 'Products', 'Stock adjustments', 'Daily register', 'Customers', 'Suppliers', 'Categories', 'Units', 'Multiple units', 'Expenses', 'Expense categories', 'Users', 'Roles & permissions', 'Settings']);
+        $permissions = Permission::whereIn('name', array_keys(Permissions::all()))->get()->sortBy(fn ($p) => sprintf('%02d-%s-%03d', $moduleOrder[Permissions::info($p->name)['group']] ?? 18, Permissions::info($p->name)['group'], array_search($p->name, array_keys(Permissions::all()))));
 
         return view($resource === 'customers' ? 'customers.form' : 'crud.form', compact('resource', 'def', 'record', 'options', 'permissions'));
     }
@@ -181,14 +194,18 @@ class ResourceController extends Controller
             return response()->json($record, 201);
         }
 
-        return redirect()->route('manage.index', $resource)->with('success', 'Changes saved.');
+        return ($request->user()->hasPermission(Resources::permission($resource, 'view'))
+            ? redirect()->route('manage.index', $resource)
+            : redirect()->route('manage.create', $resource))->with('success', 'Changes saved.');
     }
 
     public function update(ResourceRequest $request, string $resource, int $id, ResourceService $service)
     {
         $service->save($resource, $request->validated(), $id);
 
-        return redirect()->route('manage.index', $resource)->with('success', 'Changes saved.');
+        return ($request->user()->hasPermission(Resources::permission($resource, 'view'))
+            ? redirect()->route('manage.index', $resource)
+            : redirect()->route('manage.edit', [$resource, $id]))->with('success', 'Changes saved.');
     }
 
     public function destroy(string $resource, int $id, ResourceService $service)

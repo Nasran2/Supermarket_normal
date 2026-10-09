@@ -9,7 +9,7 @@ class PurchasePaymentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission($this->routeIs('purchases.refunds.store') ? 'purchases.delete' : 'purchases.edit');
+        return $this->user()?->hasPermission($this->routeIs('purchases.refunds.store') ? 'purchases.refund' : 'purchases.pay');
     }
 
     public function rules(): array

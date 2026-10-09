@@ -1,5 +1,5 @@
 <section class="card product-stock-history mt-6" id="stock-history">
-    <div class="card-heading"><div><h2>Stock movement history <span class="badge slate">{{ $movements->total() }}</span></h2><p>Every stock change in {{ $product->unit->short_name }}. Select an invoice to view its bill.</p></div>@can('products.edit')<a class="btn secondary" href="{{ route('adjustments.create') }}"><x-icon name="boxes"/>Adjust stock</a>@endcan</div>
+    <div class="card-heading"><div><h2>Stock movement history <span class="badge slate">{{ $movements->total() }}</span></h2><p>Every stock change in {{ $product->unit->short_name }}. Select an invoice to view its bill.</p></div>@can('stock-adjustments.create')<a class="btn secondary" href="{{ route('adjustments.create') }}"><x-icon name="boxes"/>Adjust stock</a>@endcan</div>
     <div class="table-wrap"><table><thead><tr><th>Date &amp; time</th><th>Movement</th><th>Bill / reference</th><th class="text-right">Quantity change</th><th class="text-right">Stock after</th><th>Recorded by</th></tr></thead><tbody>
     @forelse($movements as $movement)
         @php

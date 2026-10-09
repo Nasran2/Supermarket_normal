@@ -35,7 +35,7 @@ Route::middleware(['auth', 'auth.session'])->group(function () {
         Route::post('/complete', [PosController::class, 'complete'])->name('complete');
     });
     Route::get('/sales', [SaleController::class, 'index'])->middleware('permission:sales.view')->name('sales.index');
-    Route::get('/sales/{sale}/receipt', [SaleController::class, 'receipt'])->name('sales.receipt');
+    Route::get('/sales/{sale}/receipt', [SaleController::class, 'receipt'])->middleware('permission:sales.receipt')->name('sales.receipt');
     Route::get('/sales/{sale}/edit', [SaleController::class, 'edit'])->middleware(['permission:sales.edit', 'permission:pos.access'])->name('sales.edit');
     Route::get('/sales/{sale}/edit/products', [SaleController::class, 'editProducts'])->middleware(['permission:sales.edit', 'permission:pos.access'])->name('sales.edit.products');
     Route::post('/sales/{sale}/edit/quote', [SaleController::class, 'editQuote'])->name('sales.edit.quote');
@@ -52,12 +52,13 @@ Route::middleware(['auth', 'auth.session'])->group(function () {
     Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
     Route::put('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
     Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->middleware('permission:purchases.view')->name('purchases.show');
+    Route::delete('/purchases/{purchase}', [PurchaseController::class, 'void'])->name('purchases.destroy');
     Route::post('/purchases/{purchase}/void', [PurchaseController::class, 'void'])->name('purchases.void');
     Route::post('/purchases/{purchase}/payments', [PurchasePaymentController::class, 'store'])->name('purchases.payments.store');
     Route::post('/purchases/{purchase}/refunds', [PurchasePaymentController::class, 'refund'])->name('purchases.refunds.store');
     Route::post('/purchases/{purchase}/payment-balance', [PurchasePaymentController::class, 'balance'])->name('purchases.balance');
     Route::get('/register', [RegisterController::class, 'index'])->middleware('permission:register.view')->name('register.index');
-    Route::get('/register/current-summary', [RegisterController::class, 'currentSummary'])->middleware('permission:register.view')->name('register.current-summary');
+    Route::get('/register/current-summary', [RegisterController::class, 'currentSummary'])->middleware('permission:register.view|register.close')->name('register.current-summary');
     Route::post('/register/open', [RegisterController::class, 'open'])->name('register.open');
     Route::post('/register/movement', [RegisterController::class, 'movement'])->name('register.movement');
     Route::post('/register/close', [RegisterController::class, 'close'])->name('register.close');
@@ -70,18 +71,18 @@ Route::middleware(['auth', 'auth.session'])->group(function () {
     Route::get('/reports/{report}/export', [ReportController::class, 'export'])->name('reports.export');
     Route::get('/reports/{report}', [ReportController::class, 'show'])->name('reports.show');
     Route::prefix('stock-adjustments')->name('adjustments.')->group(function () {
-        Route::get('/', [StockBatchController::class, 'index'])->middleware('permission:products.view')->name('index');
-        Route::get('/products', [StockBatchController::class, 'products'])->middleware('permission:products.edit')->name('products');
-        Route::get('/create', [StockBatchController::class, 'create'])->middleware('permission:products.edit')->name('create');
-        Route::post('/', [StockBatchController::class, 'store'])->middleware('permission:products.edit')->name('store');
-        Route::get('/{adjustment}/edit', [StockBatchController::class, 'edit'])->middleware('permission:products.edit')->name('edit');
-        Route::get('/{adjustment}', [StockBatchController::class, 'show'])->middleware('permission:products.view')->name('show');
-        Route::put('/{adjustment}', [StockBatchController::class, 'update'])->middleware('permission:products.edit')->name('update');
-        Route::delete('/{adjustment}', [StockBatchController::class, 'destroy'])->middleware('permission:products.edit')->name('destroy');
+        Route::get('/', [StockBatchController::class, 'index'])->middleware('permission:stock-adjustments.view')->name('index');
+        Route::get('/products', [StockBatchController::class, 'products'])->middleware('permission:stock-adjustments.create|stock-adjustments.edit')->name('products');
+        Route::get('/create', [StockBatchController::class, 'create'])->middleware('permission:stock-adjustments.create')->name('create');
+        Route::post('/', [StockBatchController::class, 'store'])->middleware('permission:stock-adjustments.create')->name('store');
+        Route::get('/{adjustment}/edit', [StockBatchController::class, 'edit'])->middleware('permission:stock-adjustments.edit')->name('edit');
+        Route::get('/{adjustment}', [StockBatchController::class, 'show'])->middleware('permission:stock-adjustments.view')->name('show');
+        Route::put('/{adjustment}', [StockBatchController::class, 'update'])->middleware('permission:stock-adjustments.edit')->name('update');
+        Route::delete('/{adjustment}', [StockBatchController::class, 'destroy'])->middleware('permission:stock-adjustments.delete')->name('destroy');
     });
-    Route::get('/stock/{product}/adjust', [StockController::class, 'edit'])->middleware('permission:products.edit')->name('stock.edit');
+    Route::get('/stock/{product}/adjust', [StockController::class, 'edit'])->middleware('permission:stock-adjustments.create')->name('stock.edit');
     Route::put('/stock/{product}/adjust', [StockController::class, 'update'])->name('stock.update');
-    Route::post('/units/{unit}/default', [StockPriceController::class, 'defaultUnit'])->middleware('permission:units.edit')->name('units.default');
+    Route::post('/units/{unit}/default', [StockPriceController::class, 'defaultUnit'])->middleware('permission:units.set_default')->name('units.default');
     Route::put('/stock-prices/{layer}', [StockPriceController::class, 'reprice'])->middleware('permission:products.manage_prices')->name('stock-prices.update');
     Route::prefix('manage/{resource}')->name('manage.')->group(function () {
         Route::get('/', [ResourceController::class, 'index'])->name('index');

@@ -59,11 +59,11 @@ class ProductMovementHistoryTest extends TestCase
     public function test_product_viewer_can_read_history_but_no_invoice_link_without_sales_access(): void
     {
         $role = Role::create(['name' => 'Product history viewer']);
-        $role->permissions()->sync(Permission::where('name', 'products.view')->pluck('id'));
+        $role->permissions()->sync(Permission::whereIn('name', ['products.view', 'products.view_history'])->pluck('id'));
         $user = User::create(['name' => 'History viewer', 'username' => 'histviewer', 'email' => 'histviewer@example.test', 'password' => 'test-password', 'role_id' => $role->id]);
         $this->flushSession();
         $this->actingAs($user);
         $this->get(route('manage.show', ['products', $this->product->id]))->assertOk()->assertSee('Stock movement history')->assertSee($this->sale->invoice)->assertDontSee('href="'.route('sales.show', $this->sale).'"', false);
-        $this->get(route('stock.edit',$this->product))->assertForbidden();
+        $this->get(route('stock.edit', $this->product))->assertForbidden();
     }
 }

@@ -8,7 +8,7 @@ class StockAdjustmentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission('products.edit');
+        return $this->user()?->hasPermission('stock-adjustments.create');
     }
 
     public function rules(): array

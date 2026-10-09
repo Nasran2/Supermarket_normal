@@ -8,7 +8,7 @@ class RegisterRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission($this->routeIs('register.open') ? 'register.open' : 'register.close');
+        return $this->user()?->hasPermission($this->route()->getName());
     }
 
     public function rules(): array

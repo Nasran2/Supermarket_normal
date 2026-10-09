@@ -20,6 +20,8 @@ class SaleService
 
     public function quote(array $data, User $user, bool $lock = false, ?Sale $editing = null): array
     {
+        abort_if(count($data['payments'] ?? []) > 1 && ! $user->hasPermission('pos.split_payment'), 403);
+        abort_if(! empty($data['allow_due']) && ! $user->hasPermission('pos.due_sale'), 403);
         $ids = array_column($data['items'], 'product_id');
         $products = Product::with(['unit', 'conversions.unit'])->whereIn('id', $ids)->orderBy('id');
         if ($lock) {
@@ -52,6 +54,7 @@ class SaleService
             $baseQuantity = $units->resolve($p, $item['unit_id'] ?? null, $q)['base_stock_quantity'];
             $allocation = app(StockLayerService::class)->plan($p, $baseQuantity, isset($item['stock_price']) ? (string) $item['stock_price'] : null, $reserved, $lock, $editing, isset($item['stock_layer_id']) ? (int) $item['stock_layer_id'] : null);
             $selected = $units->resolve($p, $item['unit_id'] ?? null, $q, $allocation['stock_price']);
+            abort_if(isset($item['unit_price']) && Money::compare($item['unit_price'], $selected['price']) !== 0 && ! $user->hasPermission('pos.override_price'), 403);
             $adjustment = app(SaleLineService::class)->calculate($item, $selected['price']);
             $catalogTotal = Money::mul($selected['price'], $q);
             $priceReduction = Money::sub($catalogTotal, $adjustment['line_subtotal']);
@@ -64,6 +67,7 @@ class SaleService
         }
         $invoiceDiscount = app(SaleLineService::class)->billDiscount($data, Money::sub($subtotal, $lineDiscounts));
         $discount = Money::add($lineDiscounts, $invoiceDiscount);
+        abort_if(Money::compare($discount, 0) > 0 && ! $user->hasPermission('pos.discount'), 403);
         $discountBudget = Money::add($discountBudget, $invoiceDiscount);
         if (Money::compare($discountBudget, 0) > 0) {
             if (! $this->settings->get('allow_discount', true)) {
@@ -104,6 +108,8 @@ class SaleService
 
     public function complete(array $data, User $user): Sale
     {
+        abort_if(! empty($data['allow_due']) && ! $user->hasPermission('pos.due_sale'), 403);
+
         return DB::transaction(function () use ($data, $user) {
             $register = $this->registers->current($user->id, true);
             if (! $register) {

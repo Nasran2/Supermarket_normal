@@ -15,7 +15,7 @@ class RegisterController extends Controller
     {
         $register = $service->current(auth()->id());
         $summary = $register ? $service->summary($register, true) : null;
-        $registers = Register::with('user')->where('user_id', auth()->id())->latest()->paginate(15);
+        $registers = Register::with('user')->when(! auth()->user()->hasPermission('register.view_all'), fn ($q) => $q->where('user_id', auth()->id()))->latest()->paginate(15);
         if ($register) {
             $register->load('movements.user');
         }
@@ -68,7 +68,7 @@ class RegisterController extends Controller
 
     public function show(Register $register, RegisterService $service)
     {
-        abort_unless($register->user_id === auth()->id() || auth()->user()->hasPermission('reports.register'), 403);
+        abort_unless($register->user_id === auth()->id() || auth()->user()->hasPermission('register.view_all'), 403);
         $register->load(['user', 'movements.user']);
         $summary = $service->summary($register, true);
         $sales = $register->sales()->with('payments')->latest('sold_at')->get();

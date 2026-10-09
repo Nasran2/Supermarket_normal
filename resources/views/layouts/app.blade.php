@@ -19,5 +19,5 @@
  @if($errors->any())<div class="notice error" role="alert"><x-icon name="circle-alert"/><div><strong>Please check the following</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div></div>@endif
  @yield('content')
 </main><footer class="app-footer">Powered by Twinsofte <span>{{ $settings['currency']??'LKR' }} · {{ $settings['timezone']??'Asia/Colombo' }}</span></footer></div>@stack('scripts')
-@if(auth()->user()->hasPermission('register.view') || auth()->user()->hasPermission('register.open'))@include('register.partials.dialogs')@endif
+@if(auth()->user()->hasPermission('register.view') || auth()->user()->hasPermission('register.open') || auth()->user()->hasPermission('register.close'))@include('register.partials.dialogs')@endif
 </body></html>

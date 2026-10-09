@@ -26,6 +26,9 @@ class ResourceService
 {
     private function guardPermissions(array $ids): void
     {
+        if (auth()->user()->isAdministrator()) {
+            return;
+        }
         $allowed = auth()->user()->role->permissions->pluck('id')->all();
         if (array_diff($ids, $allowed)) {
             throw ValidationException::withMessages(['permissions' => 'You cannot grant permissions beyond your own access.']);
@@ -34,6 +37,15 @@ class ResourceService
 
     public function guardEditable($resource, $record): void
     {
+        if ($resource === 'users') {
+            if ($record->role?->system && $record->role->name === 'Administrator' && ! auth()->user()->isAdministrator()) {
+                throw ValidationException::withMessages(['role_id' => 'Only an administrator can manage Administrator accounts.']);
+            }
+            $this->guardPermissions($record->role?->permissions->pluck('id')->all() ?? []);
+        }
+        if ($resource === 'roles' && ! auth()->user()->isAdministrator()) {
+            $this->guardPermissions($record->permissions->pluck('id')->all());
+        }
         if ($resource === 'expenses' && ($record->type !== 'MANUAL' || $record->status !== 'ACTIVE')) {
             throw ValidationException::withMessages(['expense' => 'Automatic or reversed expenses cannot be edited manually.']);
         }
@@ -151,6 +163,9 @@ class ResourceService
                 }
                 if ($resource === 'users') {
                     $target = Role::with('permissions')->findOrFail($data['role_id']);
+                    if ($target->system && $target->name === 'Administrator' && ! auth()->user()->isAdministrator()) {
+                        throw ValidationException::withMessages(['role_id' => 'Only an administrator can assign Administrator access.']);
+                    }
                     $this->guardPermissions($target->permissions->pluck('id')->all());
                     if ($id === auth()->id() && (! $data['active'] || $data['role_id'] != auth()->user()->role_id)) {
                         throw ValidationException::withMessages(['active' => 'You cannot disable yourself or change your own role.']);
@@ -200,6 +215,9 @@ class ResourceService
                 $permissionIds = $values['permissions'] ?? [];
                 $categoryIds = $values['categories'] ?? [];
                 if ($resource === 'roles') {
+                    if (strcasecmp(trim($values['name']), 'Administrator') === 0) {
+                        throw ValidationException::withMessages(['name' => 'Administrator is a protected system role.']);
+                    }
                     $this->guardPermissions($permissionIds);
                 }
                 unset($values['permissions'], $values['categories']);

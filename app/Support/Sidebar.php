@@ -29,14 +29,14 @@ class Sidebar
             $group('Daily register', 'wallet', [$link('Register & history', 'register.index', [], 'register.view', request()->is('register*')), $link('Register report', 'reports.show', 'register', 'reports.register'), $link('Cash summary', 'reports.show', 'cash', 'reports.cash')]),
         ];
         $products = $resource('products', 'Products', 'package', 'product');
-        foreach ([$link('Stock adjustments', 'adjustments.index', [], 'products.view', request()->is('stock-adjustments*') && ! request()->routeIs('adjustments.create')), $link('New adjustment', 'adjustments.create', [], 'products.edit', request()->routeIs('adjustments.create')), $link('Low stock', 'manage.index', ['resource' => 'products', 'low_stock' => 1], 'products.view')] as $child) {
+        foreach ([$link('Stock adjustments', 'adjustments.index', [], 'stock-adjustments.view', request()->is('stock-adjustments*') && ! request()->routeIs('adjustments.create')), $link('New adjustment', 'adjustments.create', [], 'stock-adjustments.create', request()->routeIs('adjustments.create')), $link('Low stock', 'manage.index', ['resource' => 'products', 'low_stock' => 1], 'products.view')] as $child) {
             if ($user->hasPermission($child['permissions'][0])) {
                 $products['children'][] = $child;
             }
         }
         $products['active'] = collect($products['children'])->contains('active', true);
         $expenses = $resource('expenses', 'Expenses', 'circle-dollar-sign', 'expense');
-        foreach ([$link('Expense categories', 'manage.index', 'expense-categories', 'expenses.view', request()->route('resource') === 'expense-categories'), $link('Add expense category', 'manage.create', 'expense-categories', 'expenses.create')] as $child) {
+        foreach ([$link('Expense categories', 'manage.index', 'expense-categories', 'expense-categories.view', request()->route('resource') === 'expense-categories'), $link('Add expense category', 'manage.create', 'expense-categories', 'expense-categories.create')] as $child) {
             if ($user->hasPermission($child['permissions'][0])) {
                 $expenses['children'][] = $child;
             }
@@ -47,11 +47,11 @@ class Sidebar
         foreach (ReportService::TITLES as $key => $title) {
             $reports[] = $link($title, 'reports.show', $key, ReportService::permission($key), request()->route('report') === $key);
         }
-        if (! $user->role?->permissions->contains(fn ($p) => str_starts_with($p->name, 'reports.'))) {
+        if (! collect(array_keys(ReportService::TITLES))->contains(fn ($kind) => $user->hasPermission(ReportService::permission($kind)))) {
             $reports = [];
         }
         $settings = [$link('Overview', 'settings.index', [], 'settings.view', request()->routeIs('settings.index'))];
-        foreach (['business' => ['Business', 'settings.business'], 'pos' => ['Point of sale', 'settings.pos'], 'receipt' => ['Receipt', 'settings.receipt'], 'stock' => ['Stock controls', 'settings.pos'], 'system' => ['System', 'settings.business']] as $key => [$title, $permission]) {
+        foreach (['business' => ['Business', 'settings.business'], 'pos' => ['Point of sale', 'settings.pos'], 'receipt' => ['Receipt', 'settings.receipt'], 'stock' => ['Stock controls', 'settings.stock'], 'system' => ['System', 'settings.system']] as $key => [$title, $permission]) {
             $settings[] = $link($title, 'settings.edit', $key, $permission, request()->route('group') === $key);
         }
         foreach (['payment-methods' => ['Payment methods', 'payment method']] as $key => [$title, $singular]) {

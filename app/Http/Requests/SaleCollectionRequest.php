@@ -8,7 +8,7 @@ class SaleCollectionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission('sales.edit') ?? false;
+        return $this->user()?->hasPermission('sales.collect_payment') ?? false;
     }
 
     public function rules(): array

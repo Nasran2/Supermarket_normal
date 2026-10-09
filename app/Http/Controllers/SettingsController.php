@@ -23,7 +23,7 @@ class SettingsController extends Controller
         $fields = config('pos.'.$group);
         abort_unless($fields, 404);
         abort_unless(auth()->user()->hasPermission(match ($group) {
-            'stock' => 'settings.pos','system' => 'settings.business',default => 'settings.'.$group
+            'stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$group
         }), 403);
         $values = $service->all();
         $paymentMethods = PaymentMethod::where('active', true)->orderBy('display_order')->get();

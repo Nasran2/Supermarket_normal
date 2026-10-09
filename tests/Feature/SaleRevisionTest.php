@@ -203,7 +203,7 @@ class SaleRevisionTest extends TestCase
         $sale = $this->sale();
         $second = $this->sale();
         $role = Role::create(['name' => 'Invoice editor only']);
-        $role->permissions()->sync(Permission::whereIn('name', ['sales.edit', 'sales.view', 'pos.access', 'settings.pos'])->pluck('id'));
+        $role->permissions()->sync(Permission::whereIn('name', ['sales.edit', 'sales.view', 'pos.access', 'settings.pos', 'pos.discount', 'pos.override_price', 'pos.split_payment'])->pluck('id'));
         $this->cashier->update(['role_id' => $role->id]);
         $this->actingAs($this->cashier->fresh());
         $this->get(route('sales.edit', $sale))->assertOk();

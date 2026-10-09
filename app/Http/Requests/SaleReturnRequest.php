@@ -8,7 +8,7 @@ class SaleReturnRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission('sales.void') ?? false;
+        return $this->user()?->hasPermission('sales.return') ?? false;
     }
 
     public function rules(): array

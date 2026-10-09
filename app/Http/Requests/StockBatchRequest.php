@@ -8,7 +8,7 @@ class StockBatchRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission('products.edit') ?? false;
+        return $this->user()?->hasPermission($this->routeIs('adjustments.update') ? 'stock-adjustments.edit' : 'stock-adjustments.create') ?? false;
     }
 
     public function rules(): array

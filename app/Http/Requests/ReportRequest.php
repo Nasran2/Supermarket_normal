@@ -9,7 +9,10 @@ class ReportRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission(ReportService::permission((string) $this->route('report')));
+        $permission = ReportService::permission((string) $this->route('report'));
+        $format = $this->routeIs('reports.pdf') ? '.pdf' : ($this->routeIs('reports.export') ? '.export' : '');
+
+        return $this->user()?->hasPermission($permission) && ($format === '' || $this->user()->hasPermission($permission.$format));
     }
 
     public function rules(): array

@@ -20,6 +20,15 @@ class PurchaseService
     public function save(array $data, int $userId, ?Purchase $purchase = null): Purchase
     {
         return DB::transaction(function () use ($data, $userId, $purchase) {
+            $user = User::findOrFail($userId);
+            if (! $user->hasPermission('purchases.manage_charges')) {
+                if ($purchase) {
+                    $data['charges'] = $purchase->charges->map(fn ($charge) => $charge->only('label', 'amount'))->all();
+                    $data['charge_treatment'] = $purchase->charge_treatment;
+                } else {
+                    abort_if(! empty($data['charges']), 403);
+                }
+            }
             $before = [];
             $isNew = ! $purchase;
             $mode = $data['payment_mode'] ?? 'AUTO';

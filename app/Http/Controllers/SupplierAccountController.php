@@ -13,7 +13,7 @@ class SupplierAccountController extends Controller
 {
     private function filters(Request $request): array
     {
-        abort_unless($request->user()->hasPermission('purchases.view'), 403);
+        abort_unless($request->user()->hasPermission('suppliers.view'), 403);
 
         return $request->validate(['from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d'.($request->filled('from') ? '|after_or_equal:from' : ''), 'export' => 'nullable|in:pdf,csv']);
     }
@@ -22,7 +22,7 @@ class SupplierAccountController extends Controller
     {
         $filters = $this->filters($request);
         $record = Supplier::withDueBalances()->findOrFail($record->id);
-        $account = app(SupplierLedgerService::class)->build($record, $filters);
+        $account = $request->user()->hasPermission('suppliers.ledger') ? app(SupplierLedgerService::class)->build($record, $filters) : ['entries' => collect(), 'opening' => '0', 'debits' => '0', 'credits' => '0', 'closing' => '0'];
         $entries = $account['entries'];
         $page = LengthAwarePaginator::resolveCurrentPage('ledger_page');
         $ledger = new LengthAwarePaginator($entries->forPage($page, 20)->values(), $entries->count(), 20, $page, ['path' => $request->url(), 'pageName' => 'ledger_page', 'query' => $request->query()]);
@@ -33,6 +33,7 @@ class SupplierAccountController extends Controller
 
     public function ledger(Request $request, Supplier $supplier)
     {
+        abort_unless($request->user()->hasPermission('suppliers.ledger') && $request->user()->hasPermission('suppliers.export'), 403);
         $filters = $this->filters($request);
         $account = app(SupplierLedgerService::class)->build($supplier, $filters);
         $headers = ['Date', 'Type', 'Purchase reference', 'Details', 'Debit', 'Credit', 'Balance'];
