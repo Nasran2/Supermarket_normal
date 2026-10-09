@@ -56,4 +56,32 @@ $help = match($resource) { 'users'=>'Choose a role that matches this team member
 @if($resource==='expenses')@can('expenses.create')
 <dialog id="expense-category-dialog" class="purchase-payment-dialog" aria-labelledby="expense-category-title"><div class="modal-heading"><div><span class="eyebrow">EXPENSE CATEGORIES</span><h2 id="expense-category-title">Add expense category</h2></div><button type="button" class="icon-button" data-close-expense-category aria-label="Close category dialog"><x-icon name="x"/></button></div><form class="modal-body" id="expense-category-quick-form" action="{{ route('manage.store','expense-categories') }}" method="POST">@csrf<p class="muted">Create a category and select it for this expense.</p><div class="notice error" role="alert" data-category-error hidden></div><label class="field">Category name<input name="name" required maxlength="255" autocomplete="off"></label><div class="form-footer"><button type="button" class="btn secondary" data-close-expense-category>Cancel</button><button type="submit" class="btn primary"><x-icon name="check"/>Add category</button></div></form></dialog>
 @endcan @endif
+
+@if($resource==='payment-methods')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const hasCharge = document.querySelector('input[name="has_charge"][value="1"]');
+        if (!hasCharge) return;
+        
+        const chargeFields = ['charge_type', 'charge_value', 'charge_bearer'].map(name => 
+            document.querySelector(`[name="${name}"]`)?.closest('.field')
+        );
+        
+        function toggleChargeFields() {
+            const isChecked = hasCharge.checked;
+            chargeFields.forEach(field => {
+                if (field) {
+                    field.style.display = isChecked ? '' : 'none';
+                    const input = field.querySelector('input, select');
+                    if (input && isChecked) input.setAttribute('required', 'required');
+                    if (input && !isChecked) input.removeAttribute('required');
+                }
+            });
+        }
+        
+        hasCharge.addEventListener('change', toggleChargeFields);
+        toggleChargeFields();
+    });
+</script>
+@endif
 @endsection

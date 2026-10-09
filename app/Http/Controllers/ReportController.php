@@ -38,7 +38,7 @@ class ReportController extends Controller
         $cards = $result['cards'];
         $methods = PaymentMethod::orderBy('display_order')->get();
         $users = User::orderBy('name')->get();
-        $rules = PaymentChargeRule::orderBy('name')->get();
+        $rules = collect(); // Deprecated
 
         $products = $report === 'stock' ? Product::orderBy('name')->get(['id', 'name']) : collect();
         $categories = $report === 'stock' ? Category::orderBy('name')->get(['id', 'name']) : collect();
@@ -52,7 +52,7 @@ class ReportController extends Controller
         $filters = $request->validated();
         $title = ReportService::TITLES[$report];
         $labels = [];
-        foreach (['payment_method_id' => [PaymentMethod::class, 'Payment method'], 'user_id' => [User::class, 'Cashier'], 'rule_id' => [PaymentChargeRule::class, 'Charge rule'], 'product_id' => [Product::class, 'Product'], 'category_id' => [Category::class, 'Category']] as $key => [$model,$label]) {
+        foreach (['payment_method_id' => [PaymentMethod::class, 'Payment method'], 'user_id' => [User::class, 'Cashier'], 'product_id' => [Product::class, 'Product'], 'category_id' => [Category::class, 'Category']] as $key => [$model,$label]) {
             if (! empty($filters[$key])) {
                 $labels[$label] = $model::find($filters[$key])?->name ?? '-';
             }

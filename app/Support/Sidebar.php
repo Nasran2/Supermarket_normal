@@ -54,7 +54,7 @@ class Sidebar
         foreach (['business' => ['Business', 'settings.business'], 'pos' => ['Point of sale', 'settings.pos'], 'receipt' => ['Receipt', 'settings.receipt'], 'stock' => ['Stock controls', 'settings.pos'], 'system' => ['System', 'settings.business']] as $key => [$title, $permission]) {
             $settings[] = $link($title, 'settings.edit', $key, $permission, request()->route('group') === $key);
         }
-        foreach (['payment-methods' => ['Payment methods', 'payment method'], 'payment-rules' => ['Payment charge rules', 'charge rule']] as $key => [$title, $singular]) {
+        foreach (['payment-methods' => ['Payment methods', 'payment method']] as $key => [$title, $singular]) {
             $settings[] = $link($title, 'manage.index', $key, Resources::permission($key, 'view'), request()->route('resource') === $key && ! request()->routeIs('manage.create'));
             $settings[] = $link('Add '.$singular, 'manage.create', $key, Resources::permission($key, 'create'), request()->route('resource') === $key && request()->routeIs('manage.create'));
         }

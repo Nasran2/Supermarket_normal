@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class PaymentMethod extends Model
 {
-    protected $fillable = ['name', 'code', 'type', 'charge_bearer', 'active', 'display_order'];
+    protected $fillable = ['name', 'code', 'type', 'charge_bearer', 'has_charge', 'charge_type', 'charge_value', 'active', 'display_order'];
 
-    protected $casts = ['active' => 'boolean'];
+    protected $casts = ['active' => 'boolean', 'has_charge' => 'boolean', 'charge_value' => 'decimal:4'];
 
     public function rules()
     {

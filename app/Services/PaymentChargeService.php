@@ -11,27 +11,16 @@ use App\Support\Money;
 
 class PaymentChargeService
 {
-    public function getApplicableRule(PaymentMethod $method, string $amount, bool $lock = false): ?PaymentChargeRule
-    {
-        $rules = $method->rules()->where('active', true)->orderByDesc('priority')->orderBy('id');
-        if ($lock) {
-            $rules->lockForUpdate();
-        }
-
-        return $rules->get()->first(function ($r) use ($amount) {
-            $min = Money::compare($amount, $r->minimum_amount);
-
-            return ($r->comparison_operator === 'GT' ? $min > 0 : $min >= 0) && ($r->maximum_amount === null || Money::compare($amount, $r->maximum_amount) <= 0);
-        });
-    }
-
     public function calculateCharge(PaymentMethod $method, string $amount, bool $lock = false, ?string $ruleAmount = null): array
     {
-        $rule = $this->getApplicableRule($method, $ruleAmount ?? $amount, $lock);
-        $charge = $rule ? ($rule->charge_type === 'PERCENTAGE' ? Money::percent($amount, $rule->charge_value) : Money::round($rule->charge_value)) : '0.00';
-        $bearer = $rule?->charge_bearer ?? $method->charge_bearer;
+        if (!$method->has_charge) {
+            return ['rule_id' => null, 'rule_name' => null, 'charge_type' => null, 'charge_value' => '0.0000', 'charge_bearer' => $method->charge_bearer, 'processing_charge' => '0.00', 'customer_payable' => $amount, 'business_expense' => '0.00'];
+        }
 
-        return ['rule_id' => $rule?->id, 'rule_name' => $rule?->name, 'charge_type' => $rule?->charge_type, 'charge_value' => $rule?->charge_value ?? '0.0000', 'charge_bearer' => $bearer, 'processing_charge' => $charge, 'customer_payable' => $bearer === 'CUSTOMER' ? Money::add($amount, $charge) : $amount, 'business_expense' => $bearer === 'BUSINESS' ? $charge : '0.00'];
+        $charge = $method->charge_type === 'PERCENTAGE' ? Money::percent($amount, $method->charge_value) : Money::round($method->charge_value);
+        $bearer = $method->charge_bearer;
+
+        return ['rule_id' => null, 'rule_name' => null, 'charge_type' => $method->charge_type, 'charge_value' => $method->charge_value, 'charge_bearer' => $bearer, 'processing_charge' => $charge, 'customer_payable' => $bearer === 'CUSTOMER' ? Money::add($amount, $charge) : $amount, 'business_expense' => $bearer === 'BUSINESS' ? $charge : '0.00'];
     }
 
     public function createProcessingExpense(SalePayment $payment): ?Expense
