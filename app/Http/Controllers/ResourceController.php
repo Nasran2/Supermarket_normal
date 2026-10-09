@@ -8,15 +8,18 @@ use App\Models\Customer;
 use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductStockLayer;
+use App\Models\Sale;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\Unit;
 use App\Models\UnitPreset;
 use App\Services\DefaultUnitService;
+use App\Services\PaymentActivityService;
 use App\Services\ResourceService;
 use App\Services\StockLayerService;
 use App\Support\Permissions;
 use App\Support\Resources;
+use App\Support\SalesVisibility;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -32,6 +35,9 @@ class ResourceController extends Controller
     public function index(ResourceIndexRequest $request, string $resource)
     {
         $def = $this->definition($resource, 'view');
+        if ($resource === 'payment-methods') {
+            return app(PaymentActivityController::class)->index($request, app(PaymentActivityService::class));
+        }
         $query = $def['model']::with($def['relations'] ?? []);
         if ($search = trim((string) $request->input('q'))) {
             $query->where(fn ($q) => collect($def['search'])->each(fn ($col) => $q->orWhere($col, 'like', '%'.$search.'%')));
@@ -49,6 +55,7 @@ class ResourceController extends Controller
             }
         }
         if ($resource === 'expenses') {
+            $query->visibleSales();
             if ($request->filled('from')) {
                 $query->whereDate('expense_date', '>=', $request->input('from'));
             }
@@ -101,6 +108,9 @@ class ResourceController extends Controller
     {
         $def = $this->definition($resource, 'create');
         $record = new $def['model'];
+        if ($resource === 'roles') {
+            $record->sales_visibility = 'OWN';
+        }
 
         return $this->form($resource, $def, $record);
     }
@@ -119,6 +129,13 @@ class ResourceController extends Controller
         $def = $this->definition($resource, 'view');
         $record = $def['model']::with($def['relations'] ?? [])->findOrFail($id);
 
+        if ($resource === 'payment-methods') {
+            return app(PaymentActivityController::class)->show(request(), $record, app(PaymentActivityService::class));
+        }
+
+        if ($resource === 'expenses' && $record->sale_id) {
+            abort_unless(Sale::visibleTo()->whereKey($record->sale_id)->exists(), 403);
+        }
         if ($resource === 'roles') {
             return view('roles.show', compact('record'));
         }
@@ -133,15 +150,15 @@ class ResourceController extends Controller
         }
 
         if ($resource === 'customers') {
-            $record->loadCount(['sales as completed_sales_count' => fn ($query) => $query->where('status', 'ACTIVE')]);
-            $record->loadSum(['sales as paid_purchases' => fn ($query) => $query->where('status', 'ACTIVE')], 'customer_payable');
-            $sales = $record->sales()->with('payments', 'returns', 'collections')->latest('sold_at')->paginate(10);
+            $record->loadCount(['sales as completed_sales_count' => fn ($query) => $query->visibleTo()->where('status', 'ACTIVE')]);
+            $record->loadSum(['sales as paid_purchases' => fn ($query) => $query->visibleTo()->where('status', 'ACTIVE')], 'customer_payable');
+            $sales = $record->sales()->visibleTo()->with('payments', 'returns', 'collections')->latest('sold_at')->paginate(10);
 
             return view('customers.show', compact('record', 'sales'));
         }
 
         if ($resource === 'products') {
-            $movements = $record->hasMany(StockMovement::class)->when(! auth()->user()->hasPermission('products.view_history'), fn ($q) => $q->whereRaw('1 = 0'))->with('user', 'sale', 'saleReturn.sale', 'layers.layer')->latest('created_at')->latest('id')->paginate(20, ['*'], 'movements')->withQueryString();
+            $movements = $record->hasMany(StockMovement::class)->visibleSales()->when(! auth()->user()->hasPermission('products.view_history'), fn ($q) => $q->whereRaw('1 = 0'))->with('user', 'sale', 'saleReturn.sale', 'layers.layer')->latest('created_at')->latest('id')->paginate(20, ['*'], 'movements')->withQueryString();
 
             app(StockLayerService::class)->ensureLegacy($record);
             $stockStatus = request()->validate(['stock_status' => 'nullable|in:available,depleted,all'])['stock_status'] ?? 'available';
@@ -166,7 +183,9 @@ class ResourceController extends Controller
                 if ($resource === 'users' && $key === 'role_id' && ! auth()->user()->isAdministrator()) {
                     $query->where(fn ($q) => $q->where('name', '!=', 'Administrator')->orWhere('system', false));
                 }
-                $options[$key] = $query->orderBy('name')->pluck('name', 'id');
+                $options[$key] = $resource === 'users' && $key === 'role_id'
+                    ? $query->orderBy('name')->get()->filter(fn ($role) => SalesVisibility::canGrant($role->sales_visibility ?? 'ALL', $role))->pluck('name', 'id')
+                    : $query->orderBy('name')->pluck('name', 'id');
             }
         }
         if (in_array($resource, ['products', 'unit-presets'])) {

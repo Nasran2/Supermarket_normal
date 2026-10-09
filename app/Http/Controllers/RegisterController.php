@@ -6,6 +6,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Models\Register;
 use App\Services\RegisterService;
 use App\Support\Audit;
+use App\Support\SalesVisibility;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -15,7 +16,7 @@ class RegisterController extends Controller
     {
         $register = $service->current(auth()->id());
         $summary = $register ? $service->summary($register, true) : null;
-        $registers = Register::with('user')->when(! auth()->user()->hasPermission('register.view_all'), fn ($q) => $q->where('user_id', auth()->id()))->latest()->paginate(15);
+        $registers = SalesVisibility::apply(Register::with('user'), 'registers.user_id')->when(! auth()->user()->hasPermission('register.view_all'), fn ($q) => $q->where('user_id', auth()->id()))->latest()->paginate(15);
         if ($register) {
             $register->load('movements.user');
         }
@@ -69,9 +70,10 @@ class RegisterController extends Controller
     public function show(Register $register, RegisterService $service)
     {
         abort_unless($register->user_id === auth()->id() || auth()->user()->hasPermission('register.view_all'), 403);
+        abort_unless(SalesVisibility::allowsOwner((int) $register->user_id), 403);
         $register->load(['user', 'movements.user']);
         $summary = $service->summary($register, true);
-        $sales = $register->sales()->with('payments')->latest('sold_at')->get();
+        $sales = $register->sales()->visibleTo()->with('payments')->latest('sold_at')->get();
 
         return view('register.show', compact('register', 'summary', 'sales'));
     }
@@ -89,7 +91,7 @@ class RegisterController extends Controller
     private function summaryResponse(Register $register, RegisterService $service): array
     {
         $summary = $service->summary($register, true);
-        $sales = $register->sales()->with('payments')->latest('sold_at')->get();
+        $sales = $register->sales()->visibleTo()->with('payments')->latest('sold_at')->get();
 
         return ['register_id' => $register->id, 'expected_cash' => $summary['expected'], 'summary' => $summary,
             'html' => view('register.partials.summary', compact('register', 'summary', 'sales'))->render()];

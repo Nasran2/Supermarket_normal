@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Product;
 use App\Support\Resources;
+use App\Support\SalesVisibility;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -88,6 +89,7 @@ class ResourceRequest extends FormRequest
             }
         }
         if ($resource === 'roles') {
+            $r['sales_visibility'] = ['sometimes', Rule::in(array_keys(SalesVisibility::OPTIONS))];
             $r['permissions.*'] = ['integer', 'distinct', 'exists:permissions,id'];
         }
         if ($resource === 'payment-rules') {

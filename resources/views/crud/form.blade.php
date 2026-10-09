@@ -20,6 +20,13 @@ $help = match($resource) { 'users'=>'Choose a role that matches this team member
 @if($resource==='payment-rules' && $key==='charge_bearer' && $value===null)@php($value='DEFAULT')@endif
 @if($type==='checkbox')
 <label class="setting-tile"><input type="hidden" name="{{ $key }}" value="0"><input type="checkbox" name="{{ $key }}" value="1" @checked(old($key,$record->exists?$value:($key==='active')))><span><strong>{{ $label }}</strong><small>{{ $key==='active'?'Available for use in your store.':($key==='allow_decimal'?'Allow quantities such as 1.5 or 0.250.':'Enable this option.') }}</small></span></label>
+@elseif($type==='sales_visibility')
+<fieldset class="sales-visibility-field full"><legend>Sales visibility</legend><p>Choose which bills members of this role can access. Sales permissions below still control viewing, editing, returns and payments.</p><div class="sales-visibility-options">
+@foreach(\App\Support\SalesVisibility::OPTIONS as $scope=>$scopeLabel)
+@php($canScope=\App\Support\SalesVisibility::canGrant($scope,$record))
+<label class="sales-visibility-option"><input type="radio" name="sales_visibility" value="{{ $scope }}" @checked(($value??'OWN')===$scope) @disabled(!$canScope) required><span><strong>{{ $scopeLabel }}</strong><small>{{ match($scope){'ALL'=>'Bills created by every user in the store.','ROLE'=>'Bills created by users currently assigned to this same role.',default=>'Each person sees only the bills they created.'} }}</small>@unless($canScope)<small class="text-warning">Outside your sales access</small>@endunless</span></label>
+@endforeach
+</div><small>Applies to sales lists, bills, actions, sales reports, dashboard sales and payment history. Administrator always sees all sales.</small>@error('sales_visibility')<small class="text-danger">{{ $message }}</small>@enderror</fieldset>
 @elseif($type==='permissions')
 <section class="permissions-editor full"><div class="permissions-toolbar"><div><h2>Permissions</h2><p><span data-permission-count>0</span> of {{ $permissions->count() }} selected · choose access by module</p></div><div class="heading-actions"><button type="button" class="btn secondary small" data-permissions-all="1">Select available</button><button type="button" class="btn secondary small" data-permissions-all="0">Clear</button></div></div><label class="customer-search permission-search"><x-icon name="search"/><input type="search" data-permission-search placeholder="Find a module or permission…" aria-label="Search permissions"></label><div class="permission-cards">
 @foreach($permissions->groupBy(fn($p)=>\App\Support\Permissions::info($p->name)['group']) as $group=>$items)

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Role extends Model
 {
-    protected $fillable = ['name', 'system'];
+    protected $fillable = ['name', 'system', 'sales_visibility'];
 
     protected $casts = ['system' => 'boolean'];
 

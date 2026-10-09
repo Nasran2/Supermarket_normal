@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -11,6 +12,11 @@ class Expense extends Model
     protected $fillable = ['expense_category_id', 'user_id', 'sale_id', 'sale_payment_id', 'payment_method_id', 'register_id', 'type', 'status', 'expense_date', 'reference', 'description', 'amount'];
 
     protected $casts = ['expense_date' => 'date', 'amount' => 'decimal:2'];
+
+    public function scopeVisibleSales(Builder $query): Builder
+    {
+        return $query->where(fn ($q) => $q->whereNull('sale_id')->orWhereHas('sale', fn ($s) => $s->visibleTo()));
+    }
 
     protected function expenseDate(): Attribute
     {

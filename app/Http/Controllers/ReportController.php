@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ReportRequest;
 use App\Models\Category;
-use App\Models\PaymentChargeRule;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\User;
@@ -12,6 +11,7 @@ use App\Services\PdfReportService;
 use App\Services\ProfitLossService;
 use App\Services\ReportService;
 use App\Support\Money;
+use App\Support\SalesVisibility;
 
 class ReportController extends Controller
 {
@@ -52,6 +52,9 @@ class ReportController extends Controller
         $filters = $request->validated();
         $title = ReportService::TITLES[$report];
         $labels = [];
+        if (! in_array($report, ['purchases', 'stock']) && SalesVisibility::mode() !== 'ALL') {
+            $labels['Sales access'] = SalesVisibility::OPTIONS[SalesVisibility::mode()];
+        }
         foreach (['payment_method_id' => [PaymentMethod::class, 'Payment method'], 'user_id' => [User::class, 'Cashier'], 'product_id' => [Product::class, 'Product'], 'category_id' => [Category::class, 'Category']] as $key => [$model,$label]) {
             if (! empty($filters[$key])) {
                 $labels[$label] = $model::find($filters[$key])?->name ?? '-';

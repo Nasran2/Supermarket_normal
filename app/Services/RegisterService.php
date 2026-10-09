@@ -69,12 +69,12 @@ class RegisterService
                 'base_amount' => Money::round((string) ($row?->base_amount ?? 0)), 'collected' => Money::sub(Money::add((string) ($row?->collected ?? 0), (string) ($dueTotals->get($type)?->amount ?? 0)), (string) ($refundTotals->get($type)?->amount ?? 0)),
                 'customer_fees' => Money::round((string) ($row?->customer_fees ?? 0)), 'business_fees' => Money::round((string) ($row?->business_fees ?? 0))];
         }
-        $sales = $register->sales()->where('status', 'ACTIVE')->selectRaw('SUM(subtotal) as subtotal, SUM(discount) as discounts, SUM(sale_amount) as amount')->first();
+        $sales = $register->sales()->visibleTo()->where('status', 'ACTIVE')->selectRaw('SUM(subtotal) as subtotal, SUM(discount) as discounts, SUM(sale_amount) as amount')->first();
 
         return $summary + ['payment_totals' => $paymentTotals, 'sales_subtotal' => Money::round((string) ($sales->subtotal ?? 0)), 'discounts' => Money::round((string) ($sales->discounts ?? 0)), 'sales_amount' => Money::round((string) ($sales->amount ?? 0)),
-            'return_records' => $register->returns()->with('sale', 'user')->get(), 'collection_records' => $register->collections()->with('sale', 'user')->get(),
+            'return_records' => $register->returns()->whereHas('sale', fn ($q) => $q->visibleTo())->with('sale', 'user')->get(), 'collection_records' => $register->collections()->whereHas('sale', fn ($q) => $q->visibleTo())->with('sale', 'user')->get(),
             'customer_fees' => Money::sum(array_column($paymentTotals, 'customer_fees')), 'business_fees' => Money::sum(array_column($paymentTotals, 'business_fees')),
-            'voided_transactions' => $register->sales()->where('status', 'VOIDED')->count()];
+            'voided_transactions' => $register->sales()->visibleTo()->where('status', 'VOIDED')->count()];
     }
 
     public function open(int $userId, string $cash): Register

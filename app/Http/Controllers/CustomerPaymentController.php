@@ -10,6 +10,7 @@ use App\Models\Sale;
 use App\Models\SaleCollection;
 use App\Models\SalePayment;
 use App\Support\Money;
+use App\Support\SalesVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -68,7 +69,7 @@ class CustomerPaymentController extends Controller
 
         // Pay oldest invoices next
         if (Money::compare($remainingAmount, 0) > 0) {
-            $unpaidSales = $customer->sales()
+            $unpaidSales = $customer->sales()->visibleTo()
                 ->where('status', 'ACTIVE')
                 ->oldest('sold_at')
                 ->get()
@@ -122,7 +123,7 @@ class CustomerPaymentController extends Controller
         if (isset($allocations['sales']) && is_array($allocations['sales'])) {
             foreach ($allocations['sales'] as $saleId => $amount) {
                 if (Money::compare((string) $amount, 0) > 0) {
-                    $sale = Sale::findOrFail($saleId);
+                    $sale = Sale::visibleTo()->where('customer_id', $customer->id)->findOrFail($saleId);
                     $payment->allocations()->create([
                         'type' => 'INVOICE',
                         'sale_id' => $sale->id,
@@ -155,7 +156,7 @@ class CustomerPaymentController extends Controller
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        $salesQuery = $customer->sales()->where('status', 'ACTIVE');
+        $salesQuery = $customer->sales()->visibleTo()->where('status', 'ACTIVE');
         if ($startDate) {
             $salesQuery->whereDate('sold_at', '>=', $startDate);
         }
@@ -173,7 +174,7 @@ class CustomerPaymentController extends Controller
             ];
         });
 
-        $paymentsQuery = $customer->customerPayments();
+        $paymentsQuery = SalesVisibility::apply($customer->customerPayments()->getQuery(), 'customer_payments.user_id');
         if ($startDate) {
             $paymentsQuery->whereDate('payment_date', '>=', $startDate);
         }
@@ -181,7 +182,7 @@ class CustomerPaymentController extends Controller
             $paymentsQuery->whereDate('payment_date', '<=', $endDate);
         }
 
-        $payments = $paymentsQuery->with(['paymentMethod', 'allocations.sale'])->get()->map(function ($payment) {
+        $payments = $paymentsQuery->with(['paymentMethod', 'allocations.sale' => fn ($q) => $q->visibleTo()])->get()->map(function ($payment) {
             $desc = 'Customer Payment - '.($payment->paymentMethod->name ?? 'Unknown');
             if ($payment->allocations->count() > 0) {
                 $parts = [];
@@ -208,7 +209,7 @@ class CustomerPaymentController extends Controller
 
         // Add POS Payments (SalePayments)
         $salePaymentsQuery = SalePayment::whereHas('sale', function ($q) use ($customer) {
-            $q->where('customer_id', $customer->id);
+            $q->visibleTo()->where('customer_id', $customer->id);
         });
         if ($startDate) {
             $salePaymentsQuery->whereDate('created_at', '>=', $startDate);

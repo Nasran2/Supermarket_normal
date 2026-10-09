@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Support\Money;
+use App\Support\SalesVisibility;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Sale extends Model
@@ -10,6 +12,11 @@ class Sale extends Model
     protected $fillable = ['invoice', 'checkout_token', 'user_id', 'customer_id', 'register_id', 'subtotal', 'discount', 'sale_amount', 'processing_charge', 'customer_payable', 'cost_total', 'status', 'sold_at', 'voided_by', 'voided_at', 'void_reason', 'notes'];
 
     protected $casts = ['sold_at' => 'datetime', 'voided_at' => 'datetime', 'subtotal' => 'decimal:2', 'discount' => 'decimal:2', 'sale_amount' => 'decimal:2', 'processing_charge' => 'decimal:2', 'customer_payable' => 'decimal:2', 'cost_total' => 'decimal:2'];
+
+    public function scopeVisibleTo(Builder $query, ?User $user = null): Builder
+    {
+        return SalesVisibility::apply($query, 'sales.user_id', $user);
+    }
 
     public function user()
     {

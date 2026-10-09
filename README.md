@@ -117,6 +117,8 @@ Enter the amount given to automatically mark a purchase Unpaid, Partial, or Paid
 
 ## Account histories and report PDFs
 
+Payment method views open on Today with saved bill-level charges, cash received/change, later due collections, account payments and refunds. Quick ranges and inclusive custom dates drive the collection, charge, refund and net-collection cards. The payment-method directory shows the same filtered totals across all methods. Voided sales are excluded and customer invoice allocations are counted once.
+
 Category View shows its products with search and status filters. Supplier lists show dues; supplier accounts include filtered purchase/payment histories and PDF/CSV ledgers with opening and running balances. Customer **Collect Payment** is available in Actions only when due exists. Expense forms can create and select a category using the adjacent plus button without losing the draft.
 
 All 16 reports offer formatted PDF downloads with company letterhead from Business settings, applied filters, report-specific tables or statements, totals and page numbers. Downloads include all matching records across screen pages. See [account/report workflow and validation](docs/ACCOUNT-REPORTS.md).
@@ -128,3 +130,5 @@ Run `php artisan db:seed --class=BulkSampleProductSeeder` to add 120 clearly lab
 ### Granular team access
 
 Roles & permissions now lists independent dashboard cards, module CRUD and transaction/report functions with descriptions, search and selection counts. Administrator receives full access automatically. Existing role access is preserved by the permission upgrade migration, and later revocations are respected. See [permission reference](docs/PERMISSIONS.md).
+
+Roles can choose All sales, Sales from the same role, or Only this person’s sales. This setting applies to invoice access, sales totals, related history and report downloads, while action permissions remain separate. Administrator always has all-sales access. The upgrade preserves existing role scopes; new roles default to own sales. See `docs/PERMISSIONS.md` for scope and accounting details.

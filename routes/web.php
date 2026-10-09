@@ -15,13 +15,14 @@ use App\Http\Controllers\StockBatchController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockPriceController;
 use App\Http\Controllers\SupplierAccountController;
+use App\Http\Middleware\SaleVisibility;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/login', [AuthController::class, 'authenticate'])->middleware('throttle:20,1');
 });
-Route::middleware(['auth', 'auth.session'])->group(function () {
+Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/profile', [AuthController::class, 'profile'])->name('profile');
     Route::put('/profile', [AuthController::class, 'updateProfile'])->name('profile.update');

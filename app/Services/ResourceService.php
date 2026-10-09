@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Support\Audit;
 use App\Support\Money;
 use App\Support\Resources;
+use App\Support\SalesVisibility;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -42,9 +43,11 @@ class ResourceService
                 throw ValidationException::withMessages(['role_id' => 'Only an administrator can manage Administrator accounts.']);
             }
             $this->guardPermissions($record->role?->permissions->pluck('id')->all() ?? []);
+            $this->guardSalesVisibility($record->role);
         }
         if ($resource === 'roles' && ! auth()->user()->isAdministrator()) {
             $this->guardPermissions($record->permissions->pluck('id')->all());
+            $this->guardSalesVisibility($record);
         }
         if ($resource === 'expenses' && ($record->type !== 'MANUAL' || $record->status !== 'ACTIVE')) {
             throw ValidationException::withMessages(['expense' => 'Automatic or reversed expenses cannot be edited manually.']);
@@ -54,6 +57,13 @@ class ResourceService
         }
         if ($resource === 'expense-categories' && $record->system) {
             throw ValidationException::withMessages(['category' => 'This system category is protected.']);
+        }
+    }
+
+    private function guardSalesVisibility(?Role $role, ?string $mode = null): void
+    {
+        if (! SalesVisibility::canGrant($mode ?? $role?->sales_visibility ?? 'ALL', $role)) {
+            throw ValidationException::withMessages(['sales_visibility' => 'You cannot grant or manage sales visibility beyond your own access.']);
         }
     }
 
@@ -73,6 +83,10 @@ class ResourceService
                 }
                 $before = $record->getAttributes();
                 $values = $data;
+                if ($resource === 'roles') {
+                    $values['sales_visibility'] = $data['sales_visibility'] ?? ($id ? $record->sales_visibility : 'OWN');
+                    $this->guardSalesVisibility($record, $values['sales_visibility']);
+                }
                 unset($values['conversions'], $values['opening_layers']);
                 if (in_array($resource, ['products', 'unit-presets']) && $id) {
                     $before['conversions'] = $record->conversions->toArray();
@@ -167,6 +181,7 @@ class ResourceService
                         throw ValidationException::withMessages(['role_id' => 'Only an administrator can assign Administrator access.']);
                     }
                     $this->guardPermissions($target->permissions->pluck('id')->all());
+                    $this->guardSalesVisibility($target);
                     if ($id === auth()->id() && (! $data['active'] || $data['role_id'] != auth()->user()->role_id)) {
                         throw ValidationException::withMessages(['active' => 'You cannot disable yourself or change your own role.']);
                     }

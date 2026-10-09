@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\Money;
+use App\Support\SalesVisibility;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ class Customer extends Model
 
     public static function invoiceDueSql(): string
     {
+        $owner = SalesVisibility::ownerSql('due_sales.user_id');
         $clamp = DB::getDriverName() === 'sqlite' ? 'MAX' : 'GREATEST';
 
         return "COALESCE((SELECT SUM($clamp(0, due_sales.customer_payable
@@ -24,7 +26,7 @@ class Customer extends Model
             - COALESCE((SELECT SUM(amount_paid - `change`) FROM sale_payments WHERE sale_id=due_sales.id), 0)
             - COALESCE((SELECT SUM(amount) FROM sale_collections WHERE sale_id=due_sales.id), 0)
             + COALESCE((SELECT SUM(refund_amount) FROM sale_returns WHERE sale_id=due_sales.id), 0)))
-            FROM sales AS due_sales WHERE due_sales.customer_id=customers.id AND due_sales.status='ACTIVE'), 0)";
+            FROM sales AS due_sales WHERE due_sales.customer_id=customers.id AND due_sales.status='ACTIVE' AND ($owner)), 0)";
     }
 
     public function scopeWithDueBalances(Builder $query): Builder
@@ -44,6 +46,7 @@ class Customer extends Model
     public function getDueBalanceAttribute(): string
     {
         $openingRemaining = Money::sub($this->opening_due ?? '0.00', $this->opening_due_paid ?? '0.00');
+
         return Money::add($openingRemaining, $this->invoice_due);
     }
 

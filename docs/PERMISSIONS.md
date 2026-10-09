@@ -8,6 +8,24 @@ An active user assigned to the protected **system** Administrator role automatic
 
 Only administrators may assign Administrator access or manage Administrator accounts. Non-administrators cannot grant permissions outside their own access or modify roles with greater access. The last active administrator and the current user's own role/active state remain protected.
 
+## Sales visibility
+
+The role editor has a separate **Sales visibility** choice:
+
+| Choice | Visible bills |
+| --- | --- |
+| All sales | Bills created by every user |
+| Sales from the same role | Bills created by users currently assigned to the signed-in user's role |
+| Only this person’s sales | Bills created by the signed-in user |
+
+Visibility uses the original sale owner (`sales.user_id`). A return or due collection follows its bill's owner, even when another employee records it. Moving a user to another role changes which bills are included in same-role access. Administrator always sees every sale without selecting a scope.
+
+The setting restricts invoice lists and totals, direct bill/receipt links, edits and other invoice actions, dashboard sales, related payment history, customer invoice balances/history, stock movement bill references, and sales-related reports and PDF/CSV exports. Existing action and dashboard permissions remain required. Choosing All sales does not grant permission to edit, delete, refund or collect payments. Hidden direct bill links return 403; browser search/date/cashier filters cannot widen access.
+
+The upgrade preserves **All sales** for existing roles. New roles created through the editor default to **Only this person’s sales**; a freshly seeded Cashier role also defaults to that scope. Re-seeding preserves existing role scopes. Limited staff cannot grant broader visibility through role editing or user assignment, even with a forged request.
+
+Customer opening balances remain shared account data; invoice dues include only visible bills. Scoped profit summaries include visible sales and expenses entered by the permitted users, excluding expenses linked to hidden bills. They are scoped summaries, not the entire store's profit statement. Register lists also respect the permitted owners; the actual register cash ledger stays complete so closing balances remain correct. Explicit presentation scopes keep stock, accounting and transaction constraints independent of what a cashier may browse.
+
 ## Page and action access
 
 Every managed module has separate `view`, `create`, `edit` and `delete` permissions: products, categories, units, multiple-unit presets, suppliers, customers, expense categories, expenses, payment methods, users and roles. Sales, purchases and stock adjustments also have separate CRUD permissions. Financial deletion uses audited reversals and retains transaction history.
@@ -69,3 +87,5 @@ Search modules or actions, choose individual permissions, or select a module. Co
 Feature coverage includes automatic Administrator access with an empty pivot, inactive accounts, independent dashboard cards and CRUD, ledger/payment authorization, per-report PDF/CSV access, role escalation protection, POS special actions, and one-time legacy migration/revocation behavior. HTTP checks use isolated test databases; browser layout previews render the actual templates without saving role grants. The roles overview and searchable Dashboard controls have saved previews in `docs/screenshots/roles-overview.png` and `docs/screenshots/permissions-editor.png`.
 
 Validation on 9 October 2026: all 17 role/permission feature tests and all 20 JavaScript tests pass. The production asset build and PHP lint of 119 compiled Blade templates pass. The full feature suite reports 191 passing tests and 28 payment-fee failures; the same 28 failures were reproduced against unchanged HEAD before this permissions work (174 passing tests). Those older fee-rule expectations are outside this access-control change.
+
+Sales visibility validation on 9 October 2026: 40 focused tests pass (693 assertions), including 10 new scope tests; the full suite has 207 passes and the same 28 existing payment-fee failures. Production build and lint of 162 compiled templates pass. Existing Administrator, Manager and Cashier scopes were verified as All sales after migration. The read-only editor preview is saved in `docs/screenshots/role-sales-visibility.png`.

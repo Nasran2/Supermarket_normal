@@ -20,7 +20,7 @@ class DatabaseSeeder extends Seeder
         Permissions::install();
         $names = array_keys(Permissions::all());
         foreach (['Administrator', 'Manager', 'Cashier'] as $name) {
-            $role = Role::firstOrCreate(['name' => $name], ['system' => true]);
+            $role = Role::firstOrCreate(['name' => $name], ['system' => true, 'sales_visibility' => $name === 'Cashier' ? 'OWN' : 'ALL']);
             if ($role->wasRecentlyCreated) {
                 $allowed = match ($name) {
                     'Administrator' => $names,'Manager' => array_values(array_filter($names, fn ($n) => ! str_starts_with($n, 'users.') && ! str_starts_with($n, 'roles.'))),default => ['dashboard.view', 'pos.access', 'sales.view', 'sales.create', 'register.view', 'register.open', 'register.close', 'products.view', 'customers.create', 'sales.receipt', 'pos.discount', 'pos.override_price', 'pos.split_payment', 'pos.due_sale', 'dashboard.sales', 'dashboard.expenses', 'dashboard.transactions', 'dashboard.collections', 'dashboard.sales_overview', 'dashboard.register', 'dashboard.recent_sales', 'dashboard.low_stock', 'dashboard.top_products', 'dashboard.recent_expenses', 'products.view_history', 'stock-adjustments.view']

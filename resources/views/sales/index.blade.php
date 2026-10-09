@@ -2,7 +2,7 @@
 @section('title', 'Sales')
 @section('content')
 @php($currency = $settings['currency_symbol'] ?? 'Rs.')
-<div class="page-heading"><div><span class="eyebrow">TRANSACTIONS</span><h1>Sales</h1><p>Every invoice, payment and return in one place.</p></div>@can('pos.access')<a class="btn primary" href="{{ route('pos.index') }}"><x-icon name="plus"/>New sale</a>@endcan</div>
+<div class="page-heading"><div><span class="eyebrow">TRANSACTIONS</span><h1>Sales</h1><p>Every invoice, payment and return in one place.</p><span class="badge slate sales-access-badge"><x-icon name="eye" :size="14"/>{{ \App\Support\SalesVisibility::OPTIONS[\App\Support\SalesVisibility::mode()] }}</span></div>@can('pos.access')<a class="btn primary" href="{{ route('pos.index') }}"><x-icon name="plus"/>New sale</a>@endcan</div>
 <div class="sales-overview">
     <div class="card"><span class="stat-icon green"><x-icon name="receipt-text"/></span><div><span>Active invoices</span><strong>{{ $totals->invoices ?? 0 }}</strong><small>Matching your filters</small></div></div>
     <div class="card"><span class="stat-icon green"><x-icon name="shopping-bag"/></span><div><span>Invoiced sales</span><strong>{{ $currency }} {{ \App\Support\Money::display($totals->amount) }}</strong><small>After discounts · before returns</small></div></div>

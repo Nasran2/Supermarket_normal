@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\SalesVisibility;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class StockMovement extends Model
@@ -9,6 +11,16 @@ class StockMovement extends Model
     protected $fillable = ['product_id', 'user_id', 'quantity', 'balance', 'reason', 'reference'];
 
     protected $casts = ['quantity' => 'decimal:3', 'balance' => 'decimal:3'];
+
+    public function scopeVisibleSales(Builder $query): Builder
+    {
+        if (SalesVisibility::mode() === 'ALL') {
+            return $query;
+        }
+
+        return $query->where(fn ($q) => $q->whereDoesntHave('sale')->orWhereHas('sale', fn ($s) => $s->visibleTo()))
+            ->where(fn ($q) => $q->whereDoesntHave('saleReturn')->orWhereHas('saleReturn.sale', fn ($s) => $s->visibleTo()));
+    }
 
     public function product()
     {

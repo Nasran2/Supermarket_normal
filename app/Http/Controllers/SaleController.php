@@ -30,7 +30,7 @@ class SaleController extends Controller
     public function index(Request $request)
     {
         $data = $request->validate(['q' => 'nullable|string|max:100', 'from' => 'nullable|date', 'to' => 'nullable|date', 'status' => 'nullable|in:ACTIVE,VOIDED']);
-        $query = Sale::with(['user', 'customer', 'payments', 'register', 'returns', 'collections', 'items.returns']);
+        $query = Sale::visibleTo()->with(['user', 'customer', 'payments', 'register', 'returns', 'collections', 'items.returns']);
         if ($request->filled('q')) {
             $query->where(fn ($q) => $q->where('invoice', 'like', '%'.$data['q'].'%')->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', '%'.$data['q'].'%')->orWhere('phone', 'like', '%'.$data['q'].'%')));
         }

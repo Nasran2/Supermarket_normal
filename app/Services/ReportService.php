@@ -13,7 +13,9 @@ use App\Models\SaleCollection;
 use App\Models\SaleItem;
 use App\Models\SalePayment;
 use App\Models\SaleReturn;
+use App\Models\SaleRevision;
 use App\Support\Money;
+use App\Support\SalesVisibility;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Carbon\Carbon;
@@ -35,7 +37,7 @@ class ReportService
         $cards = [];
         $start = $from.' 00:00:00';
         $end = $to.' 23:59:59';
-        $pay = SalePayment::with(['sale.user', 'expense'])->whereHas('sale', fn ($q) => $q->where('status', 'ACTIVE')->whereBetween('sold_at', [$start, $end]));
+        $pay = SalePayment::with(['sale.user', 'expense'])->whereHas('sale', fn ($q) => $q->visibleTo()->where('status', 'ACTIVE')->whereBetween('sold_at', [$start, $end]));
         foreach (['payment_method_id' => 'payment_method_id', 'rule_id' => 'payment_charge_rule_id', 'charge_bearer' => 'charge_bearer'] as $input => $col) {
             if (! empty($filters[$input])) {
                 $pay->where($col, $filters[$input]);
@@ -57,8 +59,8 @@ class ReportService
         } elseif ($kind === 'payments') {
             $base = (clone $pay)->selectRaw("payment_method_id, method_name, method_type, sale_amount as base, CASE WHEN charge_bearer = 'CUSTOMER' THEN processing_charge ELSE 0 END as customer_fees, CASE WHEN charge_bearer = 'BUSINESS' THEN processing_charge ELSE 0 END as business_fees, amount_paid - sale_payments.change as collections");
             if (empty($filters['rule_id']) && empty($filters['charge_bearer'])) {
-                $collections = SaleCollection::whereBetween('collected_at', [$start, $end])->selectRaw('payment_method_id, method_name, method_type, 0 as base, 0 as customer_fees, 0 as business_fees, amount as collections');
-                $refunds = SaleReturn::whereBetween('returned_at', [$start, $end])->where('refund_amount', '>', 0)->selectRaw('payment_method_id, method_name, method_type, 0 as base, 0 as customer_fees, 0 as business_fees, -refund_amount as collections');
+                $collections = SaleCollection::whereHas('sale', fn ($q) => $q->visibleTo())->whereBetween('collected_at', [$start, $end])->selectRaw('payment_method_id, method_name, method_type, 0 as base, 0 as customer_fees, 0 as business_fees, amount as collections');
+                $refunds = SaleReturn::whereHas('sale', fn ($q) => $q->visibleTo())->whereBetween('returned_at', [$start, $end])->where('refund_amount', '>', 0)->selectRaw('payment_method_id, method_name, method_type, 0 as base, 0 as customer_fees, 0 as business_fees, -refund_amount as collections');
                 foreach ([$collections, $refunds] as $activity) {
                     if (! empty($filters['payment_method_id'])) {
                         $activity->where('payment_method_id', $filters['payment_method_id']);
@@ -75,7 +77,7 @@ class ReportService
             $cards = ['Net collections' => (string) DB::query()->fromSub(clone $query, 'totals')->sum('collections'), 'Original allocated sales' => (string) (clone $pay)->sum('sale_amount')];
         } elseif (in_array($kind, ['returns', 'collections'])) {
             $isReturn = $kind === 'returns';
-            $query = ($isReturn ? SaleReturn::query() : SaleCollection::query())->with('sale', 'user')->whereBetween($isReturn ? 'returned_at' : 'collected_at', [$start, $end])->latest('id');
+            $query = ($isReturn ? SaleReturn::query() : SaleCollection::query())->whereHas('sale', fn ($q) => $q->visibleTo())->with('sale', 'user')->whereBetween($isReturn ? 'returned_at' : 'collected_at', [$start, $end])->latest('id');
             if (! empty($filters['user_id'])) {
                 $query->where('user_id', $filters['user_id']);
             }
@@ -89,7 +91,7 @@ class ReportService
             $map = $isReturn ? fn ($r) => [$r->returned_at->format('Y-m-d H:i'), $r->reference, $r->sale->invoice, Money::display($r->amount), Money::display($r->due_reduction), Money::display($r->refund_amount), $r->method_name ?? 'No refund', 'REG-'.$r->register_id, $r->user->name, $r->reason] : fn ($c) => [$c->collected_at->format('Y-m-d H:i'), $c->sale->invoice, Money::display($c->amount), Money::display($c->amount_paid), Money::display($c->change), $c->method_name, 'REG-'.$c->register_id, $c->user->name, $c->reference ?? '—'];
             $cards = $isReturn ? ['Returns' => (string) (clone $query)->sum('amount'), 'Refunds paid' => (string) (clone $query)->sum('refund_amount'), 'Due reduced' => (string) (clone $query)->sum('due_reduction')] : ['Dues collected' => (string) (clone $query)->sum('amount')];
         } elseif ($kind === 'sales') {
-            $query = Sale::with(['user', 'customer', 'payments', 'returns', 'collections'])->whereBetween('sold_at', [$start, $end])->latest('sold_at');
+            $query = Sale::visibleTo()->with(['user', 'customer', 'payments', 'returns', 'collections'])->whereBetween('sold_at', [$start, $end])->latest('sold_at');
             if (! empty($filters['user_id'])) {
                 $query->where('user_id', $filters['user_id']);
             }
@@ -113,7 +115,7 @@ class ReportService
                     return array_merge($baseMap($s), [Money::display($cogs), Money::display($profit), $margin]);
                 };
             }
-            $periodReturns = SaleReturn::whereBetween('returned_at', [$start, $end]);
+            $periodReturns = SaleReturn::whereHas('sale', fn ($q) => $q->visibleTo())->whereBetween('returned_at', [$start, $end]);
             $periodReturns->whereHas('sale', function ($q) use ($filters) {
                 if (! empty($filters['user_id'])) {
                     $q->where('user_id', $filters['user_id']);
@@ -134,7 +136,7 @@ class ReportService
             $map = fn ($p) => [$p->purchase_date->format('Y-m-d'), $p->reference, $p->supplier->name, Money::display($p->total), $p->payment_tracking ? Money::display($p->paid_amount) : 'Unrecorded', $p->due_amount !== null ? Money::display($p->due_amount) : 'Unrecorded', $p->payment_status, $p->user->name, $p->status];
             $cards = ['Active purchases' => (string) (clone $query)->where('status', 'ACTIVE')->sum('total')];
         } elseif ($kind === 'expenses') {
-            $query = Expense::with('category', 'user', 'method')->whereBetween('expense_date', [$from, $to])->latest('expense_date');
+            $query = Expense::visibleSales()->with('category', 'user', 'method')->whereBetween('expense_date', [$from, $to])->latest('expense_date');
             if (! empty($filters['user_id'])) {
                 $query->where('user_id', $filters['user_id']);
             }
@@ -213,7 +215,7 @@ class ReportService
                 $map = fn ($p) => array_merge([$p->name, $p->sku, $p->categories->pluck('name')->join(', '), $p->unit->short_name, $p->stock, $p->low_stock, $p->stockLayers->pluck('selling_price')->unique()->sort()->map(fn ($v) => Money::display($v))->join(' / '), Money::display(Money::sum($p->stockLayers->map(fn ($l) => Money::mul($l->remaining_quantity, $l->selling_price))))], $canCost ? [Money::display(Money::sum($p->stockLayers->map(fn ($l) => $l->stock_value)))] : []);
             }
         } elseif ($kind === 'product-sales') {
-            $query = SaleItem::whereHas('sale', fn ($q) => $q->where('status', 'ACTIVE')->whereBetween('sold_at', [$start, $end]))->selectRaw('product_id, name, unit, SUM(quantity) as quantity, SUM(total) as total, SUM(COALESCE(cogs_total, COALESCE(base_quantity, quantity) * COALESCE(base_cost, cost))) as cogs')->groupBy('product_id', 'name', 'unit')->orderByDesc('total');
+            $query = SaleItem::whereHas('sale', fn ($q) => $q->visibleTo()->where('status', 'ACTIVE')->whereBetween('sold_at', [$start, $end]))->selectRaw('product_id, name, unit, SUM(quantity) as quantity, SUM(total) as total, SUM(COALESCE(cogs_total, COALESCE(base_quantity, quantity) * COALESCE(base_cost, cost))) as cogs')->groupBy('product_id', 'name', 'unit')->orderByDesc('total');
             $headers = ['Product', 'Unit', 'Original quantity before returns', 'Original line sales before invoice discount / returns'];
             $canCost = auth()->user()?->hasPermission('products.view_cost') ?? false;
             if ($canCost) {
@@ -221,7 +223,7 @@ class ReportService
             }
             $map = fn ($i) => array_merge([$i->name, $i->unit, $i->quantity, Money::display($i->total)], $canCost ? [Money::display($i->cogs), Money::display(Money::sub($i->total, $i->cogs)), Money::compare($i->total, 0) > 0 ? (string) BigDecimal::of(Money::sub($i->total, $i->cogs))->multipliedBy(100)->dividedBy($i->total, 2, RoundingMode::HALF_UP) : '0.00'] : []);
         } elseif ($kind === 'register') {
-            $query = app(RegisterService::class)->withSummary(Register::with('user'))->whereBetween('opened_at', [$start, $end])->latest('opened_at');
+            $query = app(RegisterService::class)->withSummary(SalesVisibility::apply(Register::with('user'), 'registers.user_id'))->whereBetween('opened_at', [$start, $end])->latest('opened_at');
             if (! empty($filters['user_id'])) {
                 $query->where('user_id', $filters['user_id']);
             }
@@ -232,12 +234,12 @@ class ReportService
                 return ['REG-'.$r->id, $r->user->name, $r->opened_at->format('Y-m-d H:i'), $r->closed_at?->format('Y-m-d H:i') ?? 'Open', Money::display($r->opening_cash), Money::display($s['cash']), Money::display($s['in']), Money::display($s['out']), Money::display($s['expenses']), Money::display($r->closed_at ? $r->expected_cash : $s['expected']), $r->closed_at ? Money::display($r->actual_cash) : '—', $r->closed_at ? Money::display($r->difference) : '—'];
             };
         } elseif ($kind === 'cash') {
-            $sp = DB::table('sale_payments')->selectRaw("'Sale' as type, sale_id as reference_id, reference, created_at as date, payment_method_id, amount_paid - `change` as in_amount, 0 as out_amount");
-            $cp = DB::table('customer_payments')->selectRaw("'Customer payment' as type, id as reference_id, notes as reference, payment_date as date, payment_method_id, amount as in_amount, 0 as out_amount");
-            $sc = DB::table('sale_collections')->selectRaw("'Due collection' as type, sale_id as reference_id, reference, collected_at as date, payment_method_id, amount as in_amount, 0 as out_amount");
-            $sr = DB::table('sale_returns')->selectRaw("'Refund' as type, id as reference_id, reference, returned_at as date, payment_method_id, 0 as in_amount, refund_amount as out_amount")->whereNotNull('payment_method_id');
-            $pp = DB::table('purchase_payments')->selectRaw("CASE WHEN kind = 'REFUND' THEN 'Supplier refund' ELSE 'Supplier payment' END as type, purchase_id as reference_id, reference, created_at as date, payment_method_id, CASE WHEN kind = 'REFUND' THEN amount ELSE 0 END as in_amount, CASE WHEN kind = 'PAYMENT' THEN amount ELSE 0 END as out_amount");
-            $xp = DB::table('expenses')->selectRaw("'Expense' as type, id as reference_id, reference, expense_date as date, payment_method_id, 0 as in_amount, amount as out_amount")->whereNotNull('payment_method_id')->where('status', 'ACTIVE');
+            $sp = DB::table('sale_payments')->whereIn('sale_id', Sale::visibleTo()->select('id'))->selectRaw("'Sale' as type, sale_id as reference_id, reference, created_at as date, payment_method_id, amount_paid - `change` as in_amount, 0 as out_amount");
+            $cp = SalesVisibility::apply(DB::table('customer_payments'), 'customer_payments.user_id')->selectRaw("'Customer payment' as type, id as reference_id, notes as reference, payment_date as date, payment_method_id, amount as in_amount, 0 as out_amount");
+            $sc = DB::table('sale_collections')->whereIn('sale_id', Sale::visibleTo()->select('id'))->selectRaw("'Due collection' as type, sale_id as reference_id, reference, collected_at as date, payment_method_id, amount as in_amount, 0 as out_amount");
+            $sr = DB::table('sale_returns')->whereIn('sale_id', Sale::visibleTo()->select('id'))->selectRaw("'Refund' as type, id as reference_id, reference, returned_at as date, payment_method_id, 0 as in_amount, refund_amount as out_amount")->whereNotNull('payment_method_id');
+            $pp = SalesVisibility::apply(DB::table('purchase_payments'), 'purchase_payments.user_id')->selectRaw("CASE WHEN kind = 'REFUND' THEN 'Supplier refund' ELSE 'Supplier payment' END as type, purchase_id as reference_id, reference, created_at as date, payment_method_id, CASE WHEN kind = 'REFUND' THEN amount ELSE 0 END as in_amount, CASE WHEN kind = 'PAYMENT' THEN amount ELSE 0 END as out_amount");
+            $xp = SalesVisibility::apply(DB::table('expenses'), 'expenses.user_id')->where(fn ($q) => $q->whereNull('sale_id')->orWhereIn('sale_id', Sale::visibleTo()->select('id')))->selectRaw("'Expense' as type, id as reference_id, reference, expense_date as date, payment_method_id, 0 as in_amount, amount as out_amount")->whereNotNull('payment_method_id')->where('status', 'ACTIVE');
 
             $unionQuery = $sp->unionAll($cp)->unionAll($sc)->unionAll($sr)->unionAll($pp)->unionAll($xp);
 
@@ -284,7 +286,19 @@ class ReportService
                 'Closing balance' => (string) $closing,
             ];
         } elseif ($kind === 'audit') {
-            $query = AuditLog::with('user')->whereBetween('created_at', [$start, $end])->latest();
+            $query = SalesVisibility::apply(AuditLog::with('user'), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
+            if (SalesVisibility::mode() !== 'ALL') {
+                $subjects = [Sale::class => Sale::visibleTo()->select('id')];
+                foreach ([SaleReturn::class, SaleCollection::class, SaleRevision::class] as $subject) {
+                    $subjects[$subject] = $subject::whereHas('sale', fn ($q) => $q->visibleTo())->select('id');
+                }
+                $query->where(function ($q) use ($subjects) {
+                    $q->whereNotIn('subject_type', array_keys($subjects));
+                    foreach ($subjects as $type => $ids) {
+                        $q->orWhere(fn ($q) => $q->where('subject_type', $type)->whereIn('subject_id', $ids));
+                    }
+                });
+            }
             $headers = ['Time', 'User', 'Action', 'Record', 'Before', 'After'];
             $map = fn ($a) => [$a->created_at->format('Y-m-d H:i:s'), $a->user?->name ?? 'System', $a->action, class_basename($a->subject_type).' #'.$a->subject_id, json_encode($a->before), json_encode($a->after)];
         } else {
