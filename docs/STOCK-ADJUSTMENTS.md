@@ -6,7 +6,9 @@ Reports contains All reports and every entry in `ReportService::TITLES`: Sales, 
 
 ## Batch corrections
 
-Open Products → Stock adjustments → New adjustment. Search active products by name/SKU/barcode, select several or all matching results, and Add selected. Up to 100 products can be included. Each row supports Add stock, Remove stock or Set counted stock in its primary unit. Decimal quantities obey the primary unit and configured precision. Zero changes permit price-only corrections; zero counted stock is valid.
+Open Products → Stock adjustments → New adjustment. Search active products by name/SKU/barcode and click a match to add it immediately. A complete barcode adds automatically; arrow keys and Enter select search results. The quantity field is selected after adding, and Enter returns to search. Repeating a product focuses its existing row without duplicating or changing its quantity. Up to 100 products can be included. Choose the default adjustment for new rows once, then change individual rows as needed. Each row supports Add stock, Remove stock or Set counted stock in its primary unit. Decimal quantities obey the primary unit and configured precision. Zero changes permit price-only corrections; zero counted stock is valid.
+
+Selling price and cost inputs are visible in the same row as quantity, without opening another control. Removing stock automatically selects its stock row when only one is available; products with several available rows still require choosing which stock to remove. Removed stock displays that row’s prices as read-only. Search suggestions overlay the following card without clipping. The same search controls are available when editing a batch.
 
 Selling price and cost are optional. Blank keeps the current value; an explicit zero sets zero. Primary-price changes update prices derived from unit conversions, while explicitly configured additional-unit prices stay unchanged. Converted prices/costs are range-checked. Purchase and sale historical snapshots remain unchanged.
 
@@ -25,3 +27,5 @@ Seven stock/navigation tests plus 13 affected multiple-unit tests passed on SQLi
 Browser QA created a two-product batch, changed stock and prices/costs, saved a second revision and reversed it in the isolated QA database. Bananas returned to 25 kg, price 240 and cost 180; Bath Soap returned to 74 pcs, price 180 and cost 130. The main database contains no test adjustment. Desktop report sublinks and mobile hamburger → Reports → Stock navigation were verified.
 
 [Adjustment form](screenshots/stock-adjustment-form.jpg), [detail snapshots](screenshots/stock-adjustment-details.jpg), [report sublinks](screenshots/report-sublinks.jpg).
+
+The simplified picker passed eight stock/navigation feature tests (122 assertions) and three JavaScript tests. Browser QA in the isolated QA database verified immediate click/Enter/barcode addition, quantity focus and Enter-to-search, repeated scans, retained price entries, single/multiple stock-row handling and saving a three-product adjustment. [Quick search layout](screenshots/stock-adjustment-quick-search.png).

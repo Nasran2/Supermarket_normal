@@ -107,7 +107,8 @@
                         <x-icon name="user" :size="18"/>
                     </div>
                     <input type="text" name="login" value="{{ old('login', old('email')) }}" maxlength="255" autocapitalize="none" spellcheck="false" autocomplete="username" placeholder="Enter your username or email" required autofocus 
-                        class="w-full input-icon-left pr-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0db168] focus:ring-1 focus:ring-[#0db168] transition-colors bg-white text-[13px] text-gray-900 shadow-sm outline-none placeholder:text-gray-400 placeholder:font-medium">
+                        style="padding-left: 2.75rem;"
+                        class="w-full pr-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0db168] focus:ring-1 focus:ring-[#0db168] transition-colors bg-white text-[13px] text-gray-900 shadow-sm outline-none placeholder:text-gray-400 placeholder:font-medium">
                 </div>
             </div>
 
@@ -119,7 +120,8 @@
                         <x-icon name="lock" :size="18"/>
                     </div>
                     <input type="password" id="password-input" name="password" autocomplete="current-password" placeholder="Enter your password" required 
-                        class="w-full input-icon-left pr-10 py-2.5 rounded-lg border border-gray-200 focus:border-[#0db168] focus:ring-1 focus:ring-[#0db168] transition-colors bg-white text-[13px] text-gray-900 shadow-sm outline-none placeholder:text-gray-400 placeholder:font-medium">
+                        style="padding-left: 2.75rem;"
+                        class="w-full pr-10 py-2.5 rounded-lg border border-gray-200 focus:border-[#0db168] focus:ring-1 focus:ring-[#0db168] transition-colors bg-white text-[13px] text-gray-900 shadow-sm outline-none placeholder:text-gray-400 placeholder:font-medium">
                     <button type="button" id="toggle-password" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none transition-colors" aria-label="Toggle password visibility">
                         <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>

@@ -78,7 +78,7 @@ class PurchasePaymentService
             if (! $method) {
                 $this->fail('This payment method is no longer active.');
             }
-            if (($method->type === 'CASH') !== ($register !== null)) {
+            if ($register !== null && $method->type !== 'CASH') {
                 $this->fail('The payment method changed while this payment was being recorded. Refresh and select it again.');
             }
             $movement = null;

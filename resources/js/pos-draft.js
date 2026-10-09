@@ -1,3 +1,5 @@
+import { stockChoiceKey } from './pos-price-options.js';
+
 export function draftStore(storage, key) {
   return {
     read() {
@@ -24,7 +26,7 @@ export function draftStore(storage, key) {
         if (
           !Number.isSafeInteger(item.id) ||
           item.id < 1 ||
-          ids.has(`${item.id}:${item.stock_price ?? ''}:${item.unit_id}`) ||
+          ids.has(stockChoiceKey(item)) ||
           !Number.isSafeInteger(item.unit_id) ||
           item.unit_id < 1 ||
           !/^\d+(?:\.\d{1,3})?$/.test(String(item.quantity)) ||
@@ -38,7 +40,8 @@ export function draftStore(storage, key) {
           (item.unit_price !== null && !/^\d+(?:\.\d{1,2})?$/.test(String(item.unit_price)))
         )
           throw new Error('Invalid saved item');
-        ids.add(`${item.id}:${item.stock_price ?? ''}:${item.unit_id}`);
+        ids.add(stockChoiceKey(item));
+        if (item.stock_layer_id != null && (!Number.isSafeInteger(item.stock_layer_id) || item.stock_layer_id < 1)) throw new Error('Invalid saved stock row');
         if (item.stock_price != null && !/^\d+(?:\.\d{1,2})?$/.test(String(item.stock_price))) throw new Error('Invalid saved stock price');
       }
       return value;

@@ -62,7 +62,7 @@ class SaleController extends Controller
     public function edit(Sale $sale, SaleRevisionService $service)
     {
         $service->assertEditable($sale, auth()->id());
-        $sale->load('items.product.unit', 'items.product.conversions.unit', 'customer', 'payments');
+        $sale->load('items.product.unit', 'items.product.conversions.unit', 'items.allocations.layer', 'customer', 'payments');
         $register = $sale->register;
         $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
         $customers = Customer::withDueBalances()->where('active', true)->orWhere('id', $sale->customer_id)->orderBy('name')->get();
@@ -77,7 +77,9 @@ class SaleController extends Controller
                 $id = $i->unit_id ?? $i->product->unit_id;
                 $selected = collect($options)->firstWhere('id', $id);
 
-                return ['stock_price' => $stockPrice, 'line_key' => (string) Str::uuid(), 'id' => $i->product_id, 'name' => $i->name, 'units' => $options, 'unit_id' => $id, 'unit' => $i->unit, 'decimal' => $selected['decimal'] ?? false, 'price' => $i->catalog_price ?? $i->price, 'unit_price' => $i->price, 'quantity' => $i->quantity, 'discount_type' => $i->discount_type ?? 'AMOUNT', 'discount_value' => $i->discount_value ?? '0', 'unavailable' => ! $selected || ! $i->product->active || ! $i->product->unit->active];
+                $allocation = $i->allocations->count() === 1 ? $i->allocations->first() : null;
+
+                return ['stock_layer_id' => $allocation?->stock_layer_id, 'stock_reference' => $allocation?->layer?->source_reference ?? '', 'stock_price' => $stockPrice, 'line_key' => (string) Str::uuid(), 'id' => $i->product_id, 'name' => $i->name, 'units' => $options, 'unit_id' => $id, 'unit' => $i->unit, 'decimal' => $selected['decimal'] ?? false, 'price' => $i->catalog_price ?? $i->price, 'unit_price' => $i->price, 'quantity' => $i->quantity, 'discount_type' => $i->discount_type ?? 'AMOUNT', 'discount_value' => $i->discount_value ?? '0', 'unavailable' => ! $selected || ! $i->product->active || ! $i->product->unit->active];
             })->all()];
 
         return view('pos.index', compact('register', 'methods', 'customers', 'categories', 'editingSale', 'editSeed'));

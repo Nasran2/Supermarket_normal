@@ -1,4 +1,5 @@
 import { draftStore } from './pos-draft.js';
+import { sellingPriceOptions, priceOptionForItem, stockChoiceKey } from './pos-price-options.js';
 const pos = document.getElementById('pos');
 const $ = (id) => document.getElementById(id),
   money = (v) => {
@@ -76,6 +77,8 @@ function saveDraft() {
           id: p.id,
           line_key: p.line_key,
           stock_price: p.stock_price,
+          stock_layer_id: p.stock_layer_id ?? null,
+          stock_reference: p.stock_reference ?? '',
           name: p.name,
           unit_id: p.unit_id,
           unit: p.unit,
@@ -172,12 +175,13 @@ async function restoreDraft() {
     if (current !== restoreNumber) return;
     cart = saved.items.map((item) => {
       const fresh = available.find((p) => p.id === item.id);
-      const group = fresh?.price_options?.find((g) => item.stock_price != null && scaled(g.stock_price, 2) === scaled(item.stock_price, 2)) || (item.stock_price == null && fresh?.price_options?.length === 1 ? fresh.price_options[0] : null);
+      const group = priceOptionForItem(fresh, item);
       const unit = group?.units.find((u) => u.id === item.unit_id);
       return {
         ...item,
         line_key: item.line_key || crypto.randomUUID(),
         stock_price: group?.stock_price ?? item.stock_price,
+        stock_reference: item.stock_layer_id != null ? (group?.reference ?? item.stock_reference ?? '') : '',
         units: group?.units || [],
         unavailable: !unit,
         ...(unit
@@ -243,6 +247,7 @@ const payload = () => ({
   items: cart.map((p) => ({
     product_id: p.id,
     stock_price: p.stock_price,
+    stock_layer_id: p.stock_layer_id ?? null,
     unit_id: p.unit_id,
     quantity: String(p.quantity),
     unit_price: p.unit_price ?? null,
@@ -320,37 +325,40 @@ async function search(scanner = false) {
   }
 }
 function priceRange(p) {
-  const prices = (p.price_options || []).map((group) => Number(group.stock_price));
+  const prices = sellingPriceOptions(p).map((group) => Number(group.stock_price));
   if (!prices.length) return moneyHTML(p.price);
   const low = Math.min(...prices), high = Math.max(...prices);
   return low === high ? moneyHTML(low) : `${moneyHTML(low)} – ${moneyHTML(high)}`;
 }
 const priceDialog = $('price-choice-dialog');
 let choosingProduct = null;
+let choosingPrices = [];
 function add(p) {
   if (!p || orderLoading || pending) return;
   if (checkoutAttempted) { dialog.close(); restoreDraft(); return; }
   if (!syncQuantities()) return;
-  const groups = p.price_options || [];
+  const groups = sellingPriceOptions(p);
   if (!groups.length) { message.textContent = `${p.name} is out of stock.`; return; }
   if (groups.length === 1) { addPrice(p, groups[0]); return; }
   choosingProduct = p;
-  $('price-choice-product').textContent = `${p.name} · ${Number(p.stock)} ${p.unit} available`;
-  $('price-choice-options').innerHTML = groups.map((group, index) => `<button type="button" class="price-choice" data-price-choice="${index}"><span><strong>${moneyHTML(group.stock_price)}</strong><small>${Number(group.quantity)} ${escape(p.unit)} available</small></span><kbd>${index + 1}</kbd></button>`).join('');
+  choosingPrices = groups;
+  $('price-choice-product').textContent = p.name;
+  $('price-choice-options').innerHTML = groups.map((group, index) => `<button type="button" class="price-choice" data-price-choice="${index}"><span class="price-choice-rate"><small>Selling price / ${escape(p.unit)}</small><strong>${moneyHTML(group.stock_price)}</strong>${group.reference?`<small class="price-choice-source">${escape(group.reference)}</small>`:''}${group.received?`<small class="price-choice-received">${escape(group.received)}</small>`:''}</span><span class="price-choice-stock"><strong>${Number(group.quantity).toLocaleString()} ${escape(p.unit)}</strong><small>Available stock</small><span class="price-choice-add">Add to cart <kbd>${index + 1}</kbd></span></span></button>`).join('');
   priceDialog.showModal();
   $('price-choice-options').querySelector('button').focus();
 }
 function addPrice(p, group) {
   const unit = group.units.find((option) => option.id === p.unit_id);
-  const existing = cart.find((item) => item.id === p.id && item.unit_id === p.unit_id && scaled(item.stock_price, 2) === scaled(group.stock_price, 2));
+  const key = stockChoiceKey({id:p.id, unit_id:p.unit_id, stock_price:group.stock_price, stock_layer_id:group.stock_layer_id});
+  const existing = cart.find((item) => stockChoiceKey(item) === key);
   if (existing) existing.quantity = Number((Number(existing.quantity) + 1).toFixed(3));
-  else cart.push({ ...p, line_key: crypto.randomUUID(), stock_price: group.stock_price, units: group.units, price: unit.price, quantity: 1, unit_price: null, discount_type: 'AMOUNT', discount_value: '0' });
+  else cart.push({ ...p, line_key: crypto.randomUUID(), stock_price: group.stock_price, stock_layer_id: group.stock_layer_id ?? null, stock_reference: group.reference ?? '', units: group.units, price: unit.price, quantity: 1, unit_price: null, discount_type: 'AMOUNT', discount_value: '0' });
   quote = null;
   message.textContent = '';
   render();
 }
 function selectPrice(index) {
-  const group = choosingProduct?.price_options[index];
+  const group = choosingPrices[index];
   if (!group) return;
   addPrice(choosingProduct, group);
   priceDialog.close();
@@ -361,6 +369,11 @@ $('price-choice-options').addEventListener('click', (event) => {
   if (button) selectPrice(Number(button.dataset.priceChoice));
 });
 $('close-price-choice').addEventListener('click', () => priceDialog.close());
+priceDialog.addEventListener('close', () => {
+  choosingProduct = null;
+  choosingPrices = [];
+  $('product-search').focus({ preventScroll: true });
+});
 priceDialog.addEventListener('keydown', (event) => {
   if (/^[1-9]$/.test(event.key)) { event.preventDefault(); selectPrice(Number(event.key) - 1); }
   if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
@@ -377,7 +390,7 @@ function render(persist = true) {
     ? cart
         .map(
           (p) =>
-            `<div class="cart-line compact-cart-line" data-cart-id="${p.line_key}"><button class="cart-item-name ${p.unavailable ? 'unavailable' : ''}" data-action="edit" type="button" title="${escape(p.name)} · ${escape(p.unit)} · Edit price and line discount" aria-label="Edit ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><span>${escape(p.name)}</span><small>${escape(p.unit)} · ${moneyHTML(p.unit_price ?? p.price)}</small></button><div class="cart-qty-controls"><button class="icon-button" data-action="minus" type="button" aria-label="Decrease quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>−</button><input class="cart-quantity" type="number" required max="999999" min="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" step="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" value="${p.quantity}" aria-label="Quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><button class="icon-button" data-action="plus" type="button" aria-label="Increase quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>+</button></div><strong class="cart-line-amount" title="${moneyHTML(Number(lineCents(p)) / 100)}">${moneyHTML(Number(lineCents(p)) / 100)}</strong><button class="icon-button cart-remove" ${orderLoading ? 'disabled' : ''} data-action="remove" title="Remove item" aria-label="Remove ${escape(p.name)}" type="button"><i data-lucide="x" style="width:14px"></i></button></div>`,
+            `<div class="cart-line compact-cart-line" data-cart-id="${p.line_key}"><button class="cart-item-name ${p.unavailable ? 'unavailable' : ''}" data-action="edit" type="button" title="${escape(p.name)} · ${escape(p.unit)} · Edit price and line discount" aria-label="Edit ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><span>${escape(p.name)}</span><small>${escape(p.unit)} · ${moneyHTML(p.unit_price ?? p.price)}${p.stock_reference?` · ${escape(p.stock_reference)}`:''}</small></button><div class="cart-qty-controls"><button class="icon-button" data-action="minus" type="button" aria-label="Decrease quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>−</button><input class="cart-quantity" type="number" required max="999999" min="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" step="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" value="${p.quantity}" aria-label="Quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><button class="icon-button" data-action="plus" type="button" aria-label="Increase quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>+</button></div><strong class="cart-line-amount" title="${moneyHTML(Number(lineCents(p)) / 100)}">${moneyHTML(Number(lineCents(p)) / 100)}</strong><button class="icon-button cart-remove" ${orderLoading ? 'disabled' : ''} data-action="remove" title="Remove item" aria-label="Remove ${escape(p.name)}" type="button"><i data-lucide="x" style="width:14px"></i></button></div>`,
         )
         .join('')
     : '<div class="cart-empty"><i data-lucide="shopping-basket" style="width:35px;height:35px"></i><strong>Your order is empty</strong><small>Scan a barcode or choose a product.</small></div>';

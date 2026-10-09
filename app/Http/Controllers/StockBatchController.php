@@ -36,8 +36,13 @@ class StockBatchController extends Controller
     {
         $input = $request->validate(['q' => 'nullable|string|max:255']);
         $query = Product::with('unit')->where('active', true)->whereHas('unit', fn ($q) => $q->where('active', true));
-        if ($q = trim($input['q'] ?? '')) {
+        $q = trim($input['q'] ?? '');
+        if ($q !== '') {
             $query->where(fn ($query) => $query->where('name', 'like', '%'.$q.'%')->orWhere('sku', 'like', '%'.$q.'%')->orWhere('barcode', 'like', '%'.$q.'%'));
+        }
+
+        if ($q !== '') {
+            $query->orderByRaw('CASE WHEN barcode = ? THEN 0 WHEN sku = ? THEN 1 ELSE 2 END', [$q, $q]);
         }
 
         return response()->json($query->orderBy('name')->limit(60)->get()->map(fn ($p) => $this->productRow($p)));
@@ -47,7 +52,7 @@ class StockBatchController extends Controller
     {
         app(StockLayerService::class)->ensureLegacy($p);
 
-        return ['layers' => $p->stockLayers()->available()->get(['id', 'selling_price', 'cost_price', 'remaining_quantity'])->map(fn ($l) => ['id' => $l->id, 'selling_price' => $l->selling_price, 'cost_price' => auth()->user()->hasPermission('products.view_cost') ? $l->cost_price : null, 'quantity' => $l->remaining_quantity])->all(), 'product_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit_id' => $p->unit_id, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'expected_stock' => $p->stock, 'expected_price' => $p->price, 'expected_cost' => auth()->user()->hasPermission('products.view_cost') ? $p->cost : null];
+        return ['barcode' => $p->barcode, 'layers' => $p->stockLayers()->available()->get(['id', 'selling_price', 'cost_price', 'remaining_quantity'])->map(fn ($l) => ['id' => $l->id, 'selling_price' => $l->selling_price, 'cost_price' => auth()->user()->hasPermission('products.view_cost') ? $l->cost_price : null, 'quantity' => $l->remaining_quantity])->all(), 'product_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit_id' => $p->unit_id, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'expected_stock' => $p->stock, 'expected_price' => $p->price, 'expected_cost' => auth()->user()->hasPermission('products.view_cost') ? $p->cost : null];
     }
 
     public function create()

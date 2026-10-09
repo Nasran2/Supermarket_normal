@@ -10,7 +10,8 @@ $help = match($resource) { 'users'=>'Choose a role that matches this team member
 <div class="page-heading"><div><span class="eyebrow">{{ $def['title'] }}</span><h1>{{ $record->exists?'Edit':'Add' }} {{ $singular }}</h1><p>{{ $intro }}</p></div><a class="btn secondary" href="{{ route('manage.index',$resource) }}"><x-icon name="arrow-left"/>{{ $def['title'] }}</a></div>
 <form method="POST" enctype="multipart/form-data" action="{{ $record->exists?route('manage.update',[$resource,$record->id]):route('manage.store',$resource) }}" class="module-editor" data-module-editor>@csrf @if($record->exists)@method('PUT')@endif
 <section class="card module-editor-main">
-<div class="customer-section-heading"><span class="customer-section-icon"><x-icon :name="$icon"/></span><div><h2>{{ ucfirst($singular) }} details</h2><p>{{ $record->exists?'Update the details and save your changes.':'Start with the essential details below.' }}</p></div>@if($record->exists)<span class="badge slate">#{{ $record->id }}</span>@endif</div>
+<div class="customer-section-heading"><span class="customer-section-icon"><x-icon :name="$icon"/></span><div><h2>{{ ucfirst($singular) }} details</h2><p>{{ $record->exists?'Update the details and save your changes.':'Start with the essential details below.' }}</p></div>@if($record->exists)<span class="badge slate">#{{ $record->id }}</span>@endif
+</div>
 <div class="module-fields">
 @foreach($def['fields'] as $key=>$field)
 @php([$label,$type]=$field) @php($value=old($key,$record->$key))
@@ -24,13 +25,21 @@ $help = match($resource) { 'users'=>'Choose a role that matches this team member
 <fieldset class="permission-card" data-permission-group><legend>{{ \Illuminate\Support\Str::headline($group) }}</legend><label class="inline-check permission-group-toggle"><input type="checkbox" data-group-toggle>Select module</label>
 @foreach($items as $permission)@php($action=\Illuminate\Support\Str::headline(explode('.',$permission->name,2)[1]??$permission->name))
 <label class="permission-option" data-permission-label><input type="checkbox" name="permissions[]" value="{{ $permission->id }}" @checked(in_array($permission->id,old('permissions',$record->exists?$record->permissions->pluck('id')->all():[])))><span>{{ $action }}</span></label>
-@endforeach</fieldset>
-@endforeach</div></section>
+@endforeach
+</fieldset>
+@endforeach
+</div></section>
 @else
-<label class="field {{ $type==='textarea'?'full':'' }}"><span>{{ $label }} @if(($field[2]??true) || ($resource==='users' && $key==='password' && !$record->exists))<b class="required">*</b>@else<small>optional</small>@endif</span>
-@if($type==='select' || $type==='options')<select name="{{ $key }}" @required($field[2]??true)><option value="">Select {{ strtolower($label) }}</option>@foreach($type==='select'?$options[$key]:$field[3] as $id=>$name)<option value="{{ $id }}" @selected((string)$value===(string)$id)>{{ $name }}</option>@endforeach</select>
+<label class="field {{ $type==='textarea'?'full':'' }}"><span>{{ $label }} @if(($field[2]??true) || ($resource==='users' && $key==='password' && !$record->exists))<b class="required">*</b>@else
+<small>optional</small>@endif
+</span>
+@if($type==='select' || $type==='options')@if($resource==='expenses' && $key==='expense_category_id')<div class="input-with-action">@endif
+<select name="{{ $key }}" @required($field[2]??true)><option value="">Select {{ strtolower($label) }}</option>@foreach($type==='select'?$options[$key]:$field[3] as $id=>$name)<option value="{{ $id }}" @selected((string)$value===(string)$id)>{{ $name }}</option>@endforeach
+</select>@if($resource==='expenses' && $key==='expense_category_id')@can('expenses.create')<button type="button" class="btn secondary" data-open-expense-category aria-label="Add expense category" title="Add expense category"><x-icon name="plus"/></button>@endcan
+</div>@endif
 @elseif($type==='textarea')<textarea name="{{ $key }}" rows="3" placeholder="Add {{ strtolower($label) }}…" @required($field[2]??true)>{{ $value }}</textarea>
-@else<input name="{{ $key }}" type="{{ in_array($type,['money','quantity','decimal','number'])?'number':$type }}" @if(!in_array($type,['file','password']))value="{{ $value??(in_array($type,['money','quantity','decimal','number']) && ($field[2]??true)?0:($type==='date'?today()->toDateString():'')) }}"@endif @if(in_array($type,['money','quantity','decimal','number']))step="{{ match($type){'quantity'=>'0.001','decimal'=>'0.0001','number'=>'1',default=>'0.01'} }}" inputmode="decimal" @if($key!=='priority')min="0"@endif @else placeholder="{{ $type==='password'?'Enter a secure password':'Enter '.strtolower($label) }}"@endif @if($type==='file')accept="image/png,image/jpeg,image/webp"@endif @if($type==='password')autocomplete="new-password" minlength="10"@endif @if($resource==='users' && $key==='username')autocapitalize="none" spellcheck="false"@endif @required(($field[2]??true) || ($resource==='users' && $key==='password' && !$record->exists))>
+@else
+<input name="{{ $key }}" type="{{ in_array($type,['money','quantity','decimal','number'])?'number':$type }}" @if(!in_array($type,['file','password']))value="{{ $value??(in_array($type,['money','quantity','decimal','number']) && ($field[2]??true)?0:($type==='date'?today()->toDateString():'')) }}"@endif @if(in_array($type,['money','quantity','decimal','number']))step="{{ match($type){'quantity'=>'0.001','decimal'=>'0.0001','number'=>'1',default=>'0.01'} }}" inputmode="decimal" @if($key!=='priority')min="0"@endif @else placeholder="{{ $type==='password'?'Enter a secure password':'Enter '.strtolower($label) }}"@endif @if($type==='file')accept="image/png,image/jpeg,image/webp"@endif @if($type==='password')autocomplete="new-password" minlength="10"@endif @if($resource==='users' && $key==='username')autocapitalize="none" spellcheck="false"@endif @required(($field[2]??true) || ($resource==='users' && $key==='password' && !$record->exists))>
 @endif
 @if($key==='password')<small>{{ $record->exists?'Leave blank to keep the current password.':'Use at least 10 characters.' }}</small>@endif
 @if($key==='username')<small>Letters, numbers, dots, underscores or hyphens.</small>@endif
@@ -40,7 +49,11 @@ $help = match($resource) { 'users'=>'Choose a role that matches this team member
 @endif
 @endforeach
 </div></section>
-<aside class="card module-editor-help"><span class="customer-section-icon"><x-icon name="info"/></span><h2>{{ match($resource){'roles'=>'Access that fits','users'=>'Ready for your team','units'=>'Count with confidence','expenses'=>'Keep spending clear',default=>'A little detail helps'} }}</h2><p>{{ $help }}</p><div class="module-help-note"><x-icon name="check" :size="18"/><span>Your changes take effect when you save.</span></div>@if($resource==='units' && $record->default_slot===1)<span class="badge green">Default for new products</span>@endif</aside>
+<aside class="card module-editor-help"><span class="customer-section-icon"><x-icon name="info"/></span><h2>{{ match($resource){'roles'=>'Access that fits','users'=>'Ready for your team','units'=>'Count with confidence','expenses'=>'Keep spending clear',default=>'A little detail helps'} }}</h2><p>{{ $help }}</p><div class="module-help-note"><x-icon name="check" :size="18"/><span>Your changes take effect when you save.</span></div>@if($resource==='units' && $record->default_slot===1)<span class="badge green">Default for new products</span>@endif
+</aside>
 <div class="module-editor-footer"><a class="btn secondary" href="{{ route('manage.index',$resource) }}">Cancel</a><button class="btn primary" type="submit"><x-icon name="check"/>{{ $record->exists?'Save changes':'Create '.$singular }}</button></div>
 </form>
+@if($resource==='expenses')@can('expenses.create')
+<dialog id="expense-category-dialog" class="purchase-payment-dialog" aria-labelledby="expense-category-title"><div class="modal-heading"><div><span class="eyebrow">EXPENSE CATEGORIES</span><h2 id="expense-category-title">Add expense category</h2></div><button type="button" class="icon-button" data-close-expense-category aria-label="Close category dialog"><x-icon name="x"/></button></div><form class="modal-body" id="expense-category-quick-form" action="{{ route('manage.store','expense-categories') }}" method="POST">@csrf<p class="muted">Create a category and select it for this expense.</p><div class="notice error" role="alert" data-category-error hidden></div><label class="field">Category name<input name="name" required maxlength="255" autocomplete="off"></label><div class="form-footer"><button type="button" class="btn secondary" data-close-expense-category>Cancel</button><button type="submit" class="btn primary"><x-icon name="check"/>Add category</button></div></form></dialog>
+@endcan @endif
 @endsection

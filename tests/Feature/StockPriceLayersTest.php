@@ -11,6 +11,7 @@ use App\Models\Supplier;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\RegisterService;
+use App\Services\SaleRevisionService;
 use App\Services\StockLayerService;
 use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -79,6 +80,19 @@ class StockPriceLayersTest extends TestCase
         $this->assertSame('15.000', $groups[0]['quantity']);
     }
 
+    public function test_price_choices_are_sorted_and_ignore_depleted_preloaded_deliveries(): void
+    {
+        $p = $this->product([['quantity' => '15', 'cost' => '110', 'selling_price' => '140'], ['quantity' => '20', 'cost' => '100', 'selling_price' => '130']]);
+        $groups = $this->getJson(route('pos.products'))->assertOk()->json('0.price_options');
+        $this->assertSame(['130.00', '140.00'], array_column($groups, 'stock_price'));
+        $p->stockLayers()->where('selling_price', '130')->update(['remaining_quantity' => '0']);
+        $p->load('stockLayers');
+        $groups = app(StockLayerService::class)->groups($p);
+        $this->assertCount(1, $groups);
+        $this->assertSame('140.00', $groups[0]['stock_price']);
+        $this->assertSame('15.000', $groups[0]['quantity']);
+    }
+
     public function test_identical_selling_prices_aggregate_and_fifo_uses_actual_cost(): void
     {
         $p = $this->product([['quantity' => '10', 'cost' => '100', 'selling_price' => '130'], ['quantity' => '10', 'cost' => '110', 'selling_price' => '130']]);
@@ -94,6 +108,46 @@ class StockPriceLayersTest extends TestCase
         $p = $this->product();
         $this->postJson(route('pos.quote'), $this->data($p, '21'))->assertUnprocessable()->assertJsonValidationErrors('items');
         $this->assertSame('35.000', $p->fresh()->stock);
+    }
+
+    public function test_same_price_stock_rows_are_selectable_and_selected_delivery_is_consumed_and_edited(): void
+    {
+        $p = $this->product([['quantity' => '44', 'cost' => '390', 'selling_price' => '490'], ['quantity' => '10', 'cost' => '420', 'selling_price' => '490']]);
+        $choices = $this->getJson(route('pos.products', ['q' => $p->sku]))->assertOk()->json('0.price_options');
+        $this->assertCount(2, $choices);
+        $this->assertSame(['490.00', '490.00'], array_column($choices, 'stock_price'));
+        $this->assertSame(['44.000', '10.000'], array_column($choices, 'quantity'));
+        $this->assertArrayNotHasKey('cost_price', $choices[1]);
+        $data = $this->data($p, '2', '490');
+        $data['items'][0]['stock_layer_id'] = $choices[1]['stock_layer_id'];
+        $sale = $this->sale($data);
+        $this->assertSame('840.00', $sale->cost_total);
+        $this->assertSame(['44.000', '8.000'], $p->stockLayers()->orderBy('id')->pluck('remaining_quantity')->all());
+        $this->assertSame($choices[1]['stock_layer_id'], $sale->items->first()->allocations->first()->stock_layer_id);
+        $this->get(route('sales.edit', $sale))->assertOk()->assertViewHas('editSeed', fn ($seed) => $seed['items'][0]['stock_layer_id'] === $choices[1]['stock_layer_id']);
+        $revision = ['version' => app(SaleRevisionService::class)->version($sale->fresh()), 'items' => [['product_id' => $p->id, 'stock_price' => '490', 'stock_layer_id' => $choices[1]['stock_layer_id'], 'quantity' => '3']], 'payments' => [['payment_method_id' => $data['payment_method_id'], 'amount' => '1470']]];
+        $quote = $this->postJson(route('sales.edit.quote', $sale), $revision)->assertOk()->json();
+        $revision['payments'][0]['amount_paid'] = $quote['customer_payable'];
+        $this->postJson(route('sales.revise', $sale), $revision + ['checkout_token' => (string) Str::uuid(), 'quote_hash' => $quote['quote_hash']])->assertOk();
+        $this->assertSame('1260.00', $sale->fresh()->cost_total);
+        $this->assertSame(['44.000', '7.000'], $p->stockLayers()->orderBy('id')->pluck('remaining_quantity')->all());
+    }
+
+    public function test_selected_stock_row_cannot_borrow_from_same_price_or_another_product(): void
+    {
+        $p = $this->product([['quantity' => '44', 'cost' => '390', 'selling_price' => '490'], ['quantity' => '10', 'cost' => '420', 'selling_price' => '490']]);
+        $data = $this->data($p, '11', '490');
+        $data['items'][0]['stock_layer_id'] = $p->stockLayers()->orderByDesc('id')->value('id');
+        $this->postJson(route('pos.quote'), $data)->assertUnprocessable()->assertJsonValidationErrors('items');
+        $data['items'][0]['quantity'] = '6';
+        $data['items'][] = $data['items'][0];
+        $this->postJson(route('pos.quote'), $data)->assertUnprocessable();
+        $other = $this->product();
+        $data['items'] = [$data['items'][0]];
+        $data['items'][0]['stock_layer_id'] = $other->stockLayers()->value('id');
+        $this->postJson(route('pos.quote'), $data)->assertUnprocessable();
+        $this->assertSame('54.000', $p->fresh()->stock);
+        $this->assertDatabaseCount('sales', 0);
     }
 
     public function test_duplicate_product_lines_reserve_cumulatively_and_different_prices_remain_separate(): void

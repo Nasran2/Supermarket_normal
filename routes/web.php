@@ -14,6 +14,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StockBatchController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockPriceController;
+use App\Http\Controllers\SupplierAccountController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -65,6 +66,7 @@ Route::middleware(['auth', 'auth.session'])->group(function () {
     Route::get('/settings/{group}', [SettingsController::class, 'edit'])->name('settings.edit');
     Route::put('/settings/{group}', [SettingsController::class, 'update'])->name('settings.update');
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/{report}/pdf', [ReportController::class, 'pdf'])->name('reports.pdf');
     Route::get('/reports/{report}/export', [ReportController::class, 'export'])->name('reports.export');
     Route::get('/reports/{report}', [ReportController::class, 'show'])->name('reports.show');
     Route::prefix('stock-adjustments')->name('adjustments.')->group(function () {
@@ -90,6 +92,8 @@ Route::middleware(['auth', 'auth.session'])->group(function () {
         Route::put('/{id}', [ResourceController::class, 'update'])->whereNumber('id')->name('update');
         Route::delete('/{id}', [ResourceController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
+
+    Route::get('/manage/suppliers/{supplier}/ledger', [SupplierAccountController::class, 'ledger'])->name('manage.suppliers.ledger');
 
     Route::post('/manage/customers/{customer}/payments', [CustomerPaymentController::class, 'store'])->name('manage.customers.payments.store');
     Route::get('/manage/customers/{customer}/ledger', [CustomerPaymentController::class, 'ledger'])->name('manage.customers.ledger');

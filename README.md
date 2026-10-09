@@ -97,7 +97,7 @@ Use **Bill discount** below the subtotal for a fixed amount or percentage on the
 
 ## Sidebar and stock adjustments
 
-Expandable sidebar groups provide list/create links for existing modules and links to all 16 available reports, filtered by permission. Products → Stock adjustments supports selecting up to 100 products, Add/Remove/Set stock and optional primary-unit selling-price/cost changes. Batches can be viewed, filtered, printed, revised and reversed with their audit history preserved. See [workflow and validation](docs/STOCK-ADJUSTMENTS.md).
+Expandable sidebar groups provide list/create links for existing modules and links to all 16 available reports, filtered by permission. Products → Stock adjustments adds products directly from search or barcode scans, with Enter moving between quantity entry and search. It supports up to 100 products, Add/Remove/Set stock and optional primary-unit selling-price/cost changes. Batches can be viewed, filtered, printed, revised and reversed with their audit history preserved. See [workflow and validation](docs/STOCK-ADJUSTMENTS.md).
 
 Sales now include labeled View, Edit, Delete/reversal, item Return and conditional Pay due actions. Returns and later payments update stock, invoice balances, register reconciliation and reports, with historical invoices retained. See [sales workflow](docs/SALES-WORKFLOW.md).
 
@@ -113,4 +113,14 @@ Products can hold separately priced opening stock and deliveries. POS chooses an
 
 ## Purchase payments
 
-Receive stock with **Paid in full**, **Partial payment**, or **Leave due**, and settle supplier balances later using **Pay due**. Purchases show paid/due totals, status and payment history. Cash payments update the open register automatically; older purchases use **Set balance** before tracking begins. See [purchase workflow and verification](docs/PURCHASE-PAYMENTS.md).
+Enter the amount given to automatically mark a purchase Unpaid, Partial, or Paid and show any excess as change. Settle supplier balances later using **Pay due**. Add multiple shipping/other charges as linked expenses (default), or distribute them into incoming product cost. New references use **pur-YYYYMM-0001** and **INV-YYYYMMDD-00001**. Purchases show paid/due totals, status and payment history. Cash payments update the open register automatically; older purchases use **Set balance** before tracking begins. See [purchase workflow and verification](docs/PURCHASE-PAYMENTS.md).
+
+## Account histories and report PDFs
+
+Category View shows its products with search and status filters. Supplier lists show dues; supplier accounts include filtered purchase/payment histories and PDF/CSV ledgers with opening and running balances. Customer **Collect Payment** is available in Actions only when due exists. Expense forms can create and select a category using the adjacent plus button without losing the draft.
+
+All 16 reports offer formatted PDF downloads with company letterhead from Business settings, applied filters, report-specific tables or statements, totals and page numbers. Downloads include all matching records across screen pages. See [account/report workflow and validation](docs/ACCOUNT-REPORTS.md).
+
+## Larger sample catalog
+
+Run `php artisan db:seed --class=BulkSampleProductSeeder` to add 120 clearly labelled sample products (`SAMPLE-001` through `SAMPLE-120`) with unique EAN-13 barcodes across six categories. Samples include low/out-of-stock products, kilogram quantities, same-price deliveries and different-price deliveries. Stock is recorded through the normal stock-layer and movement services. Rerunning skips existing sample SKUs without replenishing stock or overwriting edits; existing products are untouched. POS initially shows up to 60 matches, so search or select a category to find the remaining products. Product management uses pagination.

@@ -49,6 +49,20 @@ class StockBatchTest extends TestCase
         return StockAdjustment::latest('id')->firstOrFail();
     }
 
+    public function test_barcode_match_is_prioritized_before_the_search_limit(): void
+    {
+        $this->a->update(['name' => 'ZZZ scanned product', 'barcode' => 'SCAN-001']);
+        for ($i = 0; $i < 61; $i++) {
+            Product::create(['name' => 'Alternative SCAN-001 '.$i, 'sku' => 'MATCH-'.$i, 'unit_id' => $this->a->unit_id, 'cost' => '40', 'price' => '100', 'stock' => '0', 'active' => true]);
+        }
+        $response = $this->getJson(route('adjustments.products', ['q' => 'SCAN-001']))->assertOk()->json();
+        $this->assertCount(60, $response);
+        $this->assertSame($this->a->id, $response[0]['product_id']);
+        $this->assertSame('SCAN-001', $response[0]['barcode']);
+        $this->assertSame('20.000', $response[0]['expected_stock']);
+        $this->get(route('adjustments.create'))->assertOk()->assertSee('Search adjustment products')->assertDontSee('Add selected')->assertDontSee('Select all results');
+    }
+
     public function test_multi_product_adjustment_updates_quantity_prices_cost_and_history_together(): void
     {
         $batch = $this->create([$this->row($this->a, ['quantity' => '5', 'price' => '120', 'cost' => '45']), $this->row($this->b, ['mode' => 'SET', 'quantity' => '18.75', 'price' => null, 'cost' => '0'])]);

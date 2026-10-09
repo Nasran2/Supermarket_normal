@@ -1,3 +1,4 @@
+import './expense-category.js';
 import './register.js';
 import {
   createIcons,

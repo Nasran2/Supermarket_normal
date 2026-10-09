@@ -73,10 +73,15 @@ class StockLayerService
         $layers = ! $editing && $p->relationLoaded('stockLayers') ? $p->stockLayers : $p->stockLayers()->where('status', 'ACTIVE')->where(fn ($q) => $q->where('remaining_quantity', '>', 0)->when($credits, fn ($q) => $q->orWhereIn('id', array_keys($credits))))->orderBy('selling_price')->get();
         $groups = [];
         foreach ($layers as $layer) {
+            $quantity = Money::quantity($layer->remaining_quantity, $credits[$layer->id] ?? '0');
+            if (Money::compare($quantity, 0) <= 0) {
+                continue;
+            }
             $key = $layer->selling_price;
             $groups[$key] ??= ['stock_price' => $key, 'quantity' => '0.000', 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p, $key))];
-            $groups[$key]['quantity'] = Money::quantity($groups[$key]['quantity'], Money::quantity($layer->remaining_quantity, $credits[$layer->id] ?? '0'));
+            $groups[$key]['quantity'] = Money::quantity($groups[$key]['quantity'], $quantity);
         }
+        ksort($groups, SORT_NUMERIC);
 
         return array_values($groups);
     }
@@ -96,11 +101,26 @@ class StockLayerService
         return $credits;
     }
 
-    public function plan(Product $p, string $quantity, ?string $price, array &$reserved, bool $lock = false, ?Sale $editing = null): array
+    /** Separate selectable stock rows, including rows with the same selling price. */
+    public function choices(Product $p, ?Sale $editing = null): array
+    {
+        $this->ensureLegacy($p);
+        $credits = $this->credits($editing, $p);
+        $layers = ! $editing && $p->relationLoaded('stockLayers') ? $p->stockLayers : $p->stockLayers()->where('status', 'ACTIVE')->where(fn ($q) => $q->where('remaining_quantity', '>', 0)->when($credits, fn ($q) => $q->orWhereIn('id', array_keys($credits))))->get();
+
+        return $layers->filter(fn ($layer) => $layer->status === 'ACTIVE' && Money::compare(Money::quantity($layer->remaining_quantity, $credits[$layer->id] ?? '0'), 0) > 0)
+            ->sort(fn ($a, $b) => Money::compare($a->selling_price, $b->selling_price) ?: $a->received_at <=> $b->received_at ?: $a->id <=> $b->id)
+            ->map(fn ($layer) => ['stock_layer_id' => $layer->id, 'stock_price' => $layer->selling_price, 'quantity' => Money::quantity($layer->remaining_quantity, $credits[$layer->id] ?? '0'), 'reference' => $layer->source_reference, 'received' => $layer->received_at?->format('d M Y'), 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p, $layer->selling_price))])->values()->all();
+    }
+
+    public function plan(Product $p, string $quantity, ?string $price, array &$reserved, bool $lock = false, ?Sale $editing = null, ?int $layerId = null): array
     {
         $this->ensureLegacy($p);
         $credits = $this->credits($editing, $p);
         $query = $p->stockLayers()->where('status', 'ACTIVE')->where(fn ($q) => $q->where('remaining_quantity', '>', 0)->when($credits, fn ($q) => $q->orWhereIn('id', array_keys($credits))))->orderBy('received_at')->orderBy('id');
+        if ($layerId !== null) {
+            $query->whereKey($layerId);
+        }
         if ($lock) {
             $query->lockForUpdate();
         }
@@ -154,7 +174,7 @@ class StockLayerService
         if (Money::compare($left, 0) > 0) {
             $this->fail('Only '.$available.' '.$p->unit->short_name.' of '.$p->name.' are available at '.Money::display($price).'. Choose another price for the remaining quantity.');
         }
-        $total = $hasLandedCost ? Money::sum(array_column($allocations,'cost_total')) : (string) $cost->toScale(2, RoundingMode::HALF_UP);
+        $total = $hasLandedCost ? Money::sum(array_column($allocations, 'cost_total')) : (string) $cost->toScale(2, RoundingMode::HALF_UP);
         $last = count($allocations) - 1;
         $allocations[$last]['cost_total'] = Money::add($allocations[$last]['cost_total'], Money::sub($total, Money::sum(array_column($allocations, 'cost_total'))));
 

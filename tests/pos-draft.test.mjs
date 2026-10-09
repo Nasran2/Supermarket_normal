@@ -69,6 +69,19 @@ test('malformed or incompatible saved carts are rejected before restoration', ()
   }
 });
 
+test('same-price stock rows persist independently and invalid stock selections are rejected', () => {
+  const store = draftStore(memory(), 'cart');
+  const items = [11,12].map((stock_layer_id) => ({...order.items[0],stock_price:'490.00',stock_layer_id,price:'490.00',unit_price:null}));
+  store.write({...order,items});
+  assert.deepEqual(store.read().items,items);
+  store.write({...order,items:[items[0],items[0]]});
+  assert.throws(()=>store.read());
+  for (const stock_layer_id of [-1,0,'11',1.5]) {
+    store.write({...order,items:[{...items[0],stock_layer_id}]});
+    assert.throws(()=>store.read());
+  }
+});
+
 test('bill discount persists alongside line adjustments and older drafts remain compatible', () => {
   const storage = memory();
   const store = draftStore(storage, 'cart');

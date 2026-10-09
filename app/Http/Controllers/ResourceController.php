@@ -9,6 +9,7 @@ use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductStockLayer;
 use App\Models\StockMovement;
+use App\Models\Supplier;
 use App\Models\Unit;
 use App\Models\UnitPreset;
 use App\Services\DefaultUnitService;
@@ -43,7 +44,7 @@ class ResourceController extends Controller
         if ($resource === 'customers') {
             $query->withDueBalances();
             if ($request->filled('balance')) {
-                $query->whereRaw('(opening_due + '.Customer::invoiceDueSql().') '.($request->input('balance') === 'due' ? '>' : '=').' 0');
+                $query->whereRaw('(opening_due - opening_due_paid + '.Customer::invoiceDueSql().') '.($request->input('balance') === 'due' ? '>' : '=').' 0');
             }
         }
         if ($resource === 'expenses') {
@@ -60,11 +61,18 @@ class ResourceController extends Controller
         if ($resource === 'products') {
             $query->with(['stockLayers' => fn ($q) => $q->available()]);
         }
+        if ($resource === 'suppliers') {
+            $query->withDueBalances();
+            $rows = $query->orderBy('name')->paginate(20)->withQueryString();
+            $stats = DB::query()->fromSub(Supplier::withDueBalances()->toBase(), 'supplier_balances')->selectRaw('COUNT(*) as total, SUM(outstanding_due) as total_due, SUM(unrecorded_count) as unrecorded_count')->first();
+
+            return view('suppliers.index', compact('rows', 'stats'));
+        }
         $rows = $query->orderByDesc('id')->paginate(20)->withQueryString();
 
         if ($resource === 'customers') {
             $balanceQuery = Customer::withDueBalances()->toBase();
-            $stats = DB::query()->fromSub($balanceQuery, 'customer_balances')->selectRaw('COUNT(*) as total, SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_count, SUM(CASE WHEN opening_due + invoice_due > 0 THEN 1 ELSE 0 END) as due_count, SUM(opening_due + invoice_due) as total_due')->first();
+            $stats = DB::query()->fromSub($balanceQuery, 'customer_balances')->selectRaw('COUNT(*) as total, SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_count, SUM(CASE WHEN opening_due - opening_due_paid + invoice_due > 0 THEN 1 ELSE 0 END) as due_count, SUM(opening_due - opening_due_paid + invoice_due) as total_due')->first();
 
             return view('customers.index', compact('resource', 'def', 'rows', 'stats'));
         }
@@ -104,6 +112,16 @@ class ResourceController extends Controller
     {
         $def = $this->definition($resource, 'view');
         $record = $def['model']::with($def['relations'] ?? [])->findOrFail($id);
+
+        if ($resource === 'suppliers') {
+            return app(SupplierAccountController::class)->show(request(), $record);
+        }
+        if ($resource === 'categories') {
+            $filters = request()->validate(['q' => 'nullable|string|max:150', 'active' => 'nullable|boolean']);
+            $products = $record->products()->with('unit')->when(! empty($filters['q']), fn ($q) => $q->where(fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%')->orWhere('barcode', 'like', '%'.$filters['q'].'%')))->when(isset($filters['active']), fn ($q) => $q->where('active', $filters['active']))->orderBy('name')->paginate(20)->withQueryString();
+
+            return view('categories.show', compact('record', 'products'));
+        }
 
         if ($resource === 'customers') {
             $record->loadCount(['sales as completed_sales_count' => fn ($query) => $query->where('status', 'ACTIVE')]);

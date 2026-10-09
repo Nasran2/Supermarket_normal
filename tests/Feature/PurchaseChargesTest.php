@@ -14,7 +14,9 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Services\ProfitLossService;
 use App\Services\RegisterService;
+use App\Services\SaleRevisionService;
 use App\Services\SaleService;
+use App\Services\StockLayerService;
 use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -149,22 +151,39 @@ class PurchaseChargesTest extends TestCase
 
     public function test_returns_and_adjustment_reversal_preserve_landed_cost_cents(): void
     {
-        $p=$this->purchase(['charge_treatment'=>'COST','charges'=>[['label'=>'Rounding freight','amount'=>'0.01']],'items'=>[['product_id'=>$this->product->id,'quantity'=>'3','cost'=>'100','selling_price'=>'130']]]);
-        $layer=$p->items->first()->stockLayers->first();
-        app(\App\Services\StockLayerService::class)->adjust($this->product->fresh(),'-1',$layer->id,'100','130','LANDED-ADJUST','STOCK ADJUSTMENT',$this->admin->id);
-        $this->assertSame('200.01',$layer->fresh()->stock_value);
-        app(\App\Services\StockLayerService::class)->reverseSource($this->product->fresh(),'LANDED-ADJUST','REVERSE STOCK ADJUSTMENT',$this->admin->id);
-        $this->assertSame('300.01',$layer->fresh()->stock_value);
-        $first=$this->sell($this->product,'1');
-        $second=$this->sell($this->product,'1');
-        $third=$this->sell($this->product,'1');
-        $this->assertSame('100.01',$second->cost_total);
-        $this->post(route('sales.returns.store',$second),['token'=>(string)Str::uuid(),'reason'=>'Return landed-cost stock','payment_method_id'=>$this->method('CASH'),'items'=>[['sale_item_id'=>$second->items->first()->id,'quantity'=>'1']]])->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertSame('100.01',$layer->fresh()->stock_value);
-        $resold=$this->sell($this->product,'1');
-        $this->assertSame('100.01',$resold->cost_total);
-        $this->assertSame('300.01',app(ProfitLossService::class)->calculate(today()->toDateString(),today()->toDateString())['cogs']);
-        $this->assertSame('0.00',$layer->fresh()->stock_value);
+        $p = $this->purchase(['charge_treatment' => 'COST', 'charges' => [['label' => 'Rounding freight', 'amount' => '0.01']], 'items' => [['product_id' => $this->product->id, 'quantity' => '3', 'cost' => '100', 'selling_price' => '130']]]);
+        $layer = $p->items->first()->stockLayers->first();
+        app(StockLayerService::class)->adjust($this->product->fresh(), '-1', $layer->id, '100', '130', 'LANDED-ADJUST', 'STOCK ADJUSTMENT', $this->admin->id);
+        $this->assertSame('200.01', $layer->fresh()->stock_value);
+        app(StockLayerService::class)->reverseSource($this->product->fresh(), 'LANDED-ADJUST', 'REVERSE STOCK ADJUSTMENT', $this->admin->id);
+        $this->assertSame('300.01', $layer->fresh()->stock_value);
+        $first = $this->sell($this->product, '1');
+        $second = $this->sell($this->product, '1');
+        $third = $this->sell($this->product, '1');
+        $this->assertSame('100.01', $second->cost_total);
+        $this->post(route('sales.returns.store', $second), ['token' => (string) Str::uuid(), 'reason' => 'Return landed-cost stock', 'payment_method_id' => $this->method('CASH'), 'items' => [['sale_item_id' => $second->items->first()->id, 'quantity' => '1']]])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('100.01', $layer->fresh()->stock_value);
+        $resold = $this->sell($this->product, '1');
+        $this->assertSame('100.01', $resold->cost_total);
+        $this->assertSame('300.01', app(ProfitLossService::class)->calculate(today()->toDateString(), today()->toDateString())['cogs']);
+        $this->assertSame('0.00', $layer->fresh()->stock_value);
+    }
+
+    public function test_invoice_revision_preserves_landed_cost_and_invoice_number(): void
+    {
+        $p = $this->purchase(['charge_treatment' => 'COST', 'charges' => [['label' => 'Freight', 'amount' => '0.01']], 'items' => [['product_id' => $this->product->id, 'quantity' => '3', 'cost' => '100', 'selling_price' => '130']]]);
+        $layer = $p->items->first()->stockLayers->first();
+        $sale = $this->sell($this->product, '1');
+        $invoice = $sale->invoice;
+        $data = ['version' => app(SaleRevisionService::class)->version($sale->fresh()), 'items' => [['product_id' => $this->product->id, 'quantity' => '2', 'unit_price' => '130']], 'payments' => [['payment_method_id' => $this->method('CASH'), 'amount' => '260']]];
+        $quote = $this->postJson(route('sales.edit.quote', $sale), $data)->assertOk()->json();
+        $data['payments'][0]['amount_paid'] = $quote['payments'][0]['customer_payable'];
+        $this->postJson(route('sales.revise', $sale), $data + ['checkout_token' => (string) Str::uuid(), 'quote_hash' => $quote['quote_hash']])->assertOk();
+        $this->assertSame($invoice, $sale->fresh()->invoice);
+        $this->assertSame('200.01', $sale->fresh()->cost_total);
+        $this->assertSame('100.00', $layer->fresh()->stock_value);
+        $rest = $this->sell($this->product, '1');
+        $this->assertSame('300.01', Money::add($sale->fresh()->cost_total, $rest->cost_total));
     }
 
     public function test_edit_and_void_reverse_automatic_charge_expenses(): void
@@ -205,8 +224,8 @@ class PurchaseChargesTest extends TestCase
         $this->assertSame('INV-'.today()->format('Ymd').'-00001', $one->invoice);
         $this->assertSame('INV-'.today()->format('Ymd').'-00002', $two->invoice);
         $this->travel(1)->days();
-        $three = $this->sell($this->product,'1');
-        $this->assertSame('INV-'.today()->format('Ymd').'-00001',$three->invoice);
-        $this->assertSame($one->invoice,$one->fresh()->invoice);
+        $three = $this->sell($this->product, '1');
+        $this->assertSame('INV-'.today()->format('Ymd').'-00001', $three->invoice);
+        $this->assertSame($one->invoice, $one->fresh()->invoice);
     }
 }

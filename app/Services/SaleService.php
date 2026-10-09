@@ -50,7 +50,7 @@ class SaleService
             $q = (string) $item['quantity'];
             $units = app(ProductUnitService::class);
             $baseQuantity = $units->resolve($p, $item['unit_id'] ?? null, $q)['base_stock_quantity'];
-            $allocation = app(StockLayerService::class)->plan($p, $baseQuantity, isset($item['stock_price']) ? (string) $item['stock_price'] : null, $reserved, $lock, $editing);
+            $allocation = app(StockLayerService::class)->plan($p, $baseQuantity, isset($item['stock_price']) ? (string) $item['stock_price'] : null, $reserved, $lock, $editing, isset($item['stock_layer_id']) ? (int) $item['stock_layer_id'] : null);
             $selected = $units->resolve($p, $item['unit_id'] ?? null, $q, $allocation['stock_price']);
             $adjustment = app(SaleLineService::class)->calculate($item, $selected['price']);
             $catalogTotal = Money::mul($selected['price'], $q);
