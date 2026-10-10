@@ -2,6 +2,7 @@
 @section('title', $kind==='sales'?'Sales Return':'Purchase Return')
 @section('content')
 <div class="page-heading"><div><span class="eyebrow">RETURNS & EXCHANGES</span><h1>{{ $kind==='sales'?'Sales Return':'Purchase Return' }}</h1>@if($draft)<span class="badge amber">Draft {{ $draft->reference }}</span>@endif<p>{{ $kind==='sales'?'Search the original bill to start a return.':'Search the original purchase to start a supplier return.' }}</p></div>@can($kind.'_returns.view')<a class="btn secondary" href="{{ route('returns.index',$kind) }}"><x-icon name="history"/>Return history</a>@endcan @if($original)<button class="btn secondary" id="return-save-draft" type="button">Save draft</button>@endif</div>
+@if($kind==='sales')@include('returns.mode-tabs',['withoutBill'=>false])@endif
 <ol class="return-stepper" aria-label="Return progress">@foreach(['Find bill','Select items','Resolution','Settlement'] as $label)<li data-step-indicator="{{ $loop->iteration }}" class="{{ $loop->first?'active':'' }}"><span>{{ $loop->iteration }}</span>{{ $label }}</li>@endforeach</ol>
 <div id="return-error" class="notice error" hidden role="alert"></div>
 <section data-return-step="1" class="card padded">

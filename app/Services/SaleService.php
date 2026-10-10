@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Register;
 use App\Models\Sale;
 use App\Models\SaleReturn;
+use App\Models\SaleReturnItem;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\Audit;
@@ -190,7 +191,7 @@ class SaleService
             if ($sale->status !== 'ACTIVE') {
                 throw ValidationException::withMessages(['reason' => 'This sale has already been voided.']);
             }
-            if ($sale->returns()->exists() || $sale->collections()->exists()) {
+            if (($sale->returns()->exists() || SaleReturnItem::whereIn('sale_item_id', $sale->items()->select('id'))->exists()) || $sale->collections()->exists()) {
                 throw ValidationException::withMessages(['reason' => 'This invoice has returns or due collections. Use item returns for corrections; it cannot be deleted or voided again.']);
             }
             $items = $sale->items()->orderBy('product_id')->get();

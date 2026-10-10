@@ -62,6 +62,8 @@ import {
   CalendarDays,
   BriefcaseBusiness,
   BookOpen,
+  Maximize,
+  MousePointer2,
   Calculator,
 } from 'lucide';
 const icons = {
@@ -126,6 +128,8 @@ const icons = {
   CalendarDays,
   BriefcaseBusiness,
   BookOpen,
+  Maximize,
+  MousePointer2,
   Calculator,
 };
 window.refreshIcons = () => createIcons({ icons });
@@ -194,14 +198,22 @@ if (navLinks) {
   if (savedScroll) {
     navLinks.scrollTop = parseInt(savedScroll, 10);
   }
-  navLinks.addEventListener('scroll', () => {
-    sessionStorage.setItem('twinsofte-nav-scroll', navLinks.scrollTop);
-  }, { passive: true });
+  navLinks.addEventListener(
+    'scroll',
+    () => {
+      sessionStorage.setItem('twinsofte-nav-scroll', navLinks.scrollTop);
+    },
+    { passive: true },
+  );
 }
 
 // Auto-select text in number inputs for easier overriding
 document.addEventListener('focusin', (e) => {
-  if (e.target.matches('input[type="number"], input[inputmode="decimal"], input[type="text"][inputmode="decimal"]')) {
+  if (
+    e.target.matches(
+      'input[type="number"], input[inputmode="decimal"], input[type="text"][inputmode="decimal"]',
+    )
+  ) {
     setTimeout(() => {
       e.target.select();
     }, 0);
@@ -209,12 +221,19 @@ document.addEventListener('focusin', (e) => {
 });
 
 // Prevent accidental number changes when scrolling with mouse/trackpad
-document.addEventListener('wheel', () => {
-  if (document.activeElement && document.activeElement.type === 'number') {
-    document.activeElement.blur();
-  }
-}, { passive: true });
+document.addEventListener(
+  'wheel',
+  () => {
+    if (document.activeElement && document.activeElement.type === 'number') {
+      document.activeElement.blur();
+    }
+  },
+  { passive: true },
+);
 
 import './module-editor.js';
 
 import './returns.js';
+
+import './no-receipt-returns.js';
+import './documentation.js';

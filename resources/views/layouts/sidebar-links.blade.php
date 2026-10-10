@@ -14,3 +14,4 @@
 @endforeach
 @endif
 @endforeach
+<a href="{{ route('documentation.index') }}" class="nav-link {{ request()->routeIs('documentation.*')?'active':'' }}" title="Documentation" @if(request()->routeIs('documentation.*'))aria-current="page"@endif><x-icon name="book-open"/><span>Documentation</span></a>

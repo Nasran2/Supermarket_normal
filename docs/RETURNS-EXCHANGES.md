@@ -72,3 +72,7 @@ For another installation run `php artisan migrate --force`, `npm run build`, and
 The browser result is recorded in [RETURNS-BROWSER-QA.json](RETURNS-BROWSER-QA.json). Its reconciled values are customer due 190.00, supplier due 600.00, sellable soap stock 27.000, supplier-pending stock 1.000, historical write-off 110.00, net profit 70.00 and expected cash 9,540.00.
 
 Desktop/mobile screenshots are saved in `docs/screenshots/`. Browser console checks reported no errors. The verification/bootstrap helpers refuse to run outside the specifically named disposable SQLite QA database. Do not point automated `RefreshDatabase` tests at the business database.
+
+## No-receipt sales returns
+
+A second **Return Without Bill** method is now available; the existing With Bill workflow remains the default. See [no-receipt workflow, policies, accounting and verification](NO-RECEIPT-RETURNS.md).

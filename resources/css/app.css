@@ -1,4 +1,5 @@
 @import './returns.css';
+@import './documentation.css';
 @import 'tailwindcss';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../views/**/*.blade.php';
@@ -2013,11 +2014,17 @@ body.nav-collapsed .nav-link {
 body.pos-workspace {
   overflow: hidden;
   height: 100vh;
+  height: 100dvh;
 }
 .pos-workspace .app-shell {
   margin-left: 0;
   height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   overflow: hidden;
+}
+.pos-workspace .topbar {
+  flex-shrink: 0;
 }
 .pos-workspace .sidebar {
   width: 260px;
@@ -2058,7 +2065,14 @@ body.pos-workspace {
   padding: 22px 26px 26px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
+}
+.pos-workspace #pos {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 .pos-workspace .pos-heading {
   margin-bottom: 18px;
@@ -2078,9 +2092,11 @@ body.pos-workspace {
 }
 .pos-workspace .pos-grid {
   grid-template-columns: minmax(0, 1fr) 370px;
+  grid-template-rows: minmax(0, 1fr);
   gap: 22px;
   align-items: stretch;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 .pos-workspace .cart-panel {
@@ -2135,6 +2151,7 @@ body.pos-workspace {
 }
 .pos-workspace .pos-catalog {
   min-width: 0;
+  min-height: 0;
   height: 100%;
   overflow-y: auto;
   max-height: none;
@@ -2530,9 +2547,14 @@ body.pos-workspace {
 @media (max-width: 767px) {
   .pos-workspace .pos-grid {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: max-content max-content;
+    align-content: start;
+    overflow-y: auto;
   }
   .pos-workspace .pos-catalog {
     order: -1;
+    height: auto;
+    overflow: visible;
   }
   .pos-workspace .product-grid {
     grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
@@ -2632,9 +2654,10 @@ body.pos-workspace {
   min-height: 44px;
 }
 .pos-workspace .cart-panel {
-  min-height: 520px;
-  height: calc(100dvh - 170px);
+  min-height: 0;
+  height: 100%;
   max-height: none;
+  position: static;
 }
 @media (max-width: 767px) {
   .split-payment-dialog {

@@ -19,7 +19,7 @@ class StockMovement extends Model
         }
 
         return $query->where(fn ($q) => $q->whereDoesntHave('sale')->orWhereHas('sale', fn ($s) => $s->visibleTo()))
-            ->where(fn ($q) => $q->whereDoesntHave('saleReturn')->orWhereHas('saleReturn.sale', fn ($s) => $s->visibleTo()));
+            ->where(fn ($q) => $q->whereDoesntHave('saleReturn')->orWhereHas('saleReturn', fn ($s) => $s->visibleTo()));
     }
 
     public function product()

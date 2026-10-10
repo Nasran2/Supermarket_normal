@@ -2,13 +2,33 @@
 
 namespace App\Models;
 
+use App\Support\SalesVisibility;
 use Illuminate\Database\Eloquent\Model;
 
 class SaleReturn extends Model
 {
     protected $guarded = ['id'];
 
-    protected $casts = ['draft_payload' => 'array', 'amount' => 'decimal:2', 'cost_total' => 'decimal:2', 'due_reduction' => 'decimal:2', 'refund_amount' => 'decimal:2', 'replacement_value' => 'decimal:2', 'additional_payment' => 'decimal:2', 'customer_due_applied' => 'decimal:2', 'fee_refund' => 'decimal:2', 'returned_at' => 'datetime', 'cancelled_at' => 'datetime'];
+    protected $casts = ['approved_at' => 'datetime', 'verified_amount' => 'decimal:2', 'historical_cost_total' => 'decimal:2', 'estimated_cost_total' => 'decimal:2', 'unverified_amount' => 'decimal:2', 'draft_payload' => 'array', 'amount' => 'decimal:2', 'cost_total' => 'decimal:2', 'due_reduction' => 'decimal:2', 'refund_amount' => 'decimal:2', 'replacement_value' => 'decimal:2', 'additional_payment' => 'decimal:2', 'customer_due_applied' => 'decimal:2', 'fee_refund' => 'decimal:2', 'returned_at' => 'datetime', 'cancelled_at' => 'datetime'];
+
+    public function scopeVisibleTo($query, ?User $user = null)
+    {
+        return $query->where(function ($q) use ($user) {
+            $q->whereHas('sale', fn ($s) => $s->visibleTo($user))
+                ->orWhere(function ($q) use ($user) {
+                    $q->where('return_type', 'NO_RECEIPT');
+                    SalesVisibility::apply($q, 'sale_returns.user_id', $user);
+                    $q->whereDoesntHave('items.item.sale', fn ($s) => $s->whereNotIn('sales.id', Sale::visibleTo($user)->select('id')));
+                });
+        });
+    }
+
+    public function getVerificationLabelAttribute(): string
+    {
+        return match ($this->verification_status) {
+            'VERIFIED' => 'Verified Return', 'PARTIALLY_VERIFIED' => 'Partially Verified', default => 'No Receipt'
+        };
+    }
 
     public function replacement()
     {

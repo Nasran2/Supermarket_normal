@@ -86,7 +86,7 @@ class ReturnSettlementService
         if (! $s->get('return_apply_customer_due', true)) {
             self::fail('Applying return credit to customer due is disabled.');
         }
-        if ($document->sale->customer_id !== $customerId) {
+        if (($document->sale?->customer_id ?? $document->customer_id) !== $customerId) {
             abort_unless($user->hasPermission('sales_returns.allocate_other_customer'), 403);
             if (! $s->get('return_customer_search', true)) {
                 self::fail('Customer search for return credit is disabled.');

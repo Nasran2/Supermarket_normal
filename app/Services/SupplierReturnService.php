@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\SaleReturn;
 use App\Models\Supplier;
 use App\Models\SupplierReturn;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\Money;
-use App\Support\SalesVisibility;
 use Illuminate\Support\Facades\DB;
 
 class SupplierReturnService
@@ -17,7 +17,7 @@ class SupplierReturnService
         abort_unless($user->hasPermission('supplier_returns.manage'), 403);
         DB::transaction(function () use ($original, $data, $user) {
             $r = SupplierReturn::whereKey($original->id)->lockForUpdate()->firstOrFail();
-            abort_unless(SalesVisibility::canSee($r->saleReturn->sale, $user), 403);
+            abort_unless(SaleReturn::visibleTo($user)->whereKey($r->sale_return_id)->exists(), 403);
             Supplier::whereKey($r->supplier_id)->lockForUpdate()->firstOrFail();
             if ($data['action'] === 'SEND') {
                 if ($r->status !== 'PENDING') {

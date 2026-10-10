@@ -111,11 +111,11 @@ class StockReturnService
     public function reverse($document, bool $sale, int $user): void
     {
         foreach ($document->items as $item) {
-            $product = Product::with('unit')->whereKey($item->item->product_id)->lockForUpdate()->firstOrFail();
+            $product = Product::with('unit')->whereKey($sale ? ($item->product_id ?? $item->item->product_id) : $item->item->product_id)->lockForUpdate()->firstOrFail();
             $moves = [];
             foreach ($item->allocations as $row) {
-                $layer = ProductStockLayer::whereKey($row->stock_layer_id)->lockForUpdate()->firstOrFail();
-                if ($sale) {
+                $layer = $row->stock_layer_id ? ProductStockLayer::whereKey($row->stock_layer_id)->lockForUpdate()->firstOrFail() : null;
+                if ($sale && $row->sale_stock_allocation_id) {
                     $a = SaleStockAllocation::whereKey($row->sale_stock_allocation_id)->lockForUpdate()->firstOrFail();
                     $a->update(['returned_quantity' => Money::quantity($a->returned_quantity, '-'.$row->quantity)]);
                 }

@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\ReturnAccountAllocation;
 use App\Models\Sale;
 use App\Models\SaleReturn;
+use App\Models\SaleReturnItem;
 use App\Models\Supplier;
 use App\Models\SupplierReturn;
 use App\Models\User;
@@ -25,7 +26,7 @@ class SalesReturnService
 {
     public function __construct(private StockReturnService $stock, private ReturnSettlementService $settlement) {}
 
-    public function quote(Sale $sale, array $data, User $user, bool $lock = false): array
+    public function quote(Sale $sale, array $data, User $user, bool $lock = false, bool $historicalPreviewOnly = false): array
     {
         abort_unless(SalesVisibility::canSee($sale, $user), 403);
         $this->settlement->guard('sales', $data, $user, '0');
@@ -94,7 +95,7 @@ class SalesReturnService
                 }
             }
             unset($a);
-            $lines[] = ['sale_item_id' => $item->id, 'quantity' => $qty, 'base_quantity' => $base, 'amount' => $amount, 'cost_total' => Money::sum(array_column($allocations, 'cost_total')), 'stock_action' => $action, 'reason' => $input['reason'] ?? $data['reason'], 'name' => $item->name, 'unit' => $item->unit, 'allocations' => $allocations];
+            $lines[] = ['sale_item_id' => $item->id, 'product_id' => $item->product_id, 'unit_id' => $item->unit_id, 'quantity' => $qty, 'base_quantity' => $base, 'amount' => $amount, 'cost_total' => Money::sum(array_column($allocations, 'cost_total')), 'stock_action' => $action, 'reason' => $input['reason'] ?? $data['reason'], 'name' => $item->name, 'unit' => $item->unit, 'allocations' => $allocations];
         }
         if (! $lines) {
             ReturnSettlementService::fail('Enter a positive return quantity for at least one product.');
@@ -103,7 +104,7 @@ class SalesReturnService
         $settings = app(SettingsService::class);
         $fee = '0.00';
         $policy = $settings->get('return_fee_policy', 'NONE');
-        $priorFees = Money::sum($sale->returns->pluck('fee_refund'));
+        $priorFees = Money::add(Money::sum($sale->returns->pluck('fee_refund')), (string) SaleReturnItem::whereIn('sale_item_id', $sale->items()->select('id'))->whereHas('return', fn ($q) => $q->completed()->where('return_type', 'NO_RECEIPT'))->sum('fee_refund'));
         if ($policy === 'FULL') {
             $fee = Money::sub($sale->customer_fees, $priorFees);
         }
@@ -162,6 +163,9 @@ class SalesReturnService
             ReturnSettlementService::fail('Money back cannot include replacement products.');
         }
         $difference = $this->settlement->difference(Money::add($amount, $fee), $sale->due_balance, $replacementQuote['sale_amount'] ?? '0.00');
+        if ($historicalPreviewOnly) {
+            return $difference + ['lines' => $lines, 'amount' => $amount, 'fee_refund' => $fee, 'cost_total' => Money::sum(array_column($lines, 'cost_total'))];
+        }
         $apply = Money::round((string) ($data['apply_due'] ?? 0));
         if (Money::compare($apply, 0) < 0 || Money::compare($apply, $difference['owed']) > 0) {
             ReturnSettlementService::fail('Due allocation exceeds the available credit.');
@@ -244,6 +248,7 @@ class SalesReturnService
             }
             $register = app(RegisterService::class)->current($user->id, true);
             $fields = ['sale_id' => $sale->id, 'customer_id' => $sale->customer_id, 'register_id' => $register?->id, 'user_id' => $user->id, 'token' => $data['token'], 'reference' => $existing?->reference ?? app(DocumentNumberService::class)->next('SALES_RETURN', now()), 'reason' => $data['reason'] ?? '', 'notes' => $data['notes'] ?? null, 'amount' => $q['amount'], 'fee_refund' => $q['fee_refund'], 'cost_total' => $q['cost_total'], 'due_reduction' => $q['due_reduction'], 'refund_amount' => $q['refund_amount'], 'customer_due_applied' => $q['apply_due'], 'replacement_value' => $q['replacement_value'], 'resolution' => $q['resolution'], 'returned_at' => now(), 'approved_by' => $user->hasPermission('sales_returns.approve') ? $user->id : null];
+            $fields += ['return_type' => 'INVOICE', 'verification_status' => 'VERIFIED', 'additional_payment' => '0.00', 'verified_amount' => $q['amount'], 'historical_cost_total' => $q['cost_total'], 'approved_at' => $user->hasPermission('sales_returns.approve') ? now() : null];
             $fields['status'] = 'COMPLETED';
             $fields['draft_payload'] = null;
             if ($existing) {
@@ -253,7 +258,7 @@ class SalesReturnService
                 $r = SaleReturn::create($fields);
             }
             foreach ($q['lines'] as $line) {
-                $item = $r->items()->create(array_diff_key($line, ['name' => true, 'unit' => true, 'allocations' => true]));
+                $item = $r->items()->create(array_diff_key($line, ['allocations' => true]));
                 $this->stock->applySale($item, $line['allocations'], $line['stock_action'], $r->reference, $user->id);
                 if ($line['stock_action'] === 'WRITEOFF') {
                     $cat = ExpenseCategory::firstOrCreate(['name' => 'Sales Return Write-Off'], ['system' => true]);
@@ -268,39 +273,49 @@ class SalesReturnService
                     }
                 }
             }
-            if ($q['replacement_quote']) {
-                $exchange = app(SaleService::class)->exchange($q['replacement_quote'], $sale->customer_id, $user, (string) Str::uuid(), $r->reference);
-                $r->update(['replacement_sale_id' => $exchange->id]);
-                $credit = ReturnSettlementService::minimum($q['available_credit'], $q['replacement_value']);
-                if (Money::compare($credit, 0) > 0) {
-                    ReturnAccountAllocation::create(['sale_return_id' => $r->id, 'sale_id' => $exchange->id, 'customer_id' => $sale->customer_id, 'kind' => 'EXCHANGE_CREDIT', 'amount' => $credit]);
-                }
-                if (Money::compare($q['must_pay'], 0) > 0 && ! ($data['add_to_due'] ?? false)) {
-                    $event = $this->settlement->money($r, 'sale_return', 'EXCHANGE_PAYMENT', $q['must_pay'], $data['payment_method_id'] ?? null, $user, false);
-                    $method = PaymentMethod::findOrFail($event->payment_method_id);
-                    $charge = app(PaymentChargeService::class)->calculateCharge($method, $q['must_pay'], true, $q['replacement_value']);
-                    $payment = $exchange->payments()->create(['payment_method_id' => $method->id, 'method_name' => $method->name, 'method_type' => $method->type, 'sale_amount' => $q['must_pay'], 'processing_charge' => $charge['processing_charge'], 'charge_type' => $charge['charge_type'], 'charge_value' => $charge['charge_value'], 'charge_bearer' => $charge['charge_bearer'], 'customer_payable' => $charge['customer_payable'], 'amount_paid' => $charge['customer_payable'], 'change' => '0.00', 'reference' => $r->reference]);
-                    $exchange->update(['processing_charge' => $charge['processing_charge'], 'customer_payable' => Money::add($q['replacement_value'], Money::sub($charge['customer_payable'], $q['must_pay']))]);
-                    $event->update(['amount' => $charge['customer_payable'], 'processing_charge' => $charge['processing_charge']]);
-                    app(PaymentChargeService::class)->createProcessingExpense($payment);
-                    $r->update(['additional_payment' => $charge['customer_payable']]);
-                }
-            }
-            if (Money::compare($q['apply_due'], 0) > 0) {
-                $this->settlement->applyCustomer($r, (int) ($data['credit_customer_id'] ?? $sale->customer_id), $q['apply_due'], $user);
-            }
-            if (Money::compare($q['refund_amount'], 0) > 0) {
-                $event = $this->settlement->money($r, 'sale_return', 'SALES_RETURN_REFUND', '-'.$q['refund_amount'], $data['payment_method_id'] ?? null, $user, false);
-                $r->update(['payment_method_id' => $event->payment_method_id, 'method_name' => $event->method_name, 'method_type' => $event->method_type, 'register_id' => $event->register_id]);
-            }
+            $this->settleDocument($r, $q, $data, $user, $sale->customer_id);
             Audit::record('sales_return.complete', $r, [], $r->load('items.allocations', 'settlements', 'allocations', 'supplierReturns')->toArray());
 
             return $r;
         }, 3);
     }
 
+    public function settleDocument(SaleReturn $r, array $q, array $data, User $user, ?int $customerId): void
+    {
+        if ($q['replacement_quote']) {
+            $exchange = app(SaleService::class)->exchange($q['replacement_quote'], $customerId, $user, (string) Str::uuid(), $r->reference);
+            $r->update(['replacement_sale_id' => $exchange->id]);
+            $credit = ReturnSettlementService::minimum($q['available_credit'], $q['replacement_value']);
+            if (Money::compare($credit, 0) > 0) {
+                ReturnAccountAllocation::create(['sale_return_id' => $r->id, 'sale_id' => $exchange->id, 'customer_id' => $customerId, 'kind' => 'EXCHANGE_CREDIT', 'amount' => $credit]);
+            }
+            if (Money::compare($q['must_pay'], 0) > 0 && ! ($data['add_to_due'] ?? false)) {
+                $event = $this->settlement->money($r, 'sale_return', 'EXCHANGE_PAYMENT', $q['must_pay'], $data['payment_method_id'] ?? null, $user, false);
+                $method = PaymentMethod::findOrFail($event->payment_method_id);
+                $charge = app(PaymentChargeService::class)->calculateCharge($method, $q['must_pay'], true, $q['replacement_value']);
+                $payment = $exchange->payments()->create(['payment_method_id' => $method->id, 'method_name' => $method->name, 'method_type' => $method->type, 'sale_amount' => $q['must_pay'], 'processing_charge' => $charge['processing_charge'], 'charge_type' => $charge['charge_type'], 'charge_value' => $charge['charge_value'], 'charge_bearer' => $charge['charge_bearer'], 'customer_payable' => $charge['customer_payable'], 'amount_paid' => $charge['customer_payable'], 'change' => '0.00', 'reference' => $r->reference]);
+                $exchange->update(['processing_charge' => $charge['processing_charge'], 'customer_payable' => Money::add($q['replacement_value'], Money::sub($charge['customer_payable'], $q['must_pay']))]);
+                $event->update(['amount' => $charge['customer_payable'], 'processing_charge' => $charge['processing_charge']]);
+                app(PaymentChargeService::class)->createProcessingExpense($payment);
+                $r->update(['additional_payment' => $charge['customer_payable']]);
+            }
+        }
+        if (Money::compare($q['apply_due'], 0) > 0) {
+            $this->settlement->applyCustomer($r, (int) ($data['credit_customer_id'] ?? $customerId), $q['apply_due'], $user);
+        }
+        if (Money::compare($q['refund_amount'], 0) > 0) {
+            $event = $this->settlement->money($r, 'sale_return', ($r->return_type === 'NO_RECEIPT' ? 'NO_RECEIPT_SALES_RETURN_REFUND' : 'SALES_RETURN_REFUND'), '-'.$q['refund_amount'], $data['payment_method_id'] ?? null, $user, false);
+            $r->update(['payment_method_id' => $event->payment_method_id, 'method_name' => $event->method_name, 'method_type' => $event->method_type, 'register_id' => $event->register_id]);
+        }
+    }
+
     public function cancel(SaleReturn $original, string $reason, User $user): void
     {
+        if ($original->return_type === 'NO_RECEIPT') {
+            app(NoReceiptSalesReturnService::class)->cancel($original, $reason, $user);
+
+            return;
+        }
         abort_unless($user->hasPermission('sales_returns.cancel'), 403);
         DB::transaction(function () use ($original, $reason, $user) {
             $r = SaleReturn::whereKey($original->id)->lockForUpdate()->firstOrFail();

@@ -44,7 +44,7 @@ class CustomerLedgerService
             }
         }
         foreach (ReturnAccountAllocation::where('customer_id', $customer->id)->where(fn ($q) => $q->whereNull('sale_id')->orWhereHas('sale', fn ($q) => $q->visibleTo()))->with('saleReturn')->get() as $a) {
-            $add($a->created_at, 'Sales Return Credit', ($a->saleReturn?->reference ?? 'Return').' · '.str_replace('_', ' ', $a->kind).' · Customer #'.$customer->id, '0.00', $a->amount);
+            $add($a->created_at, $a->saleReturn?->return_type === 'NO_RECEIPT' ? 'No-receipt return credit' : 'Sales Return Credit', ($a->saleReturn?->reference ?? 'Return').' · '.str_replace('_', ' ', $a->kind).' · Customer #'.$customer->id, '0.00', $a->amount);
             if ($a->status === 'REVERSED') {
                 $add($a->reversed_at, 'Return Credit Reversal', $a->saleReturn?->reference ?? 'Return', $a->amount, '0.00');
             }

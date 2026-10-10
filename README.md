@@ -142,3 +142,9 @@ HR includes staff intake/exit/rehire and optional user accounts, departments/job
 ## Returns and exchanges
 
 Sales and purchase returns now use four-step wizards with historical stock allocations, due-first settlement, linked exchange bills, write-offs and supplier claims. Settings, permissions, cancellation reversals, 80mm credit notes and account/register/report integration are included. See [workflow, safeguards and verification](docs/RETURNS-EXCHANGES.md).
+
+Sales Return also supports **Return Without Bill**, with optional customer/history matching, mixed verified and unverified items, explicit credit prices and estimated cost sources, independent stock actions, exchanges and due/refund settlement. With Bill remains the default. See [policies, accounting and verification](docs/NO-RECEIPT-RETURNS.md).
+
+## Staff documentation
+
+**Documentation**, below Settings in the sidebar, opens a searchable staff guide with 21 topics and 99 plain-language steps. Each topic has a separate page with walkthroughs made from real application screens, zoomed control highlights, pause/replay and individual step controls, a larger viewer, printable instructions, and permission-aware links to the relevant screen. Examples use fictional data and never create transactions. Content is maintained in `config/documentation.php`; frame sequences and measured control coordinates live in `config/documentation-walkthroughs.php` and `config/documentation-screens.json`. PNG captures in `public/help-assets/screens` use only an isolated fictional store. Refresh the relevant captures and coordinates when a screen layout changes. Animations run locally without video downloads or external services. Reduced-motion preferences disable autoplay and visual motion. All signed-in active staff can read guides even when they cannot access Settings.

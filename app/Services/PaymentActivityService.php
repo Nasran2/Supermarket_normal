@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\PaymentMethod;
+use App\Models\SaleReturn;
 use App\Support\Money;
 use App\Support\SalesVisibility;
 use Carbon\Carbon;
@@ -20,9 +21,9 @@ class PaymentActivityService
         $collections = DB::table('sale_collections as p')->join('sales as s', 's.id', '=', 'p.sale_id')
             ->leftJoin('customers as c', 'c.id', '=', 's.customer_id')->join('users as u', 'u.id', '=', 'p.user_id')
             ->whereIn('s.status', ['ACTIVE', 'RETURN_CANCELLED'])->selectRaw("p.id as entry_id, 'Due collection' as kind, p.collected_at as occurred_at, p.payment_method_id, p.method_name, s.id as sale_id, s.invoice as bill, COALESCE(c.name, 'Walk-in customer') as customer, c.id as customer_id, u.name as cashier, 0 as allocated, p.amount_paid as received, p.change as change_amount, p.amount as collected, 0 as refunded, 0 as charges, 0 as customer_charges, 0 as business_charges, p.reference");
-        $refunds = DB::table('sale_returns as p')->join('sales as s', 's.id', '=', 'p.sale_id')
-            ->leftJoin('customers as c', 'c.id', '=', 's.customer_id')->join('users as u', 'u.id', '=', 'p.user_id')
-            ->whereIn('s.status', ['ACTIVE', 'RETURN_CANCELLED'])->where('p.refund_amount', '>', 0)->selectRaw("p.id as entry_id, 'Refund' as kind, p.returned_at as occurred_at, p.payment_method_id, p.method_name, s.id as sale_id, s.invoice as bill, COALESCE(c.name, 'Walk-in customer') as customer, c.id as customer_id, u.name as cashier, 0 as allocated, 0 as received, 0 as change_amount, 0 as collected, p.refund_amount as refunded, 0 as charges, 0 as customer_charges, 0 as business_charges, p.reference");
+        $refunds = DB::table('sale_returns as p')->leftJoin('sales as s', 's.id', '=', 'p.sale_id')
+            ->leftJoin('customers as c', 'c.id', '=', DB::raw('COALESCE(p.customer_id,s.customer_id)'))->join('users as u', 'u.id', '=', 'p.user_id')
+            ->whereIn('p.id', SaleReturn::visibleTo()->select('id'))->where('p.refund_amount', '>', 0)->selectRaw("p.id as entry_id, CASE WHEN p.return_type='NO_RECEIPT' THEN 'No receipt refund' ELSE 'Refund' END as kind, p.returned_at as occurred_at, p.payment_method_id, p.method_name, s.id as sale_id, COALESCE(s.invoice,p.reference) as bill, COALESCE(c.name, 'Walk-in customer') as customer, c.id as customer_id, u.name as cashier, 0 as allocated, 0 as received, 0 as change_amount, 0 as collected, p.refund_amount as refunded, 0 as charges, 0 as customer_charges, 0 as business_charges, p.reference");
         // Invoice allocations already appear in sale_collections; include only the remainder here.
         $allocations = DB::table('customer_payment_allocations')->where('type', 'INVOICE')
             ->selectRaw('customer_payment_id, SUM(amount) as invoice_amount')->groupBy('customer_payment_id');
@@ -31,13 +32,13 @@ class PaymentActivityService
             ->leftJoinSub($allocations, 'a', 'a.customer_payment_id', '=', 'p.id')
             ->whereRaw('p.amount - COALESCE(a.invoice_amount, 0) > 0')
             ->selectRaw("p.id as entry_id, 'Account payment' as kind, p.payment_date as occurred_at, p.payment_method_id, m.name as method_name, NULL as sale_id, NULL as bill, c.name as customer, c.id as customer_id, u.name as cashier, 0 as allocated, p.amount - COALESCE(a.invoice_amount, 0) as received, 0 as change_amount, p.amount - COALESCE(a.invoice_amount, 0) as collected, 0 as refunded, 0 as charges, 0 as customer_charges, 0 as business_charges, p.notes as reference");
-        foreach ([$checkouts, $collections, $refunds] as $entryQuery) {
+        foreach ([$checkouts, $collections] as $entryQuery) {
             SalesVisibility::apply($entryQuery, 's.user_id');
         }
         SalesVisibility::apply($accounts, 'p.user_id');
-        $returnEvents = DB::table('return_settlements as p')->leftJoin('sale_returns as r', 'r.id', '=', 'p.sale_return_id')->leftJoin('sales as s', 's.id', '=', 'r.sale_id')->leftJoin('purchase_returns as pr', 'pr.id', '=', 'p.purchase_return_id')->leftJoin('supplier_returns as sr', 'sr.id', '=', 'p.supplier_return_id')->leftJoin('customers as c', 'c.id', '=', 's.customer_id')->join('users as u', 'u.id', '=', 'p.user_id')
+        $returnEvents = DB::table('return_settlements as p')->leftJoin('sale_returns as r', 'r.id', '=', 'p.sale_return_id')->leftJoin('sales as s', 's.id', '=', 'r.sale_id')->leftJoin('purchase_returns as pr', 'pr.id', '=', 'p.purchase_return_id')->leftJoin('supplier_returns as sr', 'sr.id', '=', 'p.supplier_return_id')->leftJoin('customers as c', 'c.id', '=', 'r.customer_id')->join('users as u', 'u.id', '=', 'p.user_id')
             ->where(fn ($q) => $q->whereIn('p.kind', ['PURCHASE_RETURN_REFUND', 'PURCHASE_RETURN_PAYMENT', 'SUPPLIER_RETURN_REFUND', 'REVERSAL']))
-            ->where(fn ($q) => $q->whereNull('s.id')->orWhereRaw('('.SalesVisibility::ownerSql('s.user_id').')'))
+            ->where(fn ($q) => $q->whereNull('p.sale_return_id')->orWhereIn('r.id', SaleReturn::visibleTo()->select('id')))
             ->selectRaw("p.id as entry_id, p.kind as kind, p.created_at as occurred_at, p.payment_method_id, p.method_name, s.id as sale_id, COALESCE(r.reference,pr.reference,sr.reference) as bill, COALESCE(c.name,'Supplier') as customer,c.id as customer_id,u.name as cashier,0 as allocated,CASE WHEN p.amount>0 THEN p.amount ELSE 0 END as received,0 as change_amount,CASE WHEN p.amount>0 THEN p.amount ELSE 0 END as collected,CASE WHEN p.amount<0 THEN -p.amount ELSE 0 END as refunded,0 as charges,0 as customer_charges,0 as business_charges,COALESCE(r.reference,pr.reference,sr.reference) as reference");
         $events = $checkouts->unionAll($collections)->unionAll($refunds)->unionAll($accounts)->unionAll($returnEvents);
 

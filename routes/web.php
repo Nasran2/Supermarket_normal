@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocumentationController;
 use App\Http\Controllers\Hr\PayrollController;
 use App\Http\Controllers\Hr\StaffController;
 use App\Http\Controllers\Hr\WorkforceController;
@@ -29,6 +30,8 @@ Route::middleware('guest')->group(function () {
 });
 Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::get('/documentation', [DocumentationController::class, 'index'])->name('documentation.index');
+    Route::get('/documentation/{slug}', [DocumentationController::class, 'show'])->name('documentation.show');
     Route::get('/profile', [AuthController::class, 'profile'])->name('profile');
     Route::put('/profile', [AuthController::class, 'updateProfile'])->name('profile.update');
     Route::get('/', [DashboardController::class, 'index'])->middleware('permission:dashboard.view')->name('dashboard');
@@ -48,6 +51,9 @@ Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(functi
             Route::get('/', [TransactionReturnController::class, 'index'])->name('index');
             Route::get('/create', [TransactionReturnController::class, 'create'])->name('create');
             Route::get('/products', [TransactionReturnController::class, 'products'])->name('products');
+            Route::get('/no-receipt/products', [TransactionReturnController::class, 'noReceiptProducts'])->name('no-receipt.products');
+            Route::get('/no-receipt/customers', [TransactionReturnController::class, 'noReceiptCustomers'])->name('no-receipt.customers');
+            Route::get('/no-receipt/matches', [TransactionReturnController::class, 'noReceiptMatches'])->name('no-receipt.matches');
             Route::post('/draft', [TransactionReturnController::class, 'draft'])->name('draft');
             Route::post('/quote', [TransactionReturnController::class, 'quote'])->name('quote');
             Route::post('/', [TransactionReturnController::class, 'store'])->name('store');

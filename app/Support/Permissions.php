@@ -95,6 +95,9 @@ class Permissions
                 $add($kind.'_returns.'.$action, ucfirst($kind).' returns', ucfirst(str_replace('_', ' ', $action)), 'Authorize '.str_replace('_', ' ', $action).' for '.$kind.' returns.', $legacy);
             }
         }
+        foreach (['no_receipt', 'no_receipt_cash_refund', 'no_receipt_price_override', 'override_credit_price', 'no_receipt_supplier', 'no_receipt_approve'] as $action) {
+            $add('sales_returns.'.$action, 'Sales returns · no receipt', ucfirst(str_replace('_', ' ', $action)), 'Authorize '.str_replace('_', ' ', $action).' without an original receipt.', []);
+        }
         $add('supplier_returns.view', 'Supplier returns', 'View', 'View pending non-sellable returns.');
         $add('supplier_returns.manage', 'Supplier returns', 'Manage', 'Send and settle supplier returns.');
         $add('returns.view_cost', 'Returns', 'View historical costs', 'See return costs and allocation costs.');

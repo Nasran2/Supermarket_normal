@@ -8,15 +8,18 @@ use App\Models\Customer;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Purchase;
+use App\Models\PurchaseItem;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Models\Sale;
 use App\Models\SaleReturn;
+use App\Models\SaleReturnItem;
 use App\Models\Supplier;
 use App\Models\SupplierReturn;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\DocumentNumberService;
+use App\Services\NoReceiptSalesReturnService;
 use App\Services\PaymentChargeService;
 use App\Services\ProductUnitService;
 use App\Services\PurchaseReturnService;
@@ -59,14 +62,14 @@ class TransactionReturnController extends Controller
     {
         $this->permission($kind, 'view');
         $request->merge(['from' => $request->input('from', today()->startOfMonth()->toDateString()), 'to' => $request->input('to', today()->toDateString())]);
-        $filters = $request->validate(['from' => 'nullable|date', 'to' => 'nullable|date|after_or_equal:from', 'q' => 'nullable|string|max:150', 'status' => 'nullable|in:DRAFT,COMPLETED,CANCELLED', 'reason' => 'nullable|string|max:1000', 'stock_action' => 'nullable|in:RESTOCK,WRITEOFF,SUPPLIER', 'resolution' => 'nullable|in:MONEY,SAME,OTHER', 'customer_id' => 'nullable|integer', 'supplier_id' => 'nullable|integer', 'user_id' => 'nullable|integer', 'product_id' => 'nullable|integer', 'payment_method_id' => 'nullable|integer']);
-        $query = ($kind === 'sales' ? SaleReturn::query()->whereHas('sale', fn ($q) => $q->visibleTo())->with('sale.customer') : PurchaseReturn::query()->with('purchase.supplier'))->with('user', 'replacement');
+        $filters = $request->validate(['from' => 'nullable|date', 'to' => 'nullable|date|after_or_equal:from', 'q' => 'nullable|string|max:150', 'status' => 'nullable|in:DRAFT,COMPLETED,CANCELLED', 'reason' => 'nullable|string|max:1000', 'stock_action' => 'nullable|in:RESTOCK,WRITEOFF,SUPPLIER', 'resolution' => 'nullable|in:MONEY,SAME,OTHER', 'customer_id' => 'nullable|integer', 'supplier_id' => 'nullable|integer', 'user_id' => 'nullable|integer', 'product_id' => 'nullable|integer', 'payment_method_id' => 'nullable|integer', 'return_type' => 'nullable|in:INVOICE,NO_RECEIPT', 'verification_status' => 'nullable|in:VERIFIED,PARTIALLY_VERIFIED,UNVERIFIED', 'approved_by' => 'nullable|integer']);
+        $query = ($kind === 'sales' ? SaleReturn::visibleTo()->with('sale.customer', 'customer') : PurchaseReturn::query()->with('purchase.supplier'))->with('user', 'replacement');
         foreach (['from', 'to'] as $key) {
             if (! empty($filters[$key])) {
                 $query->whereDate('returned_at', $key === 'from' ? '>=' : '<=', $filters[$key]);
             }
         }
-        foreach (['status', 'reason', 'resolution', 'customer_id', 'supplier_id', 'user_id'] as $key) {
+        foreach (['status', 'reason', 'resolution', 'customer_id', 'supplier_id', 'user_id', ...($kind === 'sales' ? ['return_type', 'verification_status', 'approved_by'] : [])] as $key) {
             if (! empty($filters[$key]) && ! ($kind === 'sales' && $key === 'supplier_id') && ! ($kind === 'purchase' && $key === 'customer_id')) {
                 $query->where($key, $filters[$key]);
             }
@@ -78,12 +81,13 @@ class TransactionReturnController extends Controller
             $query->whereHas('items', fn ($q) => $q->where('stock_action', $filters['stock_action']));
         }
         if (! empty($filters['product_id'])) {
-            $query->whereHas('items.item', fn ($q) => $q->where('product_id', $filters['product_id']));
+            $query->whereHas($kind === 'sales' ? 'items' : 'items.item', fn ($q) => $q->where('product_id', $filters['product_id']));
         }
         if (! empty($filters['q'])) {
             $query->where(fn ($q) => $q->where('reference', 'like', '%'.$filters['q'].'%')->orWhereHas($kind === 'sales' ? 'sale' : 'purchase', fn ($q) => $q->where($kind === 'sales' ? 'invoice' : 'reference', 'like', '%'.$filters['q'].'%')));
         }
         $totals = (clone $query)->where('status', 'COMPLETED')->selectRaw('SUM(amount) as amount,SUM(due_reduction) as due,SUM(refund_amount) as refund,SUM(additional_payment) as payment')->first();
+        $breakdown = $kind === 'sales' ? ['With bill' => (clone $query)->completed()->where('return_type', 'INVOICE')->sum('amount'), 'Without bill' => (clone $query)->completed()->where('return_type', 'NO_RECEIPT')->sum('amount'), 'Cash refunds' => (clone $query)->completed()->where('method_type', 'CASH')->sum('refund_amount'), 'Due credits' => Money::add((string) (clone $query)->completed()->sum('customer_due_applied'), (string) (clone $query)->completed()->sum('due_reduction')), 'Restocked value' => SaleReturnItem::whereIn('sale_return_id', (clone $query)->completed()->select('sale_returns.id'))->where('stock_action', 'RESTOCK')->sum('amount'), 'Write-off value' => SaleReturnItem::whereIn('sale_return_id', (clone $query)->completed()->select('sale_returns.id'))->where('stock_action', 'WRITEOFF')->sum('amount'), 'Supplier return value' => SaleReturnItem::whereIn('sale_return_id', (clone $query)->completed()->select('sale_returns.id'))->where('stock_action', 'SUPPLIER')->sum('amount')] : [];
         $rows = $query->latest('id')->paginate(20)->withQueryString();
         $methods = PaymentMethod::orderBy('name')->get();
 
@@ -92,17 +96,25 @@ class TransactionReturnController extends Controller
         $users = User::orderBy('name')->get(['id', 'name']);
         $products = Product::orderBy('name')->get(['id', 'name']);
 
-        return view('returns.index', compact('kind', 'rows', 'totals', 'methods', 'customers', 'suppliers', 'users', 'products'));
+        return view('returns.index', compact('kind', 'rows', 'totals', 'methods', 'customers', 'suppliers', 'users', 'products', 'breakdown'));
     }
 
     public function create(Request $request, string $kind)
     {
         $this->permission($kind, 'create');
-        $request->validate(['original_id' => 'nullable|integer', 'draft_id' => 'nullable|integer', 'q' => 'nullable|string|max:150']);
+        $request->validate(['original_id' => 'nullable|integer', 'draft_id' => 'nullable|integer', 'q' => 'nullable|string|max:150', 'return_type' => 'nullable|in:INVOICE,NO_RECEIPT']);
         $draft = null;
         if ($request->filled('draft_id')) {
             $draft = $this->document($kind, (int) $request->draft_id);
             abort_unless($draft->status === 'DRAFT' && $draft->user_id === $request->user()->id, 403);
+        }
+        if ($kind === 'sales' && ($request->input('return_type') === 'NO_RECEIPT' || $draft?->return_type === 'NO_RECEIPT')) {
+            app(NoReceiptSalesReturnService::class)->guard($request->user());
+            $categories = Category::orderBy('name')->get();
+            $suppliers = Supplier::where('active', true)->orderBy('name')->get();
+            $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
+
+            return view('returns.no-receipt', compact('draft', 'categories', 'suppliers', 'methods'));
         }
         $original = $draft ? $this->original($kind, $kind === 'sales' ? $draft->sale_id : $draft->purchase_id) : ($request->filled('original_id') ? $this->original($kind, (int) $request->original_id) : null);
         $query = $kind === 'sales' ? Sale::visibleTo()->with('customer', 'user', 'payments', 'returns', 'collections')->where('status', 'ACTIVE') : Purchase::with('supplier', 'user')->where('status', 'ACTIVE');
@@ -142,6 +154,78 @@ class TransactionReturnController extends Controller
         return view('returns.create', compact('draft', 'categories', 'kind', 'original', 'bills', 'lines', 'methods', 'suppliers', 'customers'));
     }
 
+    private function noReceiptDraft(array $data, Request $request)
+    {
+        app(NoReceiptSalesReturnService::class)->guard($request->user());
+        $r = DB::transaction(function () use ($data, $request) {
+            $r = SaleReturn::where('token', $data['token'])->lockForUpdate()->first();
+            if ($r) {
+                abort_unless($r->user_id === $request->user()->id && $r->return_type === 'NO_RECEIPT', 403);
+                if ($r->status !== 'DRAFT') {
+                    return $r;
+                }
+                $r->update(['draft_payload' => $data, 'customer_id' => $data['customer_id'] ?? null, 'reason' => $data['reason'] ?? '', 'notes' => $data['notes'] ?? null]);
+            } else {
+                $r = SaleReturn::create(['sale_id' => null, 'customer_id' => $data['customer_id'] ?? null, 'user_id' => $request->user()->id, 'token' => $data['token'], 'reference' => app(DocumentNumberService::class)->next('SALES_RETURN', now()), 'return_type' => 'NO_RECEIPT', 'verification_status' => 'UNVERIFIED', 'status' => 'DRAFT', 'reason' => $data['reason'] ?? '', 'resolution' => $data['resolution'], 'notes' => $data['notes'] ?? null, 'amount' => '0', 'cost_total' => '0', 'due_reduction' => '0', 'refund_amount' => '0', 'returned_at' => now(), 'draft_payload' => $data]);
+            }
+            Audit::record('sales_return.no_receipt_draft', $r, [], ['customer_id' => $r->customer_id]);
+
+            return $r;
+        }, 3);
+
+        return response()->json(['reference' => $r->reference, 'url' => route('returns.show', ['sales', $r->id])]);
+    }
+
+    public function noReceiptCustomers(Request $request, string $kind)
+    {
+        abort_unless($kind === 'sales', 404);
+        app(NoReceiptSalesReturnService::class)->guard($request->user());
+        $request->validate(['q' => 'nullable|string|max:150', 'id' => 'nullable|integer']);
+
+        return Customer::withDueBalances()->where('active', true)->when($request->id, fn ($q) => $q->whereKey($request->id))->when($request->q, fn ($q) => $q->where(fn ($q) => $q->where('name', 'like', '%'.$request->q.'%')->orWhere('phone', 'like', '%'.$request->q.'%')->orWhere('id', (int) preg_replace('/[^0-9]/', '', $request->q))))->orderBy('name')->limit(15)->get()->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'phone' => $c->phone, 'due' => $c->due_balance, 'history_url' => $request->user()->hasPermission('customers.view') ? route('manage.show', ['customers', $c->id]) : null]);
+    }
+
+    public function noReceiptMatches(Request $request, string $kind)
+    {
+        abort_unless($kind === 'sales', 404);
+        $service = app(NoReceiptSalesReturnService::class);
+        $service->guard($request->user());
+        $data = $request->validate(['customer_id' => 'required|integer|exists:customers,id', 'product_id' => 'required|integer|exists:products,id']);
+
+        return response()->json($service->matches(Product::findOrFail($data['product_id']), Customer::where('active', true)->findOrFail($data['customer_id']), $request->user()));
+    }
+
+    public function noReceiptProducts(Request $request, string $kind)
+    {
+        abort_unless($kind === 'sales', 404);
+        $service = app(NoReceiptSalesReturnService::class);
+        $service->guard($request->user());
+        $request->validate(['q' => 'nullable|string|max:150', 'category_id' => 'nullable|integer', 'ids' => 'nullable|array|max:100', 'ids.*' => 'integer']);
+        $q = Product::with(['unit', 'conversions.unit', 'stockLayers' => fn ($q) => $q->available()])->where('active', true)->whereHas('unit', fn ($q) => $q->where('active', true));
+        if ($request->has('ids')) {
+            $q->whereIn('id', $request->ids);
+        } elseif ($request->filled('q')) {
+            $q->where(fn ($q) => $q->where('name', 'like', '%'.$request->q.'%')->orWhere('sku', 'like', '%'.$request->q.'%')->orWhere('barcode', $request->q));
+        }
+        if ($request->category_id) {
+            $q->whereHas('categories', fn ($q) => $q->where('categories.id', $request->category_id));
+        }
+
+        return $q->orderBy('name')->limit(40)->get()->map(function ($p) use ($request, $service) {
+            $units = app(ProductUnitService::class)->options($p);
+            foreach ($units as &$unit) {
+                $unit['suggestion'] = $service->suggestions($p, $unit['id']);
+                if (! $request->user()->hasPermission('returns.view_cost')) {
+                    unset($unit['cost'],$unit['suggestion']['cost_basis'],$unit['suggestion']['cost_basis_reference']);
+                }
+            }
+            unset($unit);
+            $recent = PurchaseItem::where('product_id', $p->id)->whereHas('purchase', fn ($q) => $q->where('status', 'ACTIVE'))->with('purchase.supplier')->latest('id')->limit(10)->get()->unique(fn ($i) => $i->purchase->supplier_id)->take(5)->map(fn ($i) => ['id' => $i->purchase->supplier_id, 'name' => $i->purchase->supplier->name, 'date' => $i->purchase->purchase_date->format('d M Y')])->values();
+
+            return ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => $p->barcode, 'unit_id' => $p->unit_id, 'units' => $units, 'price_options' => app(StockLayerService::class)->choices($p), 'recent_suppliers' => $recent];
+        });
+    }
+
     public function products(Request $request, string $kind)
     {
         $this->permission($kind, 'create');
@@ -162,16 +246,16 @@ class TransactionReturnController extends Controller
     public function quote(TransactionReturnRequest $request, string $kind)
     {
         $data = $request->validated();
-        $q = $this->service($kind)->quote($this->original($kind, (int) $data['original_id']), $data, $request->user());
+        $q = $kind === 'sales' && ($data['return_type'] ?? 'INVOICE') === 'NO_RECEIPT' ? app(NoReceiptSalesReturnService::class)->quote($data, $request->user()) : $this->service($kind)->quote($this->original($kind, (int) $data['original_id']), $data, $request->user());
         unset($q['replacement_quote'],$q['replacements']);
         foreach ($q['lines'] as &$line) {
             unset($line['allocations']);
             if (! $request->user()->hasPermission('returns.view_cost')) {
-                unset($line['cost_total']);
+                unset($line['cost_total'],$line['cost_basis'],$line['cost_basis_reference']);
             }
         }
         if (! $request->user()->hasPermission('returns.view_cost')) {
-            unset($q['cost_total']);
+            unset($q['cost_total'],$q['historical_cost_total'],$q['estimated_cost_total']);
         }
         $q['payment_charge'] = '0.00';
         if ($kind === 'sales' && Money::compare($q['must_pay'], 0) > 0 && ! ($data['add_to_due'] ?? false) && ! empty($data['payment_method_id'])) {
@@ -186,7 +270,7 @@ class TransactionReturnController extends Controller
     public function store(TransactionReturnRequest $request, string $kind)
     {
         $data = $request->validated();
-        $r = $this->service($kind)->complete($this->original($kind, (int) $data['original_id']), $data, $request->user());
+        $r = $kind === 'sales' && ($data['return_type'] ?? 'INVOICE') === 'NO_RECEIPT' ? app(NoReceiptSalesReturnService::class)->complete($data, $request->user()) : $this->service($kind)->complete($this->original($kind, (int) $data['original_id']), $data, $request->user());
 
         return response()->json([
             'reference' => $r->reference,
@@ -199,6 +283,9 @@ class TransactionReturnController extends Controller
     public function draft(TransactionReturnRequest $request, string $kind)
     {
         $data = $request->validated();
+        if ($kind === 'sales' && ($data['return_type'] ?? 'INVOICE') === 'NO_RECEIPT') {
+            return $this->noReceiptDraft($data, $request);
+        }
         $original = $this->original($kind, (int) $data['original_id']);
         $class = $kind === 'sales' ? SaleReturn::class : PurchaseReturn::class;
         $r = DB::transaction(function () use ($kind, $class, $data, $original, $request) {
@@ -227,7 +314,7 @@ class TransactionReturnController extends Controller
     {
         $document = $this->document($kind, $id);
         Gate::authorize('view', $document);
-        $document->load('items.item', 'items.allocations.layer', 'settlements', 'allocations', 'replacement', 'user');
+        $document->load([...($kind === 'sales' ? ['items.item.sale', 'items.product'] : ['items.item']), 'items.allocations.layer', 'settlements', 'allocations', 'replacement', 'user']);
 
         return view('returns.show', compact('kind', 'document'));
     }
@@ -236,7 +323,7 @@ class TransactionReturnController extends Controller
     {
         $document = $this->document($kind, $id);
         Gate::authorize('view', $document);
-        $document->load('items.item', 'settlements', 'replacement.items', 'user');
+        $document->load([...($kind === 'sales' ? ['items.item.sale', 'items.product'] : ['items.item']), 'settlements', 'replacement.items', 'user']);
 
         return view('returns.receipt', compact('kind', 'document'));
     }
@@ -255,7 +342,7 @@ class TransactionReturnController extends Controller
     {
         abort_unless($request->user()->hasPermission('supplier_returns.view'), 403);
         $request->validate(['supplier_id' => 'nullable|integer', 'status' => 'nullable|in:PENDING,SENT,SETTLED,CANCELLED']);
-        $rows = SupplierReturn::whereHas('saleReturn.sale', fn ($q) => $q->visibleTo())->with('supplier', 'saleReturn.sale', 'items.layer.product')->when($request->supplier_id, fn ($q, $id) => $q->where('supplier_id', $id))->when($request->status, fn ($q, $status) => $q->where('status', $status))->latest('id')->paginate(20)->withQueryString();
+        $rows = SupplierReturn::whereHas('saleReturn', fn ($q) => $q->visibleTo())->with('supplier', 'saleReturn.sale', 'items.layer.product', 'items.returnItem.product')->when($request->supplier_id, fn ($q, $id) => $q->where('supplier_id', $id))->when($request->status, fn ($q, $status) => $q->where('status', $status))->latest('id')->paginate(20)->withQueryString();
         $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
 
         return view('returns.suppliers', compact('rows', 'methods'));

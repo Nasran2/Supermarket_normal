@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Register;
 use App\Models\Sale;
 use App\Models\SaleReturn;
+use App\Models\SaleReturnItem;
 use App\Models\SaleRevision;
 use App\Models\User;
 use App\Support\Audit;
@@ -28,7 +29,7 @@ class SaleRevisionService
         if ($sale->status !== 'ACTIVE' || (! $isCreator && ! $isAdmin)) {
             throw ValidationException::withMessages(['sale' => 'Invoice editing requires its original register to be open under your account, or administrator privileges.']);
         }
-        if (SaleReturn::where('replacement_sale_id', $sale->id)->orWhere('sale_id', $sale->id)->exists() || $sale->returns()->exists() || $sale->collections()->exists()) {
+        if (SaleReturn::where('replacement_sale_id', $sale->id)->orWhere('sale_id', $sale->id)->exists() || ($sale->returns()->exists() || SaleReturnItem::whereIn('sale_item_id', $sale->items()->select('id'))->exists()) || $sale->collections()->exists()) {
             throw ValidationException::withMessages(['sale' => 'This invoice has returns or later due payments. Use returns or Pay due for further corrections.']);
         }
     }

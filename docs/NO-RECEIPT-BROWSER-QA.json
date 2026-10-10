@@ -1,0 +1,20 @@
+{
+    "scenarios": {
+        "repeated_barcode_and_walk_in": "passed",
+        "mixed_verified_writeoff_split_due_refund": "passed",
+        "same_product_current_prices_and_cancellation": "passed",
+        "supplier_confirmation_other_exchange_and_draft_resume": "passed",
+        "two_invoices_and_disabled_cash_non_cash_refund": "passed",
+        "desktop_and_mobile": "passed"
+    },
+    "reconciled": {
+        "customer_due": "220.00",
+        "supplier_due": "800.00",
+        "soap_stock": "26.000",
+        "shampoo_stock": "21.000",
+        "estimated_pending_supplier_claim": "150.00",
+        "net_profit": "-140.00",
+        "expected_cash": "9880.00",
+        "customer_net_collections": "-260.00"
+    }
+}

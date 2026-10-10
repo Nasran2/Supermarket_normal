@@ -69,7 +69,7 @@ class ReportController extends Controller
             abort_unless($request->user()->hasPermission('products.view_cost'), 403);
             $summary = $profit->calculate($filters['from'], $filters['to']);
             $headers = ['Profit & loss statement', 'Amount'];
-            $rows = collect(['grossSales' => 'Gross sales', 'salesReturns' => 'Less sales returns', 'revenue' => 'Net sales revenue', 'cogs' => 'Cost of goods sold', 'gross' => 'Gross profit', 'manual' => 'Other operating expenses', 'processing' => 'Business-paid processing expenses', 'purchaseCharges' => 'Purchase shipping & other charges', 'returnWriteoffs' => 'Return write-off expenses', 'expenses' => 'Total operating expenses', 'net' => 'Net profit'])->map(fn ($label, $key) => [$label, Money::display($summary[$key])])->values();
+            $rows = collect(['grossSales' => 'Gross sales', 'salesReturns' => 'Less sales returns', 'revenue' => 'Net sales revenue', 'cogs' => 'Cost of goods sold', 'gross' => 'Gross profit', 'manual' => 'Other operating expenses', 'processing' => 'Business-paid processing expenses', 'purchaseCharges' => 'Purchase shipping & other charges', 'returnWriteoffs' => 'Return write-off expenses', 'noReceiptCredit' => 'No-receipt approved credit (unverified)', 'estimatedRecovery' => 'Estimated returned inventory / supplier claim cost', 'noReceiptAdjustments' => 'No-receipt return adjustments', 'expenses' => 'Total operating expenses', 'net' => 'Net profit'])->map(fn ($label, $key) => [$label, Money::display($summary[$key])])->values();
             $cards = ['Revenue' => $summary['revenue'], 'Gross profit' => $summary['gross'], 'Net profit' => $summary['net']];
             $notes = 'Revenue and cost of goods sold are net of returns. Voided sales and reversed expenses are excluded. Customer-paid processing fees are not product revenue.';
         } else {
@@ -78,6 +78,20 @@ class ReportController extends Controller
             $rowCount = (clone $result['query'])->getCountForPagination();
             $rows = $result['query']->lazy(500)->map($result['map']);
             $cards = $result['cards'];
+            if ($report === 'returns') {
+                $headers = ['Date / cashier', 'Return / type', 'Original bill(s)', 'Customer', 'Credit / replacement', 'Due credit', 'Refund / payment', 'Verification / cost source', 'Status / approval'];
+                $rows = $rows->map(fn ($row) => [
+                    $row[0]."\n".$row[8],
+                    $row[1]."\n".($row[13] === 'NO_RECEIPT' ? 'Without bill' : 'With bill'),
+                    str_replace(', ', "\n", $row[2]),
+                    $row[16],
+                    'Credit '.$row[3]."\nReplacement ".$row[10],
+                    'Original '.$row[4]."\nOther ".$row[19],
+                    'Refund '.$row[5].' '.$row[6]."\nPaid ".$row[11],
+                    str_replace('_', ' ', $row[14])."\n".($row[15] ? 'Estimated: '.str_replace('_', ' ', $row[15]) : 'Historical cost'),
+                    $row[12].($row[17] !== '—' ? "\nApproved #".$row[17]."\n".$row[18] : ''),
+                ]);
+            }
             if ($report === 'audit') {
                 $rows = $rows->map(function ($row) {
                     foreach ([4, 5] as $index) {
@@ -88,6 +102,7 @@ class ReportController extends Controller
                 });
             }
             $notes = match ($report) {
+                'returns' => '',
                 'stock' => 'Current stock snapshot at export time. The reporting period does not reconstruct historical stock balances. Receipt date and source filters apply to stock price rows.',
                 'product-sales' => 'Product quantities, cost and margins use transaction snapshots. Column headings identify values calculated before invoice discounts or returns.',
                 'cash' => 'Opening balance includes transactions before the selected period. Money in and money out follow the selected payment method filter.',

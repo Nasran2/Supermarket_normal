@@ -60,12 +60,21 @@ class Sale extends Model
 
     public function getReturnedTotalAttribute(): string
     {
-        return Money::sum($this->returns->pluck('amount'));
+        $linked = (string) SaleReturnItem::whereIn('sale_item_id', $this->items()->select('id'))->whereHas('return', fn ($q) => $q->completed()->where('return_type', 'NO_RECEIPT'))->sum('amount');
+
+        return Money::add(Money::sum($this->returns->pluck('amount')), $linked);
     }
 
     public function getRefundedTotalAttribute(): string
     {
         return Money::sum($this->returns->pluck('refund_amount'));
+    }
+
+    public function getReturnedCostAttribute(): string
+    {
+        $linked = (string) SaleReturnItem::whereIn('sale_item_id', $this->items()->select('id'))->whereHas('return', fn ($q) => $q->completed()->where('return_type', 'NO_RECEIPT'))->sum('cost_total');
+
+        return Money::add(Money::sum($this->returns->pluck('cost_total')), $linked);
     }
 
     public function getCollectedTotalAttribute(): string

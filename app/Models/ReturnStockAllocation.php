@@ -10,6 +10,11 @@ class ReturnStockAllocation extends Model
 
     protected $casts = ['returned_at' => 'datetime', 'cancelled_at' => 'datetime', 'sent_at' => 'datetime', 'settled_at' => 'datetime', 'reversed_at' => 'datetime', 'amount' => 'decimal:2', 'cost_total' => 'decimal:2', 'quantity' => 'decimal:3', 'base_quantity' => 'decimal:3'];
 
+    public function returnItem()
+    {
+        return $this->belongsTo(SaleReturnItem::class, 'sale_return_item_id');
+    }
+
     public function layer()
     {
         return $this->belongsTo(ProductStockLayer::class, 'stock_layer_id');
