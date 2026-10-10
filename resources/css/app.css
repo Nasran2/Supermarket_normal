@@ -734,6 +734,28 @@ tbody tr:hover {
   border-top: 1px solid var(--line);
   font-size: 11px;
 }
+/* Force pagination to light mode to prevent unreadable dark mode colors */
+.pagination nav span[aria-current="page"] > span,
+.pagination nav span[aria-current="page"] {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+}
+.pagination nav a,
+.pagination nav span.cursor-default,
+.pagination nav span[aria-disabled="true"] > span {
+  background-color: #ffffff !important;
+  color: var(--muted) !important;
+  border-color: var(--line) !important;
+}
+.pagination nav a:hover {
+  background-color: #f0faf5 !important;
+  color: var(--primary-dark) !important;
+}
+.pagination nav svg {
+  width: 16px;
+  height: 16px;
+}
 .filter-bar {
   display: flex;
   align-items: end;

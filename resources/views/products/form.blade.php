@@ -27,6 +27,14 @@
                 @endforeach
             </select>
         </label>
+        <label class="field full"><span>Supplier <small>optional</small></span>
+            <select name="supplier_id" id="supplier-select" placeholder="Search and select a supplier...">
+                <option value=""></option>
+                @foreach($options['supplier_id'] as $id => $name)
+                    <option value="{{ $id }}" @selected(old('supplier_id', $record->supplier_id) == $id)>{{ $name }}</option>
+                @endforeach
+            </select>
+        </label>
     </div>
 </section>
 <aside class="card product-image-card">
@@ -70,6 +78,14 @@
                 maxOptions: 50,
                 create: false,
                 placeholder: 'Search and select categories...',
+                dropdownParent: 'body'
+            });
+        }
+        if (document.getElementById('supplier-select')) {
+            new TomSelect('#supplier-select', {
+                maxOptions: 50,
+                create: false,
+                placeholder: 'Search and select a supplier...',
                 dropdownParent: 'body'
             });
         }
