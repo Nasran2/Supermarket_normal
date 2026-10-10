@@ -81,7 +81,7 @@
             @endif
             
             <span class="block text-[10px] font-bold tracking-[0.15em] text-[#0db168] uppercase mb-2">
-                TWINSOFTE SUPERMARKET POS
+                {{ strtoupper($settings['business_name'] ?? 'Twinsofte') }} POS
             </span>
             <h1 class="text-[28px] font-extrabold tracking-tight text-[#111827] mb-1">Welcome back</h1>
             <p class="text-[13px] text-gray-500 font-medium">Sign in to continue to your POS.</p>
@@ -174,7 +174,7 @@
             
             <div class="mt-4 pt-4 border-t border-gray-100/80">
                 <p class="text-center text-[10px] text-gray-400 font-medium">
-                    Powered by <span class="font-bold text-[#0db168]">Twinsofte Solution</span>
+                    Powered by <span class="font-bold text-[#0db168]"><a href="https://{{ config('app.developer.web') }}" target="_blank" rel="noopener">{{ config('app.developer.name') }}</a></span>
                 </p>
             </div>
         </div>

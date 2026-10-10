@@ -2072,7 +2072,8 @@ body.nav-collapsed .nav-link {
 }
 .pos-workspace .cart-panel {
   min-height: 640px;
-  max-height: calc(100dvh - 170px);
+  height: calc(100dvh - 120px);
+  max-height: calc(100dvh - 120px);
   top: 18px;
 }
 .pos-workspace .cart-panel h2 {
