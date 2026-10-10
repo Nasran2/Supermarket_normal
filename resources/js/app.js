@@ -199,4 +199,13 @@ if (navLinks) {
   }, { passive: true });
 }
 
+// Auto-select text in number inputs for easier overriding
+document.addEventListener('focusin', (e) => {
+  if (e.target.matches('input[type="number"], input[inputmode="decimal"], input[type="text"][inputmode="decimal"]')) {
+    setTimeout(() => {
+      e.target.select();
+    }, 0);
+  }
+});
+
 import './module-editor.js';
