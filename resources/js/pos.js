@@ -351,8 +351,22 @@ function addPrice(p, group) {
   const unit = group.units.find((option) => option.id === p.unit_id);
   const key = stockChoiceKey({id:p.id, unit_id:p.unit_id, stock_price:group.stock_price, stock_layer_id:group.stock_layer_id});
   const existing = cart.find((item) => stockChoiceKey(item) === key);
-  if (existing) existing.quantity = Number((Number(existing.quantity) + 1).toFixed(3));
-  else cart.push({ ...p, line_key: crypto.randomUUID(), stock_price: group.stock_price, stock_layer_id: group.stock_layer_id ?? null, stock_reference: group.reference ?? '', units: group.units, price: unit.price, quantity: 1, unit_price: null, discount_type: 'AMOUNT', discount_value: '0' });
+  const maxQty = Number(group.quantity);
+  
+  if (existing) {
+    if (Number(existing.quantity) + 1 > maxQty) {
+      message.textContent = `Only ${maxQty} available.`;
+      return;
+    }
+    existing.quantity = Number((Number(existing.quantity) + 1).toFixed(3));
+  }
+  else {
+    if (1 > maxQty) {
+      message.textContent = `Only ${maxQty} available.`;
+      return;
+    }
+    cart.push({ ...p, line_key: crypto.randomUUID(), stock_price: group.stock_price, stock_layer_id: group.stock_layer_id ?? null, stock_reference: group.reference ?? '', max_quantity: maxQty, units: group.units, price: unit.price, quantity: 1, unit_price: null, discount_type: 'AMOUNT', discount_value: '0' });
+  }
   quote = null;
   message.textContent = '';
   render();
@@ -455,9 +469,14 @@ $('cart-items').addEventListener('click', (e) => {
   if (!syncQuantities() && button.dataset.action !== 'remove') return;
   if (button.dataset.action === 'remove') cart = cart.filter((i) => i.line_key !== p.line_key);
   else {
-    p.quantity = Number(
+    let newQty = Number(
       (Number(p.quantity) + (button.dataset.action === 'plus' ? 1 : -1)).toFixed(3),
     );
+    if (button.dataset.action === 'plus' && 'max_quantity' in p && newQty > p.max_quantity) {
+      message.textContent = `Only ${p.max_quantity} available.`;
+      return;
+    }
+    p.quantity = newQty;
     if (p.quantity <= 0) cart = cart.filter((i) => i.line_key !== p.line_key);
     if (Number(p.quantity) > 999999) p.quantity = '999999';
   }
@@ -478,7 +497,13 @@ function syncQuantities() {
       return false;
     }
     const p = cart.find((p) => p.line_key === input.closest('[data-cart-id]').dataset.cartId);
-    p.quantity = input.value;
+    let newQty = Number(input.value);
+    if ('max_quantity' in p && newQty > p.max_quantity) {
+      message.textContent = `Only ${p.max_quantity} available.`;
+      input.value = p.max_quantity;
+      newQty = p.max_quantity;
+    }
+    p.quantity = newQty;
   }
   return true;
 }
@@ -492,7 +517,13 @@ $('cart-items').addEventListener('input', (e) => {
     const input = e.target;
     if (!validQuantity(input)) return;
     const p = cart.find((p) => p.line_key === input.closest('[data-cart-id]').dataset.cartId);
-    p.quantity = input.value;
+    let newQty = Number(input.value);
+    if ('max_quantity' in p && newQty > p.max_quantity) {
+      message.textContent = `Only ${p.max_quantity} available.`;
+      input.value = p.max_quantity;
+      newQty = p.max_quantity;
+    }
+    p.quantity = newQty;
     quote = null;
     input.closest('.cart-line').querySelector('.cart-line-amount').textContent = money(
       Number(lineCents(p)) / 100,
@@ -1231,7 +1262,7 @@ const checkoutCustomerDialog = $('checkout-customer-dialog');
 function requestCompletion(mode) {
   const button = mode === 'due' ? $('confirm-due') : $('confirm-payment');
   if (!quote || pending || button?.disabled) return;
-  if (!editMode && !$('customer').value) {
+  if (!editMode && mode === 'due' && !$('customer').value) {
     pendingCompletion = mode;
     const select = $('checkout-customer-select');
     select.replaceChildren(new Option('Select a customer', ''));

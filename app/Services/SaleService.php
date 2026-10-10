@@ -160,8 +160,9 @@ class SaleService
     {
         DB::transaction(function () use ($sale, $reason, $userId) {
             $r = Register::whereKey($sale->register_id)->lockForUpdate()->firstOrFail();
-            if ($r->closed_at) {
-                throw ValidationException::withMessages(['reason' => 'This register is closed. Completed register records cannot be changed.']);
+            $isAdmin = User::find($userId)?->isAdministrator();
+            if ($r->closed_at && !$isAdmin) {
+                throw ValidationException::withMessages(['reason' => 'This register is closed. Completed register records cannot be changed (unless administrator).']);
             }
             $sale = Sale::whereKey($sale->id)->lockForUpdate()->firstOrFail();
             if ($sale->status !== 'ACTIVE') {

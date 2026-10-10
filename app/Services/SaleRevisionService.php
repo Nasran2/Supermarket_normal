@@ -19,8 +19,13 @@ class SaleRevisionService
     public function assertEditable(Sale $sale, int $userId): void
     {
         $register = $sale->register;
-        if ($sale->status !== 'ACTIVE' || $register->closed_at || (int) $register->open_user_id !== $userId) {
-            throw ValidationException::withMessages(['sale' => 'Invoice editing requires its original register to be open under your account.']);
+        $user = User::find($userId);
+        
+        $isCreator = !$register->closed_at && (int) $register->open_user_id === $userId;
+        $isAdmin = $user && $user->isAdministrator();
+        
+        if ($sale->status !== 'ACTIVE' || (!$isCreator && !$isAdmin)) {
+            throw ValidationException::withMessages(['sale' => 'Invoice editing requires its original register to be open under your account, or administrator privileges.']);
         }
         if ($sale->returns()->exists() || $sale->collections()->exists()) {
             throw ValidationException::withMessages(['sale' => 'This invoice has returns or later due payments. Use returns or Pay due for further corrections.']);

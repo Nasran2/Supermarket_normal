@@ -2009,8 +2009,14 @@ body.nav-collapsed .nav-link {
 }
 
 /* Full-width selling workspace; administration keeps its normal navigation. */
+body.pos-workspace {
+  overflow: hidden;
+  height: 100vh;
+}
 .pos-workspace .app-shell {
   margin-left: 0;
+  height: 100vh;
+  overflow: hidden;
 }
 .pos-workspace .sidebar {
   width: 260px;
@@ -2049,9 +2055,13 @@ body.nav-collapsed .nav-link {
 }
 .pos-workspace .pos-main {
   padding: 22px 26px 26px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .pos-workspace .pos-heading {
   margin-bottom: 18px;
+  flex: none;
 }
 .pos-heading-actions {
   display: flex;
@@ -2069,12 +2079,13 @@ body.nav-collapsed .nav-link {
   grid-template-columns: minmax(0, 1fr) 370px;
   gap: 22px;
   align-items: start;
+  flex: 1;
+  overflow: hidden;
 }
 .pos-workspace .cart-panel {
-  min-height: 640px;
-  height: calc(100dvh - 120px);
-  max-height: calc(100dvh - 120px);
-  top: 18px;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
 }
 .pos-workspace .cart-panel h2 {
   font-size: 20px;
@@ -2123,8 +2134,10 @@ body.nav-collapsed .nav-link {
 }
 .pos-workspace .pos-catalog {
   min-width: 0;
+  height: 100%;
+  overflow-y: auto;
   max-height: none;
-  overflow: visible;
+  padding-right: 4px;
 }
 .pos-workspace .catalog-tools .search-field {
   height: 54px;

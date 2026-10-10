@@ -145,8 +145,8 @@ class SaleController extends Controller
         DB::transaction(function () use ($request, $sale) {
             $register = Register::whereKey($sale->register_id)->lockForUpdate()->firstOrFail();
             $sale = Sale::whereKey($sale->id)->lockForUpdate()->firstOrFail();
-            if ($sale->status !== 'ACTIVE' || $register->closed_at) {
-                throw ValidationException::withMessages(['sale' => 'Only active sales in open registers can be edited.']);
+            if ($sale->status !== 'ACTIVE' || ($register->closed_at && !auth()->user()->isAdministrator())) {
+                throw ValidationException::withMessages(['sale' => 'Only active sales in open registers can be edited (unless administrator).']);
             }
             $before = $sale->load('payments')->toArray();
             $data = $request->validated();
