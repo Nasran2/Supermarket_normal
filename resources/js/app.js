@@ -187,4 +187,16 @@ document.querySelectorAll('.nav-group > summary').forEach((summary) => {
   });
 });
 
+// Preserve sidebar scroll position
+const navLinks = document.querySelector('.nav-links');
+if (navLinks) {
+  const savedScroll = sessionStorage.getItem('twinsofte-nav-scroll');
+  if (savedScroll) {
+    navLinks.scrollTop = parseInt(savedScroll, 10);
+  }
+  navLinks.addEventListener('scroll', () => {
+    sessionStorage.setItem('twinsofte-nav-scroll', navLinks.scrollTop);
+  }, { passive: true });
+}
+
 import './module-editor.js';
