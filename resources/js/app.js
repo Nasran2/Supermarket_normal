@@ -208,4 +208,11 @@ document.addEventListener('focusin', (e) => {
   }
 });
 
+// Prevent accidental number changes when scrolling with mouse/trackpad
+document.addEventListener('wheel', () => {
+  if (document.activeElement && document.activeElement.type === 'number') {
+    document.activeElement.blur();
+  }
+}, { passive: true });
+
 import './module-editor.js';
