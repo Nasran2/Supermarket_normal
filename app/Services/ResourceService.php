@@ -263,6 +263,9 @@ class ResourceService
                 if ($resource === 'roles') {
                     $record->permissions()->sync($permissionIds);
                 }
+                if ($resource === 'products' && $id && Money::compare((string) $before['price'], (string) $record->price) !== 0) {
+                    \App\Models\ProductStockLayer::where('product_id', $record->id)->where('status', 'ACTIVE')->update(['selling_price' => $record->price]);
+                }
                 if ($resource === 'products' && ! $id) {
                     $record->load('unit');
                     $opening = $data['opening_layers'] ?? [['quantity' => $data['stock'], 'cost' => $data['cost'], 'selling_price' => $data['price']]];
