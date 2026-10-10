@@ -37,6 +37,11 @@ class StockMovement extends Model
         return $this->belongsTo(SaleReturn::class, 'reference', 'reference');
     }
 
+    public function purchaseReturn()
+    {
+        return $this->belongsTo(PurchaseReturn::class, 'reference', 'reference');
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

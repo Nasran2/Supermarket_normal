@@ -6,14 +6,15 @@ use App\Models\Customer;
 use App\Models\CustomerPayment;
 use App\Models\PaymentMethod;
 use App\Models\Register;
+use App\Models\ReturnAccountAllocation;
 use App\Models\Sale;
 use App\Models\SaleCollection;
-use App\Models\SalePayment;
+use App\Services\CustomerLedgerService;
 use App\Support\Money;
-use App\Support\SalesVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class CustomerPaymentController extends Controller
 {
@@ -25,11 +26,24 @@ class CustomerPaymentController extends Controller
             'payment_method_id' => 'required|exists:payment_methods,id',
             'payment_date' => 'required|date',
             'mode' => 'required|in:auto,manual',
-            'allocations' => 'array',
+            'allocations' => 'array', 'allocations.opening_balance' => 'nullable|numeric|min:0|decimal:0,2', 'allocations.sales' => 'nullable|array|max:100', 'allocations.sales.*' => 'numeric|min:0|decimal:0,2',
         ]);
 
         DB::transaction(function () use ($request, $customer) {
-            $paymentMethod = PaymentMethod::find($request->payment_method_id);
+            $customer = Customer::whereKey($customer->id)->lockForUpdate()->firstOrFail();
+            $paymentMethod = PaymentMethod::whereKey($request->payment_method_id)->where('active', true)->lockForUpdate()->firstOrFail();
+            if ($request->mode === 'manual') {
+                foreach (array_keys($request->input('allocations.sales', [])) as $id) {
+                    Sale::visibleTo()->where('customer_id', $customer->id)->lockForUpdate()->findOrFail($id);
+                }
+                $allocated = Money::add((string) $request->input('allocations.opening_balance', '0'), Money::sum($request->input('allocations.sales', [])));
+                if (Money::compare($allocated, (string) $request->amount) !== 0) {
+                    throw ValidationException::withMessages(['allocations' => 'Allocate exactly the received payment amount.']);
+                }
+            }
+            if (Money::compare((string) $request->amount, $customer->due_balance) > 0) {
+                throw ValidationException::withMessages(['amount' => 'Payment exceeds the outstanding customer due.']);
+            }
             $amount = $request->input('amount');
 
             $customerPayment = $customer->customerPayments()->create([
@@ -56,7 +70,7 @@ class CustomerPaymentController extends Controller
         $remainingAmount = (string) $amount;
 
         // Pay opening balance first
-        $openingRemaining = Money::sub($customer->opening_due, $customer->opening_due_paid);
+        $openingRemaining = Money::sub(Money::sub($customer->opening_due, $customer->opening_due_paid), (string) ReturnAccountAllocation::where('customer_id', $customer->id)->whereNull('sale_id')->where('status', 'ACTIVE')->sum('amount'));
         if (Money::compare($openingRemaining, 0) > 0 && Money::compare($remainingAmount, 0) > 0) {
             $allocated = Money::compare($remainingAmount, $openingRemaining) >= 0 ? $openingRemaining : $remainingAmount;
             $payment->allocations()->create([
@@ -71,7 +85,7 @@ class CustomerPaymentController extends Controller
         if (Money::compare($remainingAmount, 0) > 0) {
             $unpaidSales = $customer->sales()->visibleTo()
                 ->where('status', 'ACTIVE')
-                ->oldest('sold_at')
+                ->oldest('sold_at')->lockForUpdate()
                 ->get()
                 ->filter(fn ($sale) => Money::compare($sale->due_balance, 0) > 0);
 
@@ -113,6 +127,10 @@ class CustomerPaymentController extends Controller
     {
         if (isset($allocations['opening_balance']) && Money::compare((string) $allocations['opening_balance'], 0) > 0) {
             $allocated = (string) $allocations['opening_balance'];
+            $opening = Money::sub(Money::sub($customer->opening_due, $customer->opening_due_paid), (string) ReturnAccountAllocation::where('customer_id', $customer->id)->whereNull('sale_id')->where('status', 'ACTIVE')->sum('amount'));
+            if (Money::compare($allocated, $opening) > 0) {
+                throw ValidationException::withMessages(['allocations' => 'Opening allocation exceeds remaining due.']);
+            }
             $payment->allocations()->create([
                 'type' => 'OPENING_BALANCE',
                 'amount' => $allocated,
@@ -123,7 +141,10 @@ class CustomerPaymentController extends Controller
         if (isset($allocations['sales']) && is_array($allocations['sales'])) {
             foreach ($allocations['sales'] as $saleId => $amount) {
                 if (Money::compare((string) $amount, 0) > 0) {
-                    $sale = Sale::visibleTo()->where('customer_id', $customer->id)->findOrFail($saleId);
+                    $sale = Sale::visibleTo()->where('customer_id', $customer->id)->lockForUpdate()->findOrFail($saleId);
+                    if (Money::compare((string) $amount, $sale->due_balance) > 0) {
+                        throw ValidationException::withMessages(['allocations' => 'Invoice allocation exceeds remaining due.']);
+                    }
                     $payment->allocations()->create([
                         'type' => 'INVOICE',
                         'sale_id' => $sale->id,
@@ -156,98 +177,7 @@ class CustomerPaymentController extends Controller
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        $salesQuery = $customer->sales()->visibleTo()->where('status', 'ACTIVE');
-        if ($startDate) {
-            $salesQuery->whereDate('sold_at', '>=', $startDate);
-        }
-        if ($endDate) {
-            $salesQuery->whereDate('sold_at', '<=', $endDate);
-        }
-
-        $sales = $salesQuery->get()->map(function ($sale) {
-            return [
-                'date' => $sale->sold_at,
-                'type' => 'Invoice',
-                'description' => 'Invoice #'.$sale->invoice,
-                'debit' => $sale->customer_payable,
-                'credit' => 0,
-            ];
-        });
-
-        $paymentsQuery = SalesVisibility::apply($customer->customerPayments()->getQuery(), 'customer_payments.user_id');
-        if ($startDate) {
-            $paymentsQuery->whereDate('payment_date', '>=', $startDate);
-        }
-        if ($endDate) {
-            $paymentsQuery->whereDate('payment_date', '<=', $endDate);
-        }
-
-        $payments = $paymentsQuery->with(['paymentMethod', 'allocations.sale' => fn ($q) => $q->visibleTo()])->get()->map(function ($payment) {
-            $desc = 'Customer Payment - '.($payment->paymentMethod->name ?? 'Unknown');
-            if ($payment->allocations->count() > 0) {
-                $parts = [];
-                foreach ($payment->allocations as $alloc) {
-                    if ($alloc->type === 'OPENING_BALANCE') {
-                        $parts[] = 'Opening Balance';
-                    } elseif ($alloc->type === 'INVOICE' && $alloc->sale) {
-                        $parts[] = $alloc->sale->invoice;
-                    }
-                }
-                if (count($parts) > 0) {
-                    $desc .= ' [Allocated to: '.implode(', ', $parts).']';
-                }
-            }
-
-            return [
-                'date' => $payment->payment_date,
-                'type' => 'Payment',
-                'description' => $desc,
-                'debit' => 0,
-                'credit' => $payment->amount,
-            ];
-        });
-
-        // Add POS Payments (SalePayments)
-        $salePaymentsQuery = SalePayment::whereHas('sale', function ($q) use ($customer) {
-            $q->visibleTo()->where('customer_id', $customer->id);
-        });
-        if ($startDate) {
-            $salePaymentsQuery->whereDate('created_at', '>=', $startDate);
-        }
-        if ($endDate) {
-            $salePaymentsQuery->whereDate('created_at', '<=', $endDate);
-        }
-
-        $salePayments = $salePaymentsQuery->with('sale')->get()->map(function ($sp) {
-            return [
-                'date' => $sp->created_at,
-                'type' => 'POS Payment',
-                'description' => 'Payment for '.($sp->sale->invoice ?? 'Sale').' ('.$sp->method_name.')',
-                'debit' => 0,
-                'credit' => Money::sub($sp->amount_paid, $sp->change),
-            ];
-        });
-
-        $ledger = collect();
-        if (! $startDate) {
-            $ledger->push([
-                'date' => $customer->created_at,
-                'type' => 'Opening Balance',
-                'description' => 'Opening Balance',
-                'debit' => $customer->opening_due,
-                'credit' => 0,
-            ]);
-        }
-
-        $ledger = $ledger->concat($sales)->concat($payments)->concat($salePayments)->sortBy('date')->values();
-
-        $balance = '0.00';
-        $ledger = $ledger->map(function ($item) use (&$balance) {
-            $balance = Money::add(Money::sub($balance, (string) $item['credit']), (string) $item['debit']);
-            $item['balance'] = $balance;
-
-            return $item;
-        });
+        $ledger = app(CustomerLedgerService::class)->build($customer, $startDate, $endDate);
 
         if ($request->input('export') === 'pdf') {
             return view('customers.ledger_print', compact('customer', 'ledger', 'startDate', 'endDate'));

@@ -1,6 +1,7 @@
 @extends('layouts.app')
 @section('title','Purchase '.$purchase->reference)
 @section('content')
+@can('purchase_returns.create')@if($purchase->status==='ACTIVE')<a class="btn secondary mb-6" href="{{ route('returns.create',['purchase','original_id'=>$purchase->id]) }}">Purchase Return</a>@endif @endcan
 @php($currency=$settings['currency_symbol']??'Rs.')
 @php($paymentStatus=$purchase->payment_status)
 <div class="page-heading purchase-page-heading"><div><span class="eyebrow">PURCHASE DETAILS</span><h1>{{ $purchase->reference }} <span class="badge {{ $paymentStatus==='Paid'?'green':($paymentStatus==='Voided'?'red':'amber') }}">{{ $paymentStatus }}</span></h1><p>{{ $purchase->purchase_date->format($settings['date_format']??'d/m/Y') }} · {{ $purchase->user->name }}</p></div><div class="heading-actions"><a class="btn secondary" href="{{ route('purchases.index') }}"><x-icon name="arrow-left"/>Purchases</a><button type="button" class="btn secondary" onclick="window.print()"><x-icon name="printer"/>Print</button>@if($purchase->status==='ACTIVE')@can('purchases.edit')<a class="btn secondary" href="{{ route('purchases.edit',$purchase) }}"><x-icon name="pencil"/>Edit purchase</a>@endcan @endif</div></div>

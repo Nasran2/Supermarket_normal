@@ -22,10 +22,10 @@ class Customer extends Model
         $clamp = DB::getDriverName() === 'sqlite' ? 'MAX' : 'GREATEST';
 
         return "COALESCE((SELECT SUM($clamp(0, due_sales.customer_payable
-            - COALESCE((SELECT SUM(amount) FROM sale_returns WHERE sale_id=due_sales.id), 0)
+            - COALESCE((SELECT SUM(due_reduction) FROM sale_returns WHERE sale_id=due_sales.id AND status='COMPLETED'), 0)
             - COALESCE((SELECT SUM(amount_paid - `change`) FROM sale_payments WHERE sale_id=due_sales.id), 0)
             - COALESCE((SELECT SUM(amount) FROM sale_collections WHERE sale_id=due_sales.id), 0)
-            + COALESCE((SELECT SUM(refund_amount) FROM sale_returns WHERE sale_id=due_sales.id), 0)))
+            - COALESCE((SELECT SUM(amount) FROM return_account_allocations WHERE sale_id=due_sales.id AND status='ACTIVE'), 0)))
             FROM sales AS due_sales WHERE due_sales.customer_id=customers.id AND due_sales.status='ACTIVE' AND ($owner)), 0)";
     }
 
@@ -47,7 +47,9 @@ class Customer extends Model
     {
         $openingRemaining = Money::sub($this->opening_due ?? '0.00', $this->opening_due_paid ?? '0.00');
 
-        return Money::add($openingRemaining, $this->invoice_due);
+        $credits = (string) ReturnAccountAllocation::where('customer_id', $this->id)->whereNull('sale_id')->where('status', 'ACTIVE')->sum('amount');
+
+        return Money::add(Money::sub($openingRemaining, $credits), $this->invoice_due);
     }
 
     public function sales()

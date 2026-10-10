@@ -50,8 +50,8 @@ class ProductMovementHistoryTest extends TestCase
     public function test_return_movement_links_to_original_invoice(): void
     {
         $this->post(route('sales.returns.store', $this->sale), ['token' => (string) Str::uuid(), 'reason' => 'Return one', 'payment_method_id' => PaymentMethod::where('type', 'CASH')->value('id'), 'items' => [['sale_item_id' => $this->sale->items->first()->id, 'quantity' => '1']]])->assertRedirect();
-        $this->get(route('manage.show', ['products', $this->product->id]))->assertOk()->assertSee('SALE RETURN')->assertSee('RET-')->assertSee('href="'.route('sales.show', $this->sale).'"', false);
-        $returnMovement = StockMovement::where('reason', 'SALE RETURN')->with('saleReturn.sale')->firstOrFail();
+        $this->get(route('manage.show', ['products', $this->product->id]))->assertOk()->assertSee('SALES_RETURN_RESTOCK')->assertSee('SR-')->assertSee('href="'.route('sales.show', $this->sale).'"', false);
+        $returnMovement = StockMovement::where('reason', 'SALES_RETURN_RESTOCK')->with('saleReturn.sale')->firstOrFail();
         $this->assertSame($this->sale->id, $returnMovement->saleReturn->sale->id);
         $this->assertSame('18.000', $returnMovement->balance);
     }

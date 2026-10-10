@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Models\Purchase;
+use App\Models\PurchaseReturn;
 use App\Models\Sale;
+use App\Models\SaleReturn;
+use App\Models\SupplierReturn;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -11,6 +14,15 @@ class DocumentNumberService
 {
     private function parts(string $type, $date): array
     {
+        if ($type === 'SALES_RETURN') {
+            return ['SR-', 6, SaleReturn::class, 'reference'];
+        }
+        if ($type === 'PURCHASE_RETURN') {
+            return ['PR-', 6, PurchaseReturn::class, 'reference'];
+        }
+        if ($type === 'SUPPLIER_RETURN') {
+            return ['SR-SUP-', 6, SupplierReturn::class, 'reference'];
+        }
         $date = Carbon::parse($date);
 
         return $type === 'PURCHASE' ? ['pur-'.$date->format('Ym').'-', 4, Purchase::class, 'reference'] : ['INV-'.$date->format('Ymd').'-', 5, Sale::class, 'invoice'];

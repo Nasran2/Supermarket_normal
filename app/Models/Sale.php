@@ -45,7 +45,7 @@ class Sale extends Model
 
     public function returns()
     {
-        return $this->hasMany(SaleReturn::class)->orderBy('id');
+        return $this->hasMany(SaleReturn::class)->where('status', 'COMPLETED')->orderBy('id');
     }
 
     public function collections()
@@ -78,7 +78,8 @@ class Sale extends Model
         if ($this->status !== 'ACTIVE') {
             return '0.00';
         }
-        $due = Money::sub(Money::sub($this->customer_payable, $this->returned_total), Money::sub($this->collected_total, $this->refunded_total));
+        $credits = (string) ReturnAccountAllocation::where('sale_id', $this->id)->where('status', 'ACTIVE')->sum('amount');
+        $due = Money::sub(Money::sub(Money::sub($this->customer_payable, $this->collected_total), Money::sum($this->returns->pluck('due_reduction'))), $credits);
 
         return Money::compare($due, 0) > 0 ? $due : '0.00';
     }
@@ -112,9 +113,19 @@ class Sale extends Model
         return Money::sum($this->items->pluck('line_discount'));
     }
 
+    public function getReturnCreditTotalAttribute(): string
+    {
+        return Money::round((string) ReturnAccountAllocation::where('sale_id', $this->id)->where('status', 'ACTIVE')->sum('amount'));
+    }
+
     public function getPaymentNamesAttribute(): string
     {
-        return $this->payments->pluck('method_name')->join(' + ');
+        $names = $this->payments->pluck('method_name');
+        if (Money::compare($this->return_credit_total, 0) > 0) {
+            $names->push('Return credit');
+        }
+
+        return $names->join(' + ');
     }
 
     public function getCustomerFeesAttribute(): string

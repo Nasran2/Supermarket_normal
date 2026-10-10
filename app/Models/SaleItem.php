@@ -22,7 +22,7 @@ class SaleItem extends Model
 
     public function returns()
     {
-        return $this->hasMany(SaleReturnItem::class);
+        return $this->hasMany(SaleReturnItem::class)->whereHas('return', fn ($q) => $q->where('status', 'COMPLETED'));
     }
 
     public function unitRecord()

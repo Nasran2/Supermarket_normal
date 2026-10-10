@@ -184,8 +184,8 @@ class StockPriceLayersTest extends TestCase
         $this->assertSame(['10.000', '10.000'], $p->stockLayers()->orderBy('id')->pluck('remaining_quantity')->all());
         $sale = $this->sale($this->data($p, '15'));
         $this->post(route('sales.returns.store', $sale), ['token' => (string) Str::uuid(), 'reason' => 'Partial return', 'payment_method_id' => PaymentMethod::where('type', 'CASH')->value('id'), 'items' => [['sale_item_id' => $sale->items->first()->id, 'quantity' => '12']]])->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertSame('1220.00', $sale->returns()->first()->cost_total);
-        $this->assertSame(['10.000', '7.000'], $p->stockLayers()->orderBy('id')->pluck('remaining_quantity')->all());
+        $this->assertSame('1250.00', $sale->returns()->first()->cost_total);
+        $this->assertSame(['7.000', '10.000'], $p->stockLayers()->orderBy('id')->pluck('remaining_quantity')->all());
     }
 
     public function test_piece_rejects_fractional_quantity_but_weight_accepts_it(): void

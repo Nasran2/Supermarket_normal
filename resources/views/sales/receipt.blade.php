@@ -9,6 +9,7 @@
 @endforeach
 <div class="row grand"><span>GRAND TOTAL</span><strong>{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($sale->customer_payable) }}</strong></div>
 @if($sale->payments->count()>1)@foreach($sale->payments as $payment)<div class="row"><span>{{ ($settings['show_payment_method']??true)?$payment->method_name:'Payment '.$loop->iteration }}</span><strong>{{ \App\Support\Money::display($payment->customer_payable) }}</strong></div>@endforeach<div class="rule"></div>@endif
+@if(\App\Support\Money::compare($sale->return_credit_total,0)>0)<div class="row"><span>Return credit applied</span><strong>{{ \App\Support\Money::display($sale->return_credit_total) }}</strong></div>@endif
 <div class="row"><span>Paid</span><strong>{{ \App\Support\Money::display($sale->paid_total) }}</strong></div>@if($sale->payments->contains('method_type','CASH'))<div class="row"><span>Change</span><strong>{{ \App\Support\Money::display($sale->change_total) }}</strong></div>@endif
 @if($sale->returns->isNotEmpty())<div class="rule"></div><div class="row"><span>Items returned</span><strong>-{{ \App\Support\Money::display($sale->returned_total) }}</strong></div><div class="row"><span>Refunds paid</span><strong>{{ \App\Support\Money::display($sale->refunded_total) }}</strong></div>@endif
 @if(\App\Support\Money::compare($sale->due_balance,0)>0)<div class="row grand"><span>BALANCE DUE</span><strong>{{ \App\Support\Money::display($sale->due_balance) }}</strong></div>@endif

@@ -12,7 +12,7 @@ class Register extends Model
 
     public function payments()
     {
-        return $this->hasManyThrough(SalePayment::class, Sale::class, 'register_id', 'sale_id')->where('sales.status', 'ACTIVE');
+        return $this->hasManyThrough(SalePayment::class, Sale::class, 'register_id', 'sale_id')->whereIn('sales.status', ['ACTIVE', 'RETURN_CANCELLED']);
     }
 
     public function user()

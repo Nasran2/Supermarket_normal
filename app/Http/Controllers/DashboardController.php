@@ -10,7 +10,6 @@ use App\Models\SaleReturn;
 use App\Services\ProfitLossService;
 use App\Services\RegisterService;
 use App\Services\ReportService;
-use App\Support\Money;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -47,7 +46,8 @@ class DashboardController extends Controller
             $overview = [];
             for ($i = $days - 1; $i >= 0; $i--) {
                 $date = today()->subDays($i);
-                $overview[] = ['label' => $date->format('d M'), 'amount' => Money::sub((string) ($dailyTotals[$date->toDateString()] ?? 0), (string) ($dailyReturns[$date->toDateString()] ?? 0))];
+                $day = $date->toDateString();
+                $overview[] = ['label' => $date->format('d M'), 'amount' => $profit->calculate($day, $day)['revenue']];
             }
         }
         $lowStock = $can('low_stock') ? Product::with('unit')->where('active', true)->whereColumn('stock', '<=', 'low_stock')->orderBy('stock')->limit(6)->get() : collect();

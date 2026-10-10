@@ -1,6 +1,10 @@
 {
+  "_pos-price-options-BAhJc5iF.js": {
+    "file": "assets/pos-price-options-BAhJc5iF.js",
+    "name": "pos-price-options"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-CwYFpPwW.css",
+    "file": "assets/app-BMQFUw6s.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -9,16 +13,22 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DgyJefas.js",
+    "file": "assets/app-aNQdu_dh.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_pos-price-options-BAhJc5iF.js"
+    ]
   },
   "resources/js/pos.js": {
-    "file": "assets/pos-D4UTEZaC.js",
+    "file": "assets/pos-C9obRlIL.js",
     "name": "pos",
     "src": "resources/js/pos.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_pos-price-options-BAhJc5iF.js"
+    ]
   },
   "resources/js/product-units.js": {
     "file": "assets/product-units-r8KRWtin.js",

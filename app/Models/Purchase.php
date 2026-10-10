@@ -15,6 +15,11 @@ class Purchase extends Model
 
     protected $casts = ['purchase_date' => 'date', 'total' => 'decimal:2', 'payment_tracking' => 'boolean', 'subtotal' => 'decimal:2', 'charges_total' => 'decimal:2'];
 
+    public function returns()
+    {
+        return $this->hasMany(PurchaseReturn::class)->where('status', 'COMPLETED');
+    }
+
     public function charges()
     {
         return $this->hasMany(PurchaseCharge::class)->where('status', 'ACTIVE');
@@ -45,7 +50,7 @@ class Purchase extends Model
 
     public function getDueAmountAttribute(): ?string
     {
-        return $this->payment_tracking ? ($this->status === 'ACTIVE' ? Money::sub($this->total, $this->paid_amount) : '0.00') : null;
+        return $this->payment_tracking ? ($this->status === 'ACTIVE' ? Money::sub(Money::sub(Money::sub($this->total, $this->paid_amount), (string) $this->returns()->sum('due_reduction')), (string) ReturnAccountAllocation::where('purchase_id', $this->id)->where('status', 'ACTIVE')->sum('amount')) : '0.00') : null;
     }
 
     public function getPaymentStatusAttribute(): string

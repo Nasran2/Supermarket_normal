@@ -64,7 +64,9 @@ class PurchasePaymentService
             }
             $amount = Money::round((string) $data['amount']);
             $given = $amount;
-            $limit = $refund ? $purchase->paid_amount : $purchase->due_amount;
+            $returnClaims = Money::sub((string) $purchase->returns()->sum('amount'), (string) $purchase->returns()->sum('due_reduction'));
+            $refundable = Money::sub($purchase->paid_amount, $returnClaims);
+            $limit = $refund ? (Money::compare($refundable, 0) > 0 ? $refundable : '0.00') : $purchase->due_amount;
             if (Money::compare($amount, 0) <= 0 || (Money::compare($amount, $limit) > 0 && ($refund || empty($data['allow_change'])))) {
                 $this->fail($refund ? 'Refund exceeds the amount paid to this supplier.' : 'Payment exceeds the outstanding purchase balance. Refresh and check the due amount.');
             }

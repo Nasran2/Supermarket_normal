@@ -18,6 +18,7 @@ use App\Http\Controllers\StockBatchController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockPriceController;
 use App\Http\Controllers\SupplierAccountController;
+use App\Http\Controllers\TransactionReturnController;
 use App\Http\Middleware\HrEnabled;
 use App\Http\Middleware\SaleVisibility;
 use Illuminate\Support\Facades\Route;
@@ -38,6 +39,22 @@ Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(functi
         Route::get('/checkout-status', [PosController::class, 'checkoutStatus'])->name('checkout-status');
         Route::post('/quote', [PosController::class, 'quote'])->name('quote');
         Route::post('/complete', [PosController::class, 'complete'])->name('complete');
+    });
+    Route::prefix('returns')->group(function () {
+        Route::post('/supplier-credit/{supplier}', [TransactionReturnController::class, 'supplierCredit'])->name('returns.supplier-credit');
+        Route::get('/suppliers', [TransactionReturnController::class, 'supplierIndex'])->name('returns.suppliers');
+        Route::post('/suppliers/{supplierReturn}', [TransactionReturnController::class, 'supplierTransition'])->name('returns.suppliers.update');
+        Route::prefix('{kind}')->where(['kind' => 'sales|purchase'])->name('returns.')->group(function () {
+            Route::get('/', [TransactionReturnController::class, 'index'])->name('index');
+            Route::get('/create', [TransactionReturnController::class, 'create'])->name('create');
+            Route::get('/products', [TransactionReturnController::class, 'products'])->name('products');
+            Route::post('/draft', [TransactionReturnController::class, 'draft'])->name('draft');
+            Route::post('/quote', [TransactionReturnController::class, 'quote'])->name('quote');
+            Route::post('/', [TransactionReturnController::class, 'store'])->name('store');
+            Route::get('/{id}/receipt', [TransactionReturnController::class, 'receipt'])->whereNumber('id')->name('receipt');
+            Route::post('/{id}/cancel', [TransactionReturnController::class, 'cancel'])->whereNumber('id')->name('cancel');
+            Route::get('/{id}', [TransactionReturnController::class, 'show'])->whereNumber('id')->name('show');
+        });
     });
     Route::get('/sales', [SaleController::class, 'index'])->middleware('permission:sales.view')->name('sales.index');
     Route::get('/sales/{sale}/receipt', [SaleController::class, 'receipt'])->middleware('permission:sales.receipt')->name('sales.receipt');

@@ -3,8 +3,8 @@
     @if($sale->status === 'ACTIVE')
         @can('sales.edit')@if(auth()->user()->hasPermission('pos.access') && $sale->returns->isEmpty() && $sale->collections->isEmpty() && ((!$sale->register->closed_at && (int)$sale->register->open_user_id===auth()->id()) || auth()->user()->isAdministrator()))<a class="btn secondary" href="{{ route('sales.edit', $sale) }}" aria-label="Edit {{ $sale->invoice }}"><x-icon name="pencil" :size="16"/>Edit</a>@endif
 @endcan
-        @can('sales.return')
-            @if($sale->has_returnable_items)<a class="btn secondary" href="{{ route('sales.show', [$sale, 'action'=>'return']) }}" aria-label="Return {{ $sale->invoice }}"><x-icon name="package-open" :size="16"/>Return</a>@endif
+        @can('sales_returns.create')
+            @if($sale->has_returnable_items)<a class="btn secondary" href="{{ route('returns.create', ['sales','original_id'=>$sale->id]) }}" aria-label="Return {{ $sale->invoice }}"><x-icon name="package-open" :size="16"/>Return</a>@endif
         @endcan
         @can('sales.delete')
             @if($sale->returns->isEmpty() && $sale->collections->isEmpty() && (!$sale->register->closed_at || auth()->user()->isAdministrator()))<a class="btn danger" href="{{ route('sales.show', [$sale, 'action'=>'delete']) }}" aria-label="Delete {{ $sale->invoice }}"><x-icon name="trash-2" :size="16"/>Delete</a>@endif

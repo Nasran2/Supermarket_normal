@@ -138,3 +138,7 @@ Roles can choose All sales, Sales from the same role, or Only this person’s sa
 Set `hr_module=true` in `.env` and run `php artisan optimize:clear` to show **Human resources**. `false` hides every HR page, report and role-editor permission, and blocks direct HR URLs while preserving history. Administrator gets all HR access automatically; assign individual permissions to other roles. Customers stay in the existing customer module.
 
 HR includes staff intake/exit/rehire and optional user accounts, departments/job titles/shifts/holidays, attendance/overnight shifts/overtime, paid and unpaid leave approvals, monthly/daily payroll with allowances/deductions, partial salary payments/advances/reversals, staff ledgers and six filtered PDF/CSV reports with company letterhead. Approved payroll records salary cost once and locks attendance; cash payouts update register reconciliation. See [HR setup, payroll policies and verification](docs/HR-MODULE.md).
+
+## Returns and exchanges
+
+Sales and purchase returns now use four-step wizards with historical stock allocations, due-first settlement, linked exchange bills, write-offs and supplier claims. Settings, permissions, cancellation reversals, 80mm credit notes and account/register/report integration are included. See [workflow, safeguards and verification](docs/RETURNS-EXCHANGES.md).

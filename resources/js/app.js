@@ -216,3 +216,5 @@ document.addEventListener('wheel', () => {
 }, { passive: true });
 
 import './module-editor.js';
+
+import './returns.js';

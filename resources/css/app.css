@@ -1,3 +1,4 @@
+@import './returns.css';
 @import 'tailwindcss';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../views/**/*.blade.php';
@@ -2078,7 +2079,7 @@ body.pos-workspace {
 .pos-workspace .pos-grid {
   grid-template-columns: minmax(0, 1fr) 370px;
   gap: 22px;
-  align-items: start;
+  align-items: stretch;
   flex: 1;
   overflow: hidden;
 }

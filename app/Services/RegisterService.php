@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Register;
+use App\Models\ReturnSettlement;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\Money;
@@ -49,6 +50,8 @@ class RegisterService
 
         $summary = compact('cash', 'pos_cash', 'due_cash', 'in', 'out', 'expenses', 'expected') + ['collections' => Money::sub(Money::add(Money::sub((string) ($register->total_collections ?? 0), (string) ($register->total_change ?? 0)), (string) ($register->due_collections ?? 0)), (string) ($register->total_refunds ?? 0)), 'transactions' => $register->transactions_count,
             'due_collections' => Money::round((string) ($register->due_collections ?? 0)), 'refunds' => Money::round((string) ($register->total_refunds ?? 0)), 'returns' => Money::round((string) ($register->returned_amount ?? 0))];
+        $customerReversals = ReturnSettlement::where('register_id', $register->id)->whereNotNull('sale_return_id')->where('kind', 'REVERSAL');
+        $summary['collections'] = Money::add($summary['collections'], (string) (clone $customerReversals)->sum('amount'));
         if (! $detailed) {
             return $summary;
         }
@@ -69,10 +72,15 @@ class RegisterService
                 'base_amount' => Money::round((string) ($row?->base_amount ?? 0)), 'collected' => Money::sub(Money::add((string) ($row?->collected ?? 0), (string) ($dueTotals->get($type)?->amount ?? 0)), (string) ($refundTotals->get($type)?->amount ?? 0)),
                 'customer_fees' => Money::round((string) ($row?->customer_fees ?? 0)), 'business_fees' => Money::round((string) ($row?->business_fees ?? 0))];
         }
+        $reversalTotals = (clone $customerReversals)->selectRaw('method_type,SUM(amount) as amount')->groupBy('method_type')->get()->keyBy('method_type');
+        foreach ($paymentTotals as &$paymentTotal) {
+            $paymentTotal['collected'] = Money::add($paymentTotal['collected'], (string) ($reversalTotals->get($paymentTotal['type'])?->amount ?? '0'));
+        }
+        unset($paymentTotal);
         $sales = $register->sales()->visibleTo()->where('status', 'ACTIVE')->selectRaw('SUM(subtotal) as subtotal, SUM(discount) as discounts, SUM(sale_amount) as amount')->first();
 
         return $summary + ['payment_totals' => $paymentTotals, 'sales_subtotal' => Money::round((string) ($sales->subtotal ?? 0)), 'discounts' => Money::round((string) ($sales->discounts ?? 0)), 'sales_amount' => Money::round((string) ($sales->amount ?? 0)),
-            'return_records' => $register->returns()->whereHas('sale', fn ($q) => $q->visibleTo())->with('sale', 'user')->get(), 'collection_records' => $register->collections()->whereHas('sale', fn ($q) => $q->visibleTo())->with('sale', 'user')->get(),
+            'return_settlements' => $register->hasMany(ReturnSettlement::class)->with('saleReturn', 'purchaseReturn', 'supplierReturn')->get(), 'return_records' => $register->returns()->whereHas('sale', fn ($q) => $q->visibleTo())->with('sale', 'user')->get(), 'collection_records' => $register->collections()->whereHas('sale', fn ($q) => $q->visibleTo())->with('sale', 'user')->get(),
             'customer_fees' => Money::sum(array_column($paymentTotals, 'customer_fees')), 'business_fees' => Money::sum(array_column($paymentTotals, 'business_fees')),
             'voided_transactions' => $register->sales()->visibleTo()->where('status', 'VOIDED')->count()];
     }

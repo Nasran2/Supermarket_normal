@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\PurchaseReturn;
+use App\Models\SaleReturn;
+use App\Policies\TransactionReturnPolicy;
 use App\Services\SettingsService;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Gate;
@@ -17,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::policy(SaleReturn::class, TransactionReturnPolicy::class);
+        Gate::policy(PurchaseReturn::class, TransactionReturnPolicy::class);
         Schema::defaultStringLength(191);
         Paginator::useTailwind();
         Gate::before(fn ($user, $ability) => $user->hasPermission($ability) ? true : null);

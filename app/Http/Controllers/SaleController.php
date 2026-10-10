@@ -12,6 +12,7 @@ use App\Models\Customer;
 use App\Models\PaymentMethod;
 use App\Models\Register;
 use App\Models\Sale;
+use App\Models\SaleReturn;
 use App\Services\ProductUnitService;
 use App\Services\RegisterService;
 use App\Services\SaleAftercareService;
@@ -145,8 +146,11 @@ class SaleController extends Controller
         DB::transaction(function () use ($request, $sale) {
             $register = Register::whereKey($sale->register_id)->lockForUpdate()->firstOrFail();
             $sale = Sale::whereKey($sale->id)->lockForUpdate()->firstOrFail();
-            if ($sale->status !== 'ACTIVE' || ($register->closed_at && !auth()->user()->isAdministrator())) {
+            if ($sale->status !== 'ACTIVE' || ($register->closed_at && ! auth()->user()->isAdministrator())) {
                 throw ValidationException::withMessages(['sale' => 'Only active sales in open registers can be edited (unless administrator).']);
+            }
+            if (SaleReturn::where('sale_id', $sale->id)->orWhere('replacement_sale_id', $sale->id)->exists()) {
+                throw ValidationException::withMessages(['sale' => 'Invoices linked to returns retain their original customer and details.']);
             }
             $before = $sale->load('payments')->toArray();
             $data = $request->validated();

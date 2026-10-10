@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
+use App\Models\PurchaseReturn;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\Audit;
@@ -38,6 +39,9 @@ class PurchaseService
             }
             if ($purchase) {
                 $purchase = Purchase::whereKey($purchase->id)->lockForUpdate()->firstOrFail();
+                if ($purchase->returns()->exists() || PurchaseReturn::where('replacement_purchase_id', $purchase->id)->orWhere('purchase_id', $purchase->id)->exists()) {
+                    throw ValidationException::withMessages(['items' => 'Purchases linked to returns cannot be edited.']);
+                }
                 $before = $purchase->load('items', 'charges')->toArray();
                 $ids = array_unique(array_merge(array_column($data['items'], 'product_id'), $purchase->items->pluck('product_id')->all()));
                 Product::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
@@ -156,6 +160,9 @@ class PurchaseService
     {
         DB::transaction(function () use ($purchase, $userId, $reason) {
             $p = Purchase::whereKey($purchase->id)->lockForUpdate()->firstOrFail();
+            if ($p->returns()->exists() || PurchaseReturn::where('replacement_purchase_id', $p->id)->orWhere('purchase_id', $p->id)->exists()) {
+                throw ValidationException::withMessages(['reason' => 'Cancel the linked return instead of voiding this purchase.']);
+            }
             if ($p->status !== 'ACTIVE') {
                 throw ValidationException::withMessages(['reason' => 'Purchase is already voided.']);
             }

@@ -215,7 +215,7 @@ class RolePermissionsTest extends TestCase
         $supplier = Supplier::create(['name' => 'Action supplier', 'active' => true]);
         $purchase = Purchase::create(['reference' => 'ACCESS-PURCHASE', 'supplier_id' => $supplier->id, 'user_id' => $owner->id, 'purchase_date' => today(), 'total' => 0]);
         $actions = [
-            ['POST', 'sales.returns.store', $sale, 'sales.return'],
+            ['POST', 'sales.returns.store', $sale, 'sales_returns.create'],
             ['POST', 'sales.collections.store', $sale, 'sales.collect_payment'],
             ['DELETE', 'sales.destroy', $sale, 'sales.delete'],
             ['POST', 'sales.void', $sale, 'sales.void'],

@@ -1,0 +1,19 @@
+{
+    "scenarios": {
+        "A": "Due-first restock passed",
+        "B": "Historical write-off and same-product exchange passed",
+        "C": "Supplier provenance and exchange payment passed",
+        "D": "Purchase return and new same-product layer passed",
+        "E": "Another product and added supplier payable passed",
+        "F": "Split due allocation and cash receipt passed"
+    },
+    "verified": {
+        "customer_due": "190.00",
+        "supplier_due": "600.00",
+        "sellable_soap_stock": "27.000",
+        "non_sellable_supplier_pending": "1.000",
+        "historical_writeoff": "110.00",
+        "net_profit": "70.00",
+        "expected_register_cash": "9540.00"
+    }
+}

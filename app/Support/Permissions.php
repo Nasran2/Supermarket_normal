@@ -89,6 +89,16 @@ class Permissions
             }
         }
 
+        foreach (['sales', 'purchase'] as $kind) {
+            foreach (['view', 'create', 'approve', 'cancel', ...($kind === 'sales' ? ['refund', 'writeoff', 'return_to_supplier', 'apply_customer_due', 'allocate_other_customer'] : ['receive_refund', 'apply_supplier_credit'])] as $action) {
+                $legacy = $kind === 'sales' && in_array($action, ['view', 'create', 'refund']) ? ['sales.return'] : [];
+                $add($kind.'_returns.'.$action, ucfirst($kind).' returns', ucfirst(str_replace('_', ' ', $action)), 'Authorize '.str_replace('_', ' ', $action).' for '.$kind.' returns.', $legacy);
+            }
+        }
+        $add('supplier_returns.view', 'Supplier returns', 'View', 'View pending non-sellable returns.');
+        $add('supplier_returns.manage', 'Supplier returns', 'Manage', 'Send and settle supplier returns.');
+        $add('returns.view_cost', 'Returns', 'View historical costs', 'See return costs and allocation costs.');
+        $add('settings.returns', 'Settings', 'Return settings', 'Configure return business policies.');
         foreach (Hr::permissions() as $name => [$group, $label]) {
             $add($name, $group, $label, $label.'.', []);
         }

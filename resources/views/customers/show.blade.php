@@ -68,6 +68,7 @@
 </div>
 </div>
 
+@can('sales_returns.view')@include('returns.account-history',['kind'=>'sales','accountReturns'=>\App\Models\SaleReturn::whereHas('sale',fn($q)=>$q->visibleTo()->where('customer_id',$record->id))->with('sale','replacement')->latest('id')->limit(30)->get()])@endcan
 @can('customers.collect_payment')<dialog id="payment-modal" class="payment-dialog">
     <div class="modal-heading">
         <div>

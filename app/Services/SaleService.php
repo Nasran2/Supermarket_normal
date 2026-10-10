@@ -7,6 +7,7 @@ use App\Models\Expense;
 use App\Models\Product;
 use App\Models\Register;
 use App\Models\Sale;
+use App\Models\SaleReturn;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\Audit;
@@ -18,7 +19,7 @@ class SaleService
 {
     public function __construct(private SettingsService $settings, private SplitPaymentService $payments, private StockService $stock, private RegisterService $registers) {}
 
-    public function quote(array $data, User $user, bool $lock = false, ?Sale $editing = null): array
+    public function quote(array $data, User $user, bool $lock = false, ?Sale $editing = null, bool $historicalExchange = false, array $returnCredits = []): array
     {
         abort_if(count($data['payments'] ?? []) > 1 && ! $user->hasPermission('pos.split_payment'), 403);
         abort_if(! empty($data['allow_due']) && ! $user->hasPermission('pos.due_sale'), 403);
@@ -52,9 +53,9 @@ class SaleService
             $q = (string) $item['quantity'];
             $units = app(ProductUnitService::class);
             $baseQuantity = $units->resolve($p, $item['unit_id'] ?? null, $q)['base_stock_quantity'];
-            $allocation = app(StockLayerService::class)->plan($p, $baseQuantity, isset($item['stock_price']) ? (string) $item['stock_price'] : null, $reserved, $lock, $editing, isset($item['stock_layer_id']) ? (int) $item['stock_layer_id'] : null);
+            $allocation = app(StockLayerService::class)->plan($p, $baseQuantity, isset($item['stock_price']) ? (string) $item['stock_price'] : null, $reserved, $lock, $editing, isset($item['stock_layer_id']) ? (int) $item['stock_layer_id'] : null, $returnCredits);
             $selected = $units->resolve($p, $item['unit_id'] ?? null, $q, $allocation['stock_price']);
-            abort_if(isset($item['unit_price']) && Money::compare($item['unit_price'], $selected['price']) !== 0 && ! $user->hasPermission('pos.override_price'), 403);
+            abort_if(! $historicalExchange && isset($item['unit_price']) && Money::compare($item['unit_price'], $selected['price']) !== 0 && ! $user->hasPermission('pos.override_price'), 403);
             $adjustment = app(SaleLineService::class)->calculate($item, $selected['price']);
             $catalogTotal = Money::mul($selected['price'], $q);
             $priceReduction = Money::sub($catalogTotal, $adjustment['line_subtotal']);
@@ -67,9 +68,9 @@ class SaleService
         }
         $invoiceDiscount = app(SaleLineService::class)->billDiscount($data, Money::sub($subtotal, $lineDiscounts));
         $discount = Money::add($lineDiscounts, $invoiceDiscount);
-        abort_if(Money::compare($discount, 0) > 0 && ! $user->hasPermission('pos.discount'), 403);
+        abort_if(! $historicalExchange && Money::compare($discount, 0) > 0 && ! $user->hasPermission('pos.discount'), 403);
         $discountBudget = Money::add($discountBudget, $invoiceDiscount);
-        if (Money::compare($discountBudget, 0) > 0) {
+        if (! $historicalExchange && Money::compare($discountBudget, 0) > 0) {
             if (! $this->settings->get('allow_discount', true)) {
                 throw ValidationException::withMessages(['discount' => 'Discounts and price reductions are disabled.']);
             }
@@ -156,12 +157,33 @@ class SaleService
         }, 3);
     }
 
+    /** An exchange uses the same quote and stock consumer as POS; credit is a ledger allocation, never a cash payment. */
+    public function exchange(array $quote, ?int $customerId, User $user, string $token, string $reference): Sale
+    {
+        $register = $this->registers->current($user->id, true);
+        if (! $register) {
+            throw ValidationException::withMessages(['register' => 'Open your register before issuing replacement products.']);
+        }
+        $sale = Sale::create(['invoice' => app(DocumentNumberService::class)->next('SALE', now()), 'checkout_token' => $token, 'user_id' => $user->id, 'customer_id' => $customerId, 'register_id' => $register->id, 'subtotal' => $quote['subtotal'], 'discount' => $quote['discount'], 'sale_amount' => $quote['sale_amount'], 'processing_charge' => '0.00', 'customer_payable' => $quote['sale_amount'], 'cost_total' => $quote['cost_total'], 'sold_at' => now(), 'notes' => 'Exchange for '.$reference]);
+        foreach ($quote['items'] as $line) {
+            $item = $sale->items()->create(array_diff_key($line, ['allocations' => true]));
+            $product = Product::findOrFail($line['product_id']);
+            app(StockLayerService::class)->consume($product, $item, $line['allocations'], 'SALE', $sale->invoice, $user->id);
+        }
+        Audit::record('sale.exchange', $sale, [], ['return' => $reference, 'quote' => $quote]);
+
+        return $sale;
+    }
+
     public function void(Sale $sale, string $reason, int $userId): void
     {
         DB::transaction(function () use ($sale, $reason, $userId) {
             $r = Register::whereKey($sale->register_id)->lockForUpdate()->firstOrFail();
+            if (SaleReturn::where('replacement_sale_id', $sale->id)->exists()) {
+                throw ValidationException::withMessages(['reason' => 'Cancel the linked return to reverse an exchange sale.']);
+            }
             $isAdmin = User::find($userId)?->isAdministrator();
-            if ($r->closed_at && !$isAdmin) {
+            if ($r->closed_at && ! $isAdmin) {
                 throw ValidationException::withMessages(['reason' => 'This register is closed. Completed register records cannot be changed (unless administrator).']);
             }
             $sale = Sale::whereKey($sale->id)->lockForUpdate()->firstOrFail();

@@ -2,6 +2,8 @@
 
 Updated 8 October 2026.
 
+**Returns update (10 October):** the item return popup has been superseded by the complete four-step returns/exchanges workflow. Its permissions, stock actions, settlement options, cancellation safeguards and settings are documented in [Returns and exchanges](RETURNS-EXCHANGES.md). The return-specific instructions and checks below describe the earlier implementation; invoice editing and due-payment instructions remain applicable.
+
 The sales directory and invoice view use the existing emerald theme. Invoice actions are labeled View, Edit, Return, Delete and Pay due. Actions follow the existing permissions and transaction state. Search matches invoice, customer name or phone; date/status filters remain available.
 
 ## Cashier workflow

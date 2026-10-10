@@ -113,10 +113,13 @@ class StockLayerService
             ->map(fn ($layer) => ['stock_layer_id' => $layer->id, 'stock_price' => $layer->selling_price, 'quantity' => Money::quantity($layer->remaining_quantity, $credits[$layer->id] ?? '0'), 'reference' => $layer->source_reference, 'received' => $layer->received_at?->format('d M Y'), 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p, $layer->selling_price))])->values()->all();
     }
 
-    public function plan(Product $p, string $quantity, ?string $price, array &$reserved, bool $lock = false, ?Sale $editing = null, ?int $layerId = null): array
+    public function plan(Product $p, string $quantity, ?string $price, array &$reserved, bool $lock = false, ?Sale $editing = null, ?int $layerId = null, array $returnCredits = []): array
     {
         $this->ensureLegacy($p);
         $credits = $this->credits($editing, $p);
+        foreach ($returnCredits as $id => $credit) {
+            $credits[$id] = Money::quantity($credits[$id] ?? '0', $credit['quantity']);
+        }
         $query = $p->stockLayers()->where('status', 'ACTIVE')->where(fn ($q) => $q->where('remaining_quantity', '>', 0)->when($credits, fn ($q) => $q->orWhereIn('id', array_keys($credits))))->orderBy('received_at')->orderBy('id');
         if ($layerId !== null) {
             $query->whereKey($layerId);
@@ -162,6 +165,7 @@ class StockLayerService
                         }
                     }
                 }
+                $creditCost = Money::add($creditCost, $returnCredits[$layer->id]['cost_total'] ?? '0');
                 $pool = Money::sub(Money::add($layer->remaining_cost_total, $creditCost), $reserved['cost_'.$layer->id] ?? '0');
                 $lineCost = BigDecimal::of($pool)->multipliedBy($take)->dividedBy($qty, 2, RoundingMode::HALF_UP);
                 $reserved['cost_'.$layer->id] = Money::add($reserved['cost_'.$layer->id] ?? '0', (string) $lineCost);
@@ -202,7 +206,7 @@ class StockLayerService
     }
 
     /** Preserve legacy sale snapshots; this bridge is only used when an old sale is edited/returned. */
-    private function legacyAllocation(SaleItem $item, Product $p): void
+    public function legacyAllocation(SaleItem $item, Product $p): void
     {
         if ($item->allocations()->exists()) {
             return;

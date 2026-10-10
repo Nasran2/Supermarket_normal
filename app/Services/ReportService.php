@@ -7,7 +7,9 @@ use App\Models\Expense;
 use App\Models\Product;
 use App\Models\ProductStockLayer;
 use App\Models\Purchase;
+use App\Models\PurchaseReturn;
 use App\Models\Register;
+use App\Models\ReturnSettlement;
 use App\Models\Sale;
 use App\Models\SaleCollection;
 use App\Models\SaleItem;
@@ -24,7 +26,7 @@ use Illuminate\Support\Facades\Schema;
 
 class ReportService
 {
-    public const TITLES = ['sales' => 'Sales', 'purchases' => 'Purchases', 'expenses' => 'Expenses', 'profit' => 'Profit & loss', 'stock' => 'Stock', 'product-sales' => 'Product sales', 'payments' => 'Payment methods', 'register' => 'Register', 'cash' => 'Cash summary', 'payment-charges' => 'Payment processing charges', 'card-charges' => 'Card charges', 'qr-charges' => 'QR charges', 'bank-charges' => 'Bank charges', 'returns' => 'Sales returns', 'collections' => 'Due collections', 'audit' => 'Audit log'];
+    public const TITLES = ['sales' => 'Sales', 'purchases' => 'Purchases', 'expenses' => 'Expenses', 'profit' => 'Profit & loss', 'stock' => 'Stock', 'product-sales' => 'Product sales', 'payments' => 'Payment methods', 'register' => 'Register', 'cash' => 'Cash summary', 'payment-charges' => 'Payment processing charges', 'card-charges' => 'Card charges', 'qr-charges' => 'QR charges', 'bank-charges' => 'Bank charges', 'purchase-returns' => 'Purchase returns', 'returns' => 'Sales returns', 'collections' => 'Due collections', 'audit' => 'Audit log'];
 
     public static function permission(string $kind): string
     {
@@ -38,7 +40,7 @@ class ReportService
         $cards = [];
         $start = $from.' 00:00:00';
         $end = $to.' 23:59:59';
-        $pay = SalePayment::with(['sale.user', 'expense'])->whereHas('sale', fn ($q) => $q->visibleTo()->where('status', 'ACTIVE')->whereBetween('sold_at', [$start, $end]));
+        $pay = SalePayment::with(['sale.user', 'expense'])->whereHas('sale', fn ($q) => $q->visibleTo()->whereIn('status', ['ACTIVE', 'RETURN_CANCELLED'])->whereBetween('sold_at', [$start, $end]));
         foreach (['payment_method_id' => 'payment_method_id', 'rule_id' => 'payment_charge_rule_id', 'charge_bearer' => 'charge_bearer'] as $input => $col) {
             if (! empty($filters[$input])) {
                 $pay->where($col, $filters[$input]);
@@ -70,12 +72,37 @@ class ReportService
                         $activity->where('user_id', $filters['user_id']);
                     }
                 }
-                $base->unionAll($collections)->unionAll($refunds);
+                $events = ReturnSettlement::whereBetween('created_at', [$start, $end])->whereIn('kind', ['PURCHASE_RETURN_REFUND', 'PURCHASE_RETURN_PAYMENT', 'SUPPLIER_RETURN_REFUND', 'REVERSAL'])->where(fn ($q) => $q->whereNull('sale_return_id')->orWhereHas('saleReturn.sale', fn ($q) => $q->visibleTo()))->selectRaw('payment_method_id, method_name, method_type, 0 as base, 0 as customer_fees, 0 as business_fees, amount as collections');
+                foreach (['user_id', 'payment_method_id'] as $key) {
+                    if (! empty($filters[$key])) {
+                        $events->where($key, $filters[$key]);
+                    }
+                }
+                $base->unionAll($collections)->unionAll($refunds)->unionAll($events);
             }
             $query = DB::query()->fromSub($base->toBase(), 'tenders')->selectRaw('payment_method_id, method_name, method_type, COUNT(*) as transactions, SUM(base) as base, SUM(customer_fees) as customer_fees, SUM(business_fees) as business_fees, SUM(collections) as collections')->groupBy('payment_method_id', 'method_name', 'method_type')->orderBy('method_name');
             $headers = ['Payment method', 'Type', 'Entries including collections / refunds', 'Original allocated sales', 'Customer-paid charges', 'Business-paid charges', 'Net collections'];
             $map = fn ($p) => [$p->method_name, $p->method_type, $p->transactions, Money::display($p->base), Money::display($p->customer_fees), Money::display($p->business_fees), Money::display($p->collections)];
             $cards = ['Net collections' => (string) DB::query()->fromSub(clone $query, 'totals')->sum('collections'), 'Original allocated sales' => (string) (clone $pay)->sum('sale_amount')];
+        } elseif ($kind === 'purchase-returns') {
+            $query = PurchaseReturn::with('purchase', 'supplier', 'user')->whereBetween('returned_at', [$start, $end])->latest('id');
+            foreach (['status', 'reason', 'resolution', 'supplier_id', 'user_id'] as $key) {
+                if (! empty($filters[$key])) {
+                    $query->where($key, $filters[$key]);
+                }
+            }
+            if (! empty($filters['q'])) {
+                $query->where(fn ($q) => $q->where('reference', 'like', '%'.$filters['q'].'%')->orWhereHas('purchase', fn ($q) => $q->where('reference', 'like', '%'.$filters['q'].'%')));
+            }
+            if (! empty($filters['product_id'])) {
+                $query->whereHas('items.item', fn ($q) => $q->where('product_id', $filters['product_id']));
+            }
+            if (! empty($filters['payment_method_id'])) {
+                $query->whereHas('settlements', fn ($q) => $q->where('payment_method_id', $filters['payment_method_id']));
+            }
+            $headers = ['Date', 'Return', 'Purchase', 'Supplier', 'Value', 'Due reduced', 'Replacement', 'Received', 'Paid', 'Supplier credit', 'Status', 'Cashier'];
+            $map = fn ($r) => [$r->returned_at->format('Y-m-d H:i'), $r->reference, $r->purchase->reference, $r->supplier->name, Money::display($r->amount), Money::display($r->due_reduction), Money::display($r->replacement_value), Money::display($r->refund_amount), Money::display($r->additional_payment), Money::display($r->supplier_credit), $r->status, $r->user->name];
+            $cards = ['Completed returns' => (string) (clone $query)->completed()->sum('amount'), 'Supplier refunds received' => (string) (clone $query)->completed()->sum('refund_amount')];
         } elseif (in_array($kind, ['returns', 'collections'])) {
             $isReturn = $kind === 'returns';
             $query = ($isReturn ? SaleReturn::query() : SaleCollection::query())->whereHas('sale', fn ($q) => $q->visibleTo())->with('sale', 'user')->whereBetween($isReturn ? 'returned_at' : 'collected_at', [$start, $end])->latest('id');
@@ -88,9 +115,22 @@ class ReportService
             if (! empty($filters['q'])) {
                 $query->whereHas('sale', fn ($q) => $q->where('invoice', 'like', '%'.$filters['q'].'%'));
             }
-            $headers = $isReturn ? ['Date', 'Return', 'Invoice', 'Return value', 'Due reduction', 'Refund paid', 'Method', 'Register', 'Cashier', 'Reason'] : ['Date', 'Invoice', 'Collected', 'Received', 'Change', 'Method', 'Register', 'Cashier', 'Reference'];
-            $map = $isReturn ? fn ($r) => [$r->returned_at->format('Y-m-d H:i'), $r->reference, $r->sale->invoice, Money::display($r->amount), Money::display($r->due_reduction), Money::display($r->refund_amount), $r->method_name ?? 'No refund', 'REG-'.$r->register_id, $r->user->name, $r->reason] : fn ($c) => [$c->collected_at->format('Y-m-d H:i'), $c->sale->invoice, Money::display($c->amount), Money::display($c->amount_paid), Money::display($c->change), $c->method_name, 'REG-'.$c->register_id, $c->user->name, $c->reference ?? '—'];
-            $cards = $isReturn ? ['Returns' => (string) (clone $query)->sum('amount'), 'Refunds paid' => (string) (clone $query)->sum('refund_amount'), 'Due reduced' => (string) (clone $query)->sum('due_reduction')] : ['Dues collected' => (string) (clone $query)->sum('amount')];
+            if ($isReturn) {
+                foreach (['status', 'reason', 'resolution', 'customer_id'] as $key) {
+                    if (! empty($filters[$key])) {
+                        $query->where($key, $filters[$key]);
+                    }
+                }
+                if (! empty($filters['stock_action'])) {
+                    $query->whereHas('items', fn ($q) => $q->where('stock_action', $filters['stock_action']));
+                }
+                if (! empty($filters['product_id'])) {
+                    $query->whereHas('items.item', fn ($q) => $q->where('product_id', $filters['product_id']));
+                }
+            }
+            $headers = $isReturn ? ['Date', 'Return', 'Invoice', 'Return value', 'Due reduction', 'Refund paid', 'Method', 'Register', 'Cashier', 'Reason', 'Replacement', 'Additional payment', 'Status'] : ['Date', 'Invoice', 'Collected', 'Received', 'Change', 'Method', 'Register', 'Cashier', 'Reference'];
+            $map = $isReturn ? fn ($r) => [$r->returned_at->format('Y-m-d H:i'), $r->reference, $r->sale->invoice, Money::display($r->amount), Money::display($r->due_reduction), Money::display($r->refund_amount), $r->method_name ?? 'No refund', 'REG-'.$r->register_id, $r->user->name, $r->reason, Money::display($r->replacement_value), Money::display($r->additional_payment), $r->status] : fn ($c) => [$c->collected_at->format('Y-m-d H:i'), $c->sale->invoice, Money::display($c->amount), Money::display($c->amount_paid), Money::display($c->change), $c->method_name, 'REG-'.$c->register_id, $c->user->name, $c->reference ?? '—'];
+            $cards = $isReturn ? ['Returns' => (string) (clone $query)->completed()->sum('amount'), 'Refunds paid' => (string) (clone $query)->completed()->sum('refund_amount'), 'Due reduced' => (string) (clone $query)->completed()->sum('due_reduction')] : ['Dues collected' => (string) (clone $query)->sum('amount')];
         } elseif ($kind === 'sales') {
             $query = Sale::visibleTo()->with(['user', 'customer', 'payments', 'returns', 'collections'])->whereBetween('sold_at', [$start, $end])->latest('sold_at');
             if (! empty($filters['user_id'])) {
@@ -128,14 +168,31 @@ class ReportService
                     $q->where('invoice', 'like', '%'.$filters['q'].'%');
                 }
             });
-            $original = (string) (clone $query)->where('status', 'ACTIVE')->sum('sale_amount');
-            $returned = (string) $periodReturns->sum('amount');
+            $original = (string) (clone $query)->whereIn('status', ['ACTIVE', 'RETURN_CANCELLED'])->sum('sale_amount');
+            $exchangeReversals = Sale::visibleTo()->where('status', 'RETURN_CANCELLED')->whereBetween('voided_at', [$start, $end]);
+            foreach (['user_id'] as $key) {
+                if (! empty($filters[$key])) {
+                    $exchangeReversals->where($key, $filters[$key]);
+                }
+            }
+            if (! empty($filters['q'])) {
+                $exchangeReversals->where('invoice', 'like', '%'.$filters['q'].'%');
+            }
+            if (! empty($filters['payment_method_id'])) {
+                $exchangeReversals->whereHas('payments', fn ($q) => $q->where('payment_method_id', $filters['payment_method_id']));
+            }
+            $original = Money::sub($original, (string) $exchangeReversals->sum('sale_amount'));
+            $returned = Money::sub((string) $periodReturns->sum('amount'), (string) SaleReturn::whereHas('sale', fn ($q) => $q->visibleTo())->where('status', 'CANCELLED')->whereBetween('cancelled_at', [$start, $end])->sum('amount'));
             $cards = ['Sales before returns' => $original, 'Returns in period' => $returned, 'Net revenue in period' => Money::sub($original, $returned), 'Original invoice payable' => (string) (clone $query)->where('status', 'ACTIVE')->sum('customer_payable')];
         } elseif ($kind === 'purchases') {
             $query = Purchase::with('supplier', 'user')->withPaymentTotals()->whereBetween('purchase_date', [$from, $to])->latest('purchase_date');
             $headers = ['Date', 'Reference', 'Supplier', 'Amount', 'Paid less refunds', 'Due', 'Payment status', 'Recorded by', 'Status'];
             $map = fn ($p) => [$p->purchase_date->format('Y-m-d'), $p->reference, $p->supplier->name, Money::display($p->total), $p->payment_tracking ? Money::display($p->paid_amount) : 'Unrecorded', $p->due_amount !== null ? Money::display($p->due_amount) : 'Unrecorded', $p->payment_status, $p->user->name, $p->status];
-            $cards = ['Active purchases' => (string) (clone $query)->where('status', 'ACTIVE')->sum('total')];
+            $grossPurchases = (string) (clone $query)->whereIn('status', ['ACTIVE', 'RETURN_CANCELLED'])->sum('total');
+            $reversals = PurchaseReturn::where('status', 'CANCELLED')->whereBetween('cancelled_at', [$start, $end]);
+            $grossPurchases = Money::sub($grossPurchases, Money::sum((clone $reversals)->with('replacement')->get()->map(fn ($r) => $r->replacement?->total ?? '0')));
+            $returned = Money::sub((string) PurchaseReturn::whereBetween('returned_at', [$start, $end])->sum('amount'), (string) $reversals->sum('amount'));
+            $cards = ['Gross purchases' => $grossPurchases, 'Purchase returns' => $returned, 'Net purchases' => Money::sub($grossPurchases, $returned)];
         } elseif ($kind === 'expenses') {
             $query = Expense::visibleSales()->with('category', 'user', 'method')->whereBetween('expense_date', [$from, $to])->latest('expense_date');
             if (! empty($filters['user_id'])) {
@@ -242,7 +299,8 @@ class ReportService
             $pp = SalesVisibility::apply(DB::table('purchase_payments'), 'purchase_payments.user_id')->selectRaw("CASE WHEN kind = 'REFUND' THEN 'Supplier refund' ELSE 'Supplier payment' END as type, purchase_id as reference_id, reference, created_at as date, payment_method_id, CASE WHEN kind = 'REFUND' THEN amount ELSE 0 END as in_amount, CASE WHEN kind = 'PAYMENT' THEN amount ELSE 0 END as out_amount");
             $xp = SalesVisibility::apply(DB::table('expenses'), 'expenses.user_id')->where(fn ($q) => $q->whereNull('sale_id')->orWhereIn('sale_id', Sale::visibleTo()->select('id')))->selectRaw("'Expense' as type, id as reference_id, reference, expense_date as date, payment_method_id, 0 as in_amount, amount as out_amount")->whereNotNull('payment_method_id')->where('status', 'ACTIVE');
 
-            $unionQuery = $sp->unionAll($cp)->unionAll($sc)->unionAll($sr)->unionAll($pp)->unionAll($xp);
+            $returnEvents = DB::table('return_settlements as r')->leftJoin('sale_returns as sr', 'sr.id', '=', 'r.sale_return_id')->leftJoin('purchase_returns as pr', 'pr.id', '=', 'r.purchase_return_id')->leftJoin('supplier_returns as sup', 'sup.id', '=', 'r.supplier_return_id')->whereIn('r.kind', ['PURCHASE_RETURN_REFUND', 'PURCHASE_RETURN_PAYMENT', 'SUPPLIER_RETURN_REFUND', 'REVERSAL'])->where(fn ($q) => $q->whereNull('sr.id')->orWhereIn('sr.sale_id', Sale::visibleTo()->select('id')))->selectRaw('r.kind as type, r.id as reference_id, COALESCE(sr.reference,pr.reference,sup.reference) as reference,r.created_at as date,r.payment_method_id,CASE WHEN r.amount>0 THEN r.amount ELSE 0 END as in_amount,CASE WHEN r.amount<0 THEN -r.amount ELSE 0 END as out_amount');
+            $unionQuery = $sp->unionAll($cp)->unionAll($sc)->unionAll($sr)->unionAll($pp)->unionAll($xp)->unionAll($returnEvents);
             if (Schema::hasTable('hr_payments')) {
                 $hrDate = DB::getDriverName() === 'sqlite' ? "date || ' 00:00:00'" : "CONCAT(date, ' 00:00:00')";
                 $hp = SalesVisibility::apply(DB::table('hr_payments'), 'hr_payments.user_id')->selectRaw("'Staff payment' as type, id as reference_id, reference, $hrDate as date, payment_method_id, 0 as in_amount, amount as out_amount")->where('status', 'ACTIVE');

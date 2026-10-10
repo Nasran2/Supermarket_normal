@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\AuditLog;
 use App\Models\Purchase;
+use App\Models\PurchaseReturn;
 use App\Models\Supplier;
+use App\Models\SupplierReturn;
 use App\Support\Money;
 use Carbon\Carbon;
 
@@ -31,9 +33,32 @@ class SupplierLedgerService
                 $refund = $payment->kind === 'REFUND';
                 $add($payment->paid_at, $refund ? 'Refund' : ($payment->kind === 'OPENING' ? 'Opening payment' : 'Payment'), $payment->method_name.($payment->reference ? ' · '.$payment->reference : '').($payment->notes ? ' · '.$payment->notes : ''), $refund ? $payment->amount : '0.00', $refund ? '0.00' : $payment->amount, $payment->amount, '2-'.$payment->id);
             }
-            if ($purchase->status !== 'ACTIVE') {
+            if ($purchase->status !== 'ACTIVE' && $purchase->status !== 'RETURN_CANCELLED') {
                 $void = ($audits[$purchase->id] ?? collect())->firstWhere('action', 'purchase.void');
                 $add($void?->created_at ?? $purchase->updated_at, 'Void', $void?->after['reason'] ?? 'Purchase voided', '0.00', $purchase->payment_tracking ? $purchase->total : '0.00', $purchase->total, '3-'.$purchase->id);
+            }
+        }
+        $returns = PurchaseReturn::where('supplier_id', $supplier->id)->with('purchase', 'settlements')->get();
+        $addReturn = function ($date, $type, $reference, $purchaseId, $debit, $credit, $order) use ($entries) {
+            $entries->push(['date' => Carbon::parse($date), 'type' => $type, 'reference' => $reference, 'description' => $type.' · '.$reference, 'purchase_id' => $purchaseId, 'debit' => $debit, 'credit' => $credit, 'amount' => Money::add($debit, $credit), 'order' => $order]);
+        };
+        foreach ($returns as $r) {
+            $addReturn($r->returned_at, 'Purchase Return', $r->reference, $r->purchase_id, '0.00', $r->amount, '4-'.$r->id);
+            foreach ($r->settlements as $event) {
+                $addReturn($event->created_at, str_replace('_', ' ', $event->kind), $r->reference, $r->purchase_id, Money::compare($event->amount, 0) > 0 ? $event->amount : '0.00', Money::compare($event->amount, 0) < 0 ? Money::sub('0', $event->amount) : '0.00', '5-'.$event->id);
+            }
+            if ($r->status === 'CANCELLED') {
+                $addReturn($r->cancelled_at, 'Return Cancellation', $r->reference, $r->purchase_id, $r->amount, '0.00', '6-'.$r->id);
+                if ($r->replacement) {
+                    $addReturn($r->cancelled_at, 'Replacement Cancellation', $r->replacement->reference, $r->replacement_purchase_id, '0.00', $r->replacement->total, '7-'.$r->id);
+                }
+            }
+        }
+        foreach (SupplierReturn::where('supplier_id', $supplier->id)->where('status', 'SETTLED')->with('settlements')->get() as $r) {
+            $purchaseId = $supplier->purchases()->value('id');
+            $addReturn($r->settled_at, 'Supplier Return Credit', $r->reference, $purchaseId, '0.00', $r->amount, '8-'.$r->id);
+            foreach ($r->settlements as $event) {
+                $addReturn($event->created_at, 'Supplier Return Refund', $r->reference, $purchaseId, $event->amount, '0.00', '9-'.$event->id);
             }
         }
         $entries = $entries->sort(fn ($a, $b) => $a['date']->getTimestamp() <=> $b['date']->getTimestamp() ?: strnatcmp($a['order'], $b['order']))->values();

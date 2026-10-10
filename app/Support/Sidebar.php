@@ -24,8 +24,8 @@ class Sidebar
             ]);
         };
         $workspace = [
-            $group('Sales', 'receipt-text', [$link('All sales', 'sales.index', [], 'sales.view', request()->is('sales*')), $link('New sale', 'pos.index', [], ['pos.access', 'sales.create']), $link('Sales report', 'reports.show', 'sales', 'reports.sales')]),
-            $group('Purchases', 'package-open', [$link('All purchases', 'purchases.index', [], 'purchases.view', request()->is('purchases*') && ! request()->routeIs('purchases.create')), $link('Add purchase', 'purchases.create', [], 'purchases.create', request()->routeIs('purchases.create')), $link('Purchase report', 'reports.show', 'purchases', 'reports.purchases')]),
+            $group('Sales', 'receipt-text', [$link('All sales', 'sales.index', [], 'sales.view', request()->is('sales*')), $link('New sale', 'pos.index', [], ['pos.access', 'sales.create']), $link('Sales Return', 'returns.create', 'sales', 'sales_returns.create', request()->routeIs('returns.create') && request()->route('kind') === 'sales'), $link('Sales Returns Report', 'returns.index', 'sales', 'sales_returns.view', request()->routeIs('returns.index') && request()->route('kind') === 'sales'), $link('Sales report', 'reports.show', 'sales', 'reports.sales')]),
+            $group('Purchases', 'package-open', [$link('All purchases', 'purchases.index', [], 'purchases.view', request()->is('purchases*') && ! request()->routeIs('purchases.create')), $link('Add purchase', 'purchases.create', [], 'purchases.create', request()->routeIs('purchases.create')), $link('Purchase Return', 'returns.create', 'purchase', 'purchase_returns.create', request()->routeIs('returns.create') && request()->route('kind') === 'purchase'), $link('Purchase Returns Report', 'returns.index', 'purchase', 'purchase_returns.view', request()->routeIs('returns.index') && request()->route('kind') === 'purchase'), $link('Purchase report', 'reports.show', 'purchases', 'reports.purchases')]),
             $group('Daily register', 'wallet', [$link('Register & history', 'register.index', [], 'register.view', request()->is('register*')), $link('Register report', 'reports.show', 'register', 'reports.register'), $link('Cash summary', 'reports.show', 'cash', 'reports.cash')]),
         ];
         $products = $resource('products', 'Products', 'package', 'product');
@@ -42,7 +42,7 @@ class Sidebar
             }
         }
         $expenses['active'] = collect($expenses['children'])->contains('active', true);
-        $inventory = [$products, $resource('categories', 'Categories', 'tags', 'category'), $resource('units', 'Units', 'ruler', 'unit'), $resource('unit-presets', 'Multiple units', 'boxes', 'unit preset'), $resource('suppliers', 'Suppliers', 'truck', 'supplier'), $resource('customers', 'Customers', 'contact', 'customer'), $expenses];
+        $inventory = [$products, $resource('categories', 'Categories', 'tags', 'category'), $resource('units', 'Units', 'ruler', 'unit'), $resource('unit-presets', 'Multiple units', 'boxes', 'unit preset'), $group('Suppliers', 'truck', [$link('All suppliers', 'manage.index', 'suppliers', 'suppliers.view'), $link('Add supplier', 'manage.create', 'suppliers', 'suppliers.create'), $link('Supplier Returns', 'returns.suppliers', [], 'supplier_returns.view', request()->routeIs('returns.suppliers'))]), $resource('customers', 'Customers', 'contact', 'customer'), $expenses];
         $reports = [$link('All reports', 'reports.index', [], [], request()->routeIs('reports.index'))];
         foreach (ReportService::TITLES as $key => $title) {
             $reports[] = $link($title, 'reports.show', $key, ReportService::permission($key), request()->route('report') === $key);

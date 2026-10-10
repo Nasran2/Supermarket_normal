@@ -10,6 +10,11 @@ class SaleReturnItem extends Model
 
     protected $casts = ['quantity' => 'decimal:3', 'base_quantity' => 'decimal:3', 'amount' => 'decimal:2', 'cost_total' => 'decimal:2'];
 
+    public function allocations()
+    {
+        return $this->hasMany(ReturnStockAllocation::class);
+    }
+
     public function return()
     {
         return $this->belongsTo(SaleReturn::class, 'sale_return_id');
