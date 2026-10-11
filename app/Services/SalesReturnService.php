@@ -15,6 +15,7 @@ use App\Models\Supplier;
 use App\Models\SupplierReturn;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\Expiry;
 use App\Support\Money;
 use App\Support\SalesVisibility;
 use Brick\Math\BigDecimal;
@@ -82,6 +83,9 @@ class SalesReturnService
             }
             app(StockLayerService::class)->legacyAllocation($item, $item->product);
             $allocations = $this->stock->salePlan($item, $base, $lock);
+            if (Expiry::enabled() && $action === 'RESTOCK' && collect($allocations)->contains(fn ($a) => Expiry::expired($a['expires_at'] ?? null))) {
+                ReturnSettlementService::fail('This product has expired and cannot be returned to sellable stock. Choose Write off or Return to supplier.');
+            }
             if ($action === 'SUPPLIER') {
                 foreach ($allocations as &$a) {
                     if (! $a['supplier_id']) {

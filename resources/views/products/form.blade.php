@@ -51,6 +51,9 @@
 </aside>
 <section class="card product-stock-card">
     <div class="customer-section-heading"><span class="customer-section-icon"><x-icon name="boxes"/></span><div><h2>Primary unit & stock</h2><p>Choose whether to keep a stock count for this product.</p></div></div>
+    @if(\App\Support\Expiry::enabled())
+    <label class="customer-active-setting"><input type="hidden" name="track_expiry" value="0"><input id="track-expiry" type="checkbox" name="track_expiry" value="1" @checked(old('track_expiry', $record->exists ? $record->track_expiry : \App\Support\Expiry::setting('expiry_default_tracking')))><span><strong>Track expiry</strong><small>Use this for products where stock batches have expiry dates.</small></span></label>
+    @endif
     <label class="customer-active-setting"><input type="hidden" name="track_stock" value="0"><input id="track-stock" type="checkbox" name="track_stock" value="1" @checked(old('track_stock',$record->exists?$record->track_stock:true))><span><strong>Maintain stock</strong><small>Enabled by default. Switch off for products you sell without keeping a stock count.</small></span></label>
     <p class="notice" id="stock-tracking-note" hidden>Stock is not maintained. This product can be sold without available stock. Enter its cost and selling price below.</p>
     <div class="product-stock-fields">

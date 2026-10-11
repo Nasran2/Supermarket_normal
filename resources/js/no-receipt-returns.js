@@ -106,6 +106,8 @@ if (config) {
         price_override_reason: r.override_reason || null,
         stock_selling_price: r.stock_price,
         cost_basis: r.cost_basis === '' ? null : r.cost_basis,
+        expires_at: r.expires_at || null,
+        batch_number: r.batch_number || null,
         purchased_on: r.purchased_on || null,
       })),
       replacements:
@@ -115,6 +117,7 @@ if (config) {
               product_id: r.product.id,
               unit_id: r.unit_id,
               quantity: r.quantity,
+              expires_at: r.expires_at ?? null,
               stock_price: r.stock_price,
               ...(r.line_index != null ? { return_line_index: r.line_index } : {}),
             })),
@@ -329,6 +332,16 @@ if (config) {
       qty.step = unit.decimal ? '0.001' : '1';
       qty.setAttribute('aria-label', `Return quantity for ${r.product.name}`);
       field(grid, 'Qty', qty);
+      if (r.product.track_expiry && !r.match) {
+        const expiryInput = document.createElement('input'); expiryInput.type = 'date'; expiryInput.value = r.expires_at || '';
+        expiryInput.addEventListener('input', () => { r.expires_at = expiryInput.value; clearQuote(); });
+        field(grid, 'Expiry date on packaging (needed to restock)', expiryInput);
+        if (r.product.batch_enabled) {
+        const batchInput = document.createElement('input'); batchInput.maxLength = 100; batchInput.value = r.batch_number || '';
+        batchInput.addEventListener('input', () => { r.batch_number = batchInput.value; clearQuote(); });
+        field(grid, 'Batch number (optional)', batchInput);
+        }
+      }
       const units = r.product.units.map((u) => [u.id, u.short_name]);
       if (r.match && !units.some(([id]) => id === r.unit_id)) units.push([r.unit_id, r.match.unit]);
       const unitSelect = select(units, r.unit_id, (v) => {
@@ -581,6 +594,7 @@ if (config) {
       product: p,
       unit_id: line_index != null ? rows[line_index].unit_id : p.unit_id,
       quantity: line_index != null ? rows[line_index].quantity : '1',
+      expires_at: option?.expires_at ?? null,
       stock_price: option?.stock_price,
       line_index,
     };
@@ -605,7 +619,7 @@ if (config) {
       $('nr-price-options').replaceChildren(
         ...options.map((o) =>
           button(
-            `${money(o.stock_price)} · ${o.quantity} available`,
+            `${money(o.stock_price)}${o.expiry_label ? ` · Exp ${o.expiry_label}` : ''} · ${o.quantity} available`,
             () => add(o),
             'btn secondary w-full',
           ),
@@ -648,12 +662,12 @@ if (config) {
         card,
         'Available selling price',
         select(
-          sellingPriceOptions(r.product).map((o) => [
-            o.stock_price,
-            `${money(o.stock_price)} · ${o.quantity} available`,
+          sellingPriceOptions(r.product).map((o, index) => [
+            String(index),
+            `${money(o.stock_price)}${o.expiry_label ? ` · Exp ${o.expiry_label}` : ''} · ${o.quantity} available`,
           ]),
-          r.stock_price,
-          (v) => (r.stock_price = v),
+          String(sellingPriceOptions(r.product).findIndex(o => o.stock_price === r.stock_price && (o.expires_at ?? null) === (r.expires_at ?? null))),
+          (v) => { const o = sellingPriceOptions(r.product)[Number(v)]; if(o) {r.stock_price=o.stock_price;r.expires_at=o.expires_at ?? null;} },
         ),
       );
       if (mode() === 'OTHER')
@@ -908,6 +922,8 @@ if (config) {
           matches: [],
           purchased_on: saved.purchased_on,
           price: saved.credit_price,
+          expires_at: saved.expires_at,
+          batch_number: saved.batch_number,
           stock_price: saved.stock_selling_price,
           cost_basis: saved.cost_basis,
           override_reason: saved.price_override_reason,

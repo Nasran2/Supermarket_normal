@@ -177,3 +177,10 @@ Laravel schedules `demo:reset` every minute and checks the ten-day deadline befo
 ```
 
 An overdue demo also resets on its next web request if the scheduler was missed; a submitted form that triggers reset is rejected with a reload message. A shared file-cache lock coordinates web requests and the scheduler on one application host. Restores use a database transaction, preserve foreign-key enforcement afterwards, and advance the reset date only on success. Run all demo instances against the same writable `storage/framework` directory. Dates are stored in UTC and displayed in the configured business timezone. After changing the application's database schema or its starting dataset, the installation owner must deliberately recreate the `demo_cycles` baseline in the demo database; mismatched tables/columns fail before destructive changes. `php artisan demo:reset` is safe when `DEMO=false` and never changes data in that mode.
+
+
+### Optional expiry tracking
+
+Expiry tracking is off by default (`EXPIRE=false`). Set `EXPIRE=true`, run `php artisan migrate --force`, `php artisan optimize:clear`, and `npm run build`, then enable **Track expiry** for each relevant product. Batch dates extend the existing stock layers; quantities are not duplicated. Disabling the feature hides its controls and keeps all recorded dates. See [Expiry tracking](docs/EXPIRY_TRACKING.md) for staff instructions, permissions, FEFO, returns and write-offs.
+
+Implementation files, verification results and local/hosting deployment details are recorded in [Expiry implementation report](docs/EXPIRY_IMPLEMENTATION.md).

@@ -27,7 +27,7 @@ class ProfitLossService
         $expenses = SalesVisibility::apply(Expense::visibleSales(), 'expenses.user_id')->whereBetween('expense_date', [$from, $to]);
         $expenses->where(fn ($q) => $q->where('status', 'ACTIVE')->orWhere(fn ($q) => $q->where('status', 'REVERSED')->where(fn ($q) => $q->where('type', 'RETURN_WRITEOFF')->orWhere(fn ($q) => $q->where('type', 'AUTOMATIC')->whereHas('sale', fn ($q) => $q->where('status', 'RETURN_CANCELLED'))))));
         $reversed = SalesVisibility::apply(Expense::visibleSales(), 'expenses.user_id')->where('status', 'REVERSED')->whereBetween('updated_at', $period)->where(fn ($q) => $q->where('type', 'RETURN_WRITEOFF')->orWhere(fn ($q) => $q->where('type', 'AUTOMATIC')->whereHas('sale', fn ($q) => $q->where('status', 'RETURN_CANCELLED'))));
-        $manual = Money::round((string) (clone $expenses)->whereIn('type', ['MANUAL', 'HR_PAYROLL'])->sum('amount'));
+        $manual = Money::round((string) (clone $expenses)->whereIn('type', ['MANUAL', 'HR_PAYROLL', 'EXPIRY_WRITEOFF'])->sum('amount'));
         $processing = Money::sub((string) (clone $expenses)->where('type', 'AUTOMATIC')->sum('amount'), (string) (clone $reversed)->where('type', 'AUTOMATIC')->sum('amount'));
         $purchaseCharges = Money::round((string) (clone $expenses)->where('type', 'PURCHASE_CHARGE')->sum('amount'));
         $returnWriteoffs = Money::sub((string) (clone $expenses)->where('type', 'RETURN_WRITEOFF')->sum('amount'), (string) $reversed->where('type', 'RETURN_WRITEOFF')->sum('amount'));

@@ -10,7 +10,7 @@ if (configElement) {
   function payload() {
     return { token: c.token, original_id: c.originalId, reason: $('return-reason').value, notes: $('return-notes').value, resolution: resolution(),
       items: c.lines.map((line) => { const row = document.querySelector(`[data-return-line="${line.id}"]`); return { [c.kind === 'sales' ? 'sale_item_id' : 'purchase_item_id']: line.id, quantity: row.querySelector('.return-qty').value || '0', ...(c.kind === 'sales' ? { stock_action: row.querySelector('.return-stock-action').value, supplier_id: row.querySelector('.return-supplier')?.value || null } : {}) }; }),
-      replacements: resolution() === 'MONEY' ? [] : replacements.map((r) => ({ product_id: r.product_id, unit_id: r.unit_id, quantity: r.quantity, ...(r.stock_price != null ? { stock_price: r.stock_price } : {}), ...(r.source_id ? { [c.kind === 'sales' ? 'sale_item_id' : 'purchase_item_id']: r.source_id } : {}), ...(c.kind === 'purchase' ? { cost: r.cost, selling_price: r.selling_price } : {}) })),
+      replacements: resolution() === 'MONEY' ? [] : replacements.map((r) => ({ product_id: r.product_id, expires_at: r.expires_at || null, batch_number: r.batch_number || null, unit_id: r.unit_id, quantity: r.quantity, ...(r.stock_price != null ? { stock_price: r.stock_price } : {}), ...(r.source_id ? { [c.kind === 'sales' ? 'sale_item_id' : 'purchase_item_id']: r.source_id } : {}), ...(c.kind === 'purchase' ? { cost: r.cost, selling_price: r.selling_price } : {}) })),
       apply_due: $('return-apply-due')?.value || '0', keep_credit: $('return-keep-credit')?.value || '0', credit_customer_id: $('return-credit-customer')?.value || null,
       payment_method_id: $('return-payment-method').value || null, add_to_due: $('return-add-due')?.checked || false, use_current_price: $('return-current-price')?.checked || false };
   }
@@ -35,7 +35,7 @@ if (configElement) {
   function newReplacement(product, option, line = null) {
     const unitId = line?.unit_id || product.unit_id, units = option?.units || product.units;
     const unit = units.find((u) => u.id === unitId) || units[0];
-    return { product_id: product.id, name: product.name, source_id: line?.id, unit_id: unitId, quantity: line ? document.querySelector(`[data-return-line="${line.id}"] .return-qty`).value : '1', stock_price: option?.stock_price, units,
+    return { product_id: product.id, name: product.name, source_id: line?.id, unit_id: unitId, quantity: line ? document.querySelector(`[data-return-line="${line.id}"] .return-qty`).value : '1', stock_price: option?.stock_price, expires_at: option?.expires_at ?? null, track_expiry: product.track_expiry, units,
       cost: line?.price || product.cost || '0', selling_price: unit?.price || product.price, options: sellingPriceOptions(product) };
   }
   function renderReplacements() {
@@ -46,11 +46,14 @@ if (configElement) {
       const unitLabel = textElement('label', 'Unit', 'field'), unit = document.createElement('select'); (r.units || []).forEach((u) => { const o = textElement('option', u.short_name); o.value = u.id; o.selected = u.id === r.unit_id; unit.append(o); }); unit.disabled = resolution() === 'SAME'; unit.addEventListener('change', () => { r.unit_id = Number(unit.value); }); unitLabel.append(unit); card.append(unitLabel);
       if (c.kind === 'sales') {
         const label = textElement('label', 'Available selling price', 'field'), select = document.createElement('select');
-        r.options.forEach((o) => { const e = textElement('option', `${currency(o.stock_price)} · ${o.quantity} available`); e.value = o.stock_price; e.selected = o.stock_price === r.stock_price; select.append(e); });
-        select.addEventListener('change', () => { r.stock_price = select.value; const opt = r.options.find((o) => o.stock_price === r.stock_price); if (opt) r.units = opt.units; }); label.append(select); card.append(label);
+        r.options.forEach((o, index) => { const e = textElement('option', `${currency(o.stock_price)}${o.expiry_label ? ` · Exp ${o.expiry_label}` : ''} · ${o.quantity} available`); e.value = String(index); e.selected = o.stock_price === r.stock_price && (o.expires_at ?? null) === (r.expires_at ?? null); select.append(e); });
+        select.addEventListener('change', () => { const opt = r.options[Number(select.value)]; if (opt) { r.stock_price = opt.stock_price; r.expires_at = opt.expires_at ?? null; r.units = opt.units; } }); label.append(select); card.append(label);
         if (resolution() === 'SAME') card.append(textElement('small', 'Original effective selling value is used unless current price is selected.'));
       } else {
         [['Replacement cost', 'cost'], ['Selling price', 'selling_price']].forEach(([name, key]) => { const label = textElement('label', name, 'field'), input = document.createElement('input'); input.type = 'number'; input.min = '0'; input.step = '0.01'; input.value = r[key]; input.addEventListener('input', () => { r[key] = input.value; }); label.append(input); card.append(label); });
+      }
+      if (c.kind === 'purchase' && r.track_expiry) {
+        const expiryLabel = textElement('label', 'Replacement batch expiry', 'field'); const expiry = document.createElement('input'); expiry.type='date'; expiry.value=r.expires_at || ''; expiry.addEventListener('input',()=>{r.expires_at=expiry.value;}); expiryLabel.append(expiry); card.append(expiryLabel);
       }
       if (resolution() === 'OTHER') { const remove = textElement('button', 'Remove', 'btn secondary'); remove.type = 'button'; remove.addEventListener('click', () => { replacements.splice(i, 1); renderReplacements(); }); card.append(remove); }
       container.append(card);
@@ -68,7 +71,7 @@ if (configElement) {
         let left = Number(row.querySelector('.return-qty').value) * Number(line.base_quantity) / Number(line.sold);
         for (const source of line.restock_prices || []) {
           const take = Math.min(left, Number(source.remaining)); if (take <= 0) continue;
-          const entries = anticipated.get(line.product_id) || []; entries.push({ stock_price: source.stock_price, quantity: take.toFixed(3), units: source.units }); anticipated.set(line.product_id, entries); left -= take;
+          const entries = anticipated.get(line.product_id) || []; entries.push({ expires_at: source.expires_at ?? null, expiry_label: source.expiry_label, stock_price: source.stock_price, quantity: take.toFixed(3), units: source.units }); anticipated.set(line.product_id, entries); left -= take;
         }
       }
       replacements = selectedLines().map((line) => { const current = products.get(line.product_id); const p = current ? { ...current, price_options: [...current.price_options, ...(anticipated.get(line.product_id) || [])] } : null; if (!p) throw new Error(`${line.name} is inactive or unavailable.`); return newReplacement(p, sellingPriceOptions(p)[0], line); });

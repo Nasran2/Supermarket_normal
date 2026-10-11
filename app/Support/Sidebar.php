@@ -50,6 +50,9 @@ class Sidebar
         if (! collect(array_keys(ReportService::TITLES))->contains(fn ($kind) => $user->hasPermission(ReportService::permission($kind)))) {
             $reports = [];
         }
+        if (Expiry::enabled()) {
+            $reports[] = $link('Expiry report', 'expiry.index', [], 'expiry.view', request()->routeIs('expiry.*'));
+        }
         $hr = [];
         if (Hr::enabled()) {
             foreach (['hr.view' => ['Overview', 'hr.index'], 'hr.staff.view' => ['Staff', 'hr.staff.index'], 'hr.attendance.view' => ['Attendance', 'hr.attendance'], 'hr.leave.view' => ['Leave requests', 'hr.leave'], 'hr.payroll.view' => ['Payroll', 'hr.payroll.index'], 'hr.payments.view' => ['Payments & advances', 'hr.payments'], 'hr.setup.view' => ['HR setup', 'hr.setup']] as $permission => [$label,$route]) {
@@ -62,6 +65,9 @@ class Sidebar
         $settings = [$link('Overview', 'settings.index', [], 'settings.view', request()->routeIs('settings.index'))];
         foreach (['business' => ['Business', 'settings.business'], 'pos' => ['Point of sale', 'settings.pos'], 'receipt' => ['Receipt', 'settings.receipt'], 'stock' => ['Stock controls', 'settings.stock'], 'system' => ['System', 'settings.system']] as $key => [$title, $permission]) {
             $settings[] = $link($title, 'settings.edit', $key, $permission, request()->route('group') === $key);
+        }
+        if (Expiry::enabled()) {
+            $settings[] = $link('Expiry dates', 'settings.edit', 'expiry', 'expiry.manage_settings', request()->route('group') === 'expiry');
         }
         foreach (['payment-methods' => ['Payment methods', 'payment method']] as $key => [$title, $singular]) {
             $settings[] = $link($title, 'manage.index', $key, Resources::permission($key, 'view'), request()->route('resource') === $key && ! request()->routeIs('manage.create'));

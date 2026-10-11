@@ -22,6 +22,7 @@ use App\Services\RegisterService;
 use App\Services\ReportService;
 use App\Services\SaleService;
 use App\Services\SettingsService;
+use App\Support\Expiry;
 use App\Support\Money;
 use App\Support\Resources;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -320,6 +321,11 @@ class PosWorkflowTest extends TestCase
             $urls[] = route('manage.index', $key);
             $urls[] = route('manage.create', $key);
         }foreach (array_keys(config('pos')) as $group) {
+            if ($group === 'expiry' && ! Expiry::enabled()) {
+                $this->get(route('settings.edit', $group))->assertNotFound();
+
+                continue;
+            }
             $urls[] = route('settings.edit', $group);
         }foreach (array_keys(ReportService::TITLES) as $report) {
             $urls[] = route('reports.show', $report);

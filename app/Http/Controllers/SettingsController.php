@@ -8,6 +8,7 @@ use App\Models\PaymentMethod;
 use App\Models\Setting;
 use App\Services\SettingsService;
 use App\Support\Audit;
+use App\Support\Expiry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -22,9 +23,10 @@ class SettingsController extends Controller
     public function edit(string $group, SettingsService $service)
     {
         $fields = config('pos.'.$group);
+        abort_if($group === 'expiry' && ! Expiry::enabled(), 404);
         abort_unless($fields, 404);
         abort_unless(auth()->user()->hasPermission(match ($group) {
-            'stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$group
+            'expiry' => 'expiry.manage_settings','stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$group
         }), 403);
         $values = $service->all();
         $paymentMethods = PaymentMethod::where('active', true)->orderBy('display_order')->get();

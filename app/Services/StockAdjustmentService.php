@@ -92,7 +92,7 @@ class StockAdjustmentService
                     $this->fail('You do not have permission to change stock prices or costs.');
                 }
                 $layerId = $input['stock_layer_id'] ?? null;
-                $rows[] = compact('layerId', 'p', 'old', 'delta', 'after', 'price', 'cost', 'priceChanged', 'costChanged');
+                $rows[] = ['expiresAt' => $input['expires_at'] ?? null, 'batchNumber' => $input['batch_number'] ?? null] + compact('layerId', 'p', 'old', 'delta', 'after', 'price', 'cost', 'priceChanged', 'costChanged');
             }
             if (! $id && ! $changed) {
                 $this->fail('Change at least one quantity, selling price or cost.');
@@ -104,7 +104,7 @@ class StockAdjustmentService
                 $batch->revision++;
             }
             $batch->save();
-            foreach ($rows as ['layerId' => $layerId, 'p' => $p, 'old' => $old, 'delta' => $delta, 'after' => $after, 'price' => $price, 'cost' => $cost, 'priceChanged' => $priceChanged, 'costChanged' => $costChanged]) {
+            foreach ($rows as ['expiresAt' => $expiresAt, 'batchNumber' => $batchNumber, 'layerId' => $layerId, 'p' => $p, 'old' => $old, 'delta' => $delta, 'after' => $after, 'price' => $price, 'cost' => $cost, 'priceChanged' => $priceChanged, 'costChanged' => $costChanged]) {
                 $priceBefore = $old?->price_before ?? $p->price;
                 $costBefore = $old?->cost_before ?? $p->cost;
                 // If this batch first changes a price in a later revision, snapshot the current price.
@@ -116,7 +116,7 @@ class StockAdjustmentService
                 }
                 $snapshot = ['name' => $p->name, 'sku' => $p->sku, 'unit_id' => $p->unit_id, 'unit' => $p->unit->short_name, 'stock_before' => $old?->stock_before ?? $p->stock, 'stock_after' => $after, 'quantity_change' => Money::quantity($old?->quantity_change ?? '0', $delta), 'price_before' => $priceBefore, 'price_after' => $priceChanged ? $price : ($old?->price_after ?? $p->price), 'cost_before' => $costBefore, 'cost_after' => $costChanged ? $cost : ($old?->cost_after ?? $p->cost), 'price_changed' => $priceChanged || ($old?->price_changed ?? false), 'cost_changed' => $costChanged || ($old?->cost_changed ?? false)];
                 if (Money::compare($delta, 0) !== 0) {
-                    app(StockLayerService::class)->adjust($p, $delta, $layerId, $cost, $price, $batch->reference, 'ADJUSTMENT: '.Str::limit($batch->reason, 240, ''), $user->id);
+                    app(StockLayerService::class)->adjust($p, $delta, $layerId, $cost, $price, $batch->reference, 'ADJUSTMENT: '.Str::limit($batch->reason, 240, ''), $user->id, $expiresAt, $batchNumber);
                 }
                 if ($priceChanged || $costChanged) {
                     $p->update(['price' => $price, 'cost' => $cost]);

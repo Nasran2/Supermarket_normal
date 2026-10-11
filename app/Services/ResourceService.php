@@ -17,6 +17,7 @@ use App\Models\Unit;
 use App\Models\UnitPresetConversion;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\Expiry;
 use App\Support\Hr;
 use App\Support\Money;
 use App\Support\Resources;
@@ -146,6 +147,14 @@ class ResourceService
                     }
                 }
                 if ($resource === 'products') {
+                    if (Expiry::enabled()) {
+                        $values['track_expiry'] = (bool) ($data['track_expiry'] ?? ($id ? $record->track_expiry : Expiry::setting('expiry_default_tracking')));
+                        if ($values['track_expiry'] && ! ($data['track_stock'] ?? $record->track_stock)) {
+                            throw ValidationException::withMessages(['track_expiry' => 'Maintain stock must be enabled to track expiry batches.']);
+                        }
+                    } else {
+                        unset($values['track_expiry']);
+                    }
                     $values['track_stock'] = $data['track_stock'] ?? ($id ? $record->track_stock : true);
                     $values['default_discount_type'] = $data['default_discount_type'] ?? ($id ? $record->default_discount_type : 'NONE');
                     $values['default_discount_value'] = $values['default_discount_type'] === 'NONE' ? '0.00' : Money::round((string) ($data['default_discount_value'] ?? ($id ? $record->default_discount_value : 0)));
@@ -290,7 +299,7 @@ class ResourceService
                             throw ValidationException::withMessages(['opening_layers.'.$index.'.quantity' => 'Additional stock rows need a quantity greater than zero.']);
                         }
                         if (Money::compare((string) $row['quantity'], 0) > 0) {
-                            app(StockLayerService::class)->receive($record, (string) $row['quantity'], (string) $row['cost'], (string) $row['selling_price'], 'OPENING_STOCK', $record->sku, auth()->id());
+                            app(StockLayerService::class)->receive($record, (string) $row['quantity'], (string) $row['cost'], (string) $row['selling_price'], 'OPENING_STOCK', $record->sku, auth()->id(), expiresAt: app(ExpiryService::class)->incoming($record, $row)['expires_at'], batchNumber: app(ExpiryService::class)->incoming($record, $row)['batch_number']);
                         }
                     }
                 }

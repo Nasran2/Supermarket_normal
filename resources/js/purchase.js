@@ -71,6 +71,14 @@ function add(initial = {}, prepend = false) {
     if (initial[input.dataset.field] !== undefined) input.value = initial[input.dataset.field];
   });
   
+  const expiryFields = line.querySelector('[data-purchase-expiry]');
+  if (expiryFields) {
+    expiryFields.hidden = !product.track_expiry;
+    expiryFields.querySelectorAll('input').forEach(input => {
+      input.disabled = !product.track_expiry;
+      input.required = product.track_expiry && product.expiry_required && input.dataset.field === 'expires_at';
+    });
+  }
   // Set display text
   line.querySelector('[data-field-display=name]').textContent = product.name;
   line.querySelector('[data-field-display=sku]').textContent = product.sku;

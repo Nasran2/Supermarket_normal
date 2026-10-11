@@ -7,7 +7,7 @@ export function availablePriceOptions(product) {
 }
 
 export const stockChoiceKey = (item) =>
-  `${item.id}:${item.stock_layer_id ?? ''}:${item.stock_price ?? ''}:${item.unit_id}`;
+  `${item.id}:${item.stock_layer_id ?? ''}:${item.stock_price ?? ''}:${item.expires_at ?? ''}:${item.unit_id}`;
 
 const priceKey = (price) => {
   const [whole, fraction = ''] = String(price).split('.');
@@ -16,6 +16,7 @@ const priceKey = (price) => {
 
 // New cart lines choose a selling price; checkout allocates its deliveries by FIFO.
 export function sellingPriceOptions(product) {
+  if (product?.track_expiry) return availablePriceOptions(product);
   const groups = new Map();
   for (const option of availablePriceOptions(product)) {
     const key = priceKey(option.stock_price);
@@ -34,6 +35,7 @@ export function sellingPriceOptions(product) {
 
 export function priceOptionForItem(product, item) {
   const options = availablePriceOptions(product);
+  if (product?.track_expiry) return options.find(option => priceKey(option.stock_price) === priceKey(item.stock_price) && (option.expires_at ?? null) === (item.expires_at ?? null));
   if (item.stock_layer_id != null) {
     return options.find((option) => option.stock_layer_id === item.stock_layer_id &&
       (item.stock_price == null || priceKey(option.stock_price) === priceKey(item.stock_price)));

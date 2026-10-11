@@ -3,13 +3,20 @@
 namespace App\Models;
 
 use App\Support\Money;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 
 class ProductStockLayer extends Model
 {
     protected $guarded = ['id'];
 
-    protected $casts = ['remaining_cost_total' => 'decimal:2', 'inventory_cost_total' => 'decimal:2', 'cost_price' => 'decimal:2', 'selling_price' => 'decimal:2', 'original_quantity' => 'decimal:3', 'remaining_quantity' => 'decimal:3', 'received_at' => 'datetime'];
+    protected $casts = ['expires_at' => 'date', 'remaining_cost_total' => 'decimal:2', 'inventory_cost_total' => 'decimal:2', 'cost_price' => 'decimal:2', 'selling_price' => 'decimal:2', 'original_quantity' => 'decimal:3', 'remaining_quantity' => 'decimal:3', 'received_at' => 'datetime'];
+
+    protected function expiresAt(): Attribute
+    {
+        return Attribute::make(set: fn ($value) => $value ? Carbon::parse($value)->toDateString() : null);
+    }
 
     public function getStockValueAttribute(): string
     {

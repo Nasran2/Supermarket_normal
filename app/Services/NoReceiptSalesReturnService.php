@@ -18,11 +18,13 @@ use App\Models\Supplier;
 use App\Models\SupplierReturn;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\Expiry;
 use App\Support\Money;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class NoReceiptSalesReturnService
 {
@@ -78,7 +80,7 @@ class NoReceiptSalesReturnService
             if (! $line || Money::compare($line['remaining'], 0) <= 0) {
                 continue;
             }
-            $matches[] = ['sale_item_id' => $item->id, 'invoice' => $item->sale->invoice, 'date' => $item->sale->sold_at->format('d M Y'), 'quantity' => $item->quantity, 'base_quantity' => $item->base_quantity ?? $item->quantity, 'remaining' => $line['remaining'], 'unit' => $item->unit, 'unit_id' => $item->unit_id, 'net_price' => app(StockReturnService::class)->portion($line['net'], '1', $item->quantity), 'original_price' => $item->price, 'allocated_discount' => Money::sub(Money::mul($item->price, $item->quantity), $line['net']), 'restock_prices' => $item->allocations()->with('layer')->orderByDesc('id')->get()->map(fn ($a) => ['stock_price' => $a->layer->selling_price, 'quantity' => Money::quantity($a->quantity, '-'.$a->returned_quantity), 'units' => array_map(fn ($u) => array_diff_key($u, ['cost' => true]), app(ProductUnitService::class)->options($product, $a->layer->selling_price))])->all()];
+            $matches[] = ['sale_item_id' => $item->id, 'invoice' => $item->sale->invoice, 'date' => $item->sale->sold_at->format('d M Y'), 'quantity' => $item->quantity, 'base_quantity' => $item->base_quantity ?? $item->quantity, 'remaining' => $line['remaining'], 'unit' => $item->unit, 'unit_id' => $item->unit_id, 'net_price' => app(StockReturnService::class)->portion($line['net'], '1', $item->quantity), 'original_price' => $item->price, 'allocated_discount' => Money::sub(Money::mul($item->price, $item->quantity), $line['net']), 'restock_prices' => $item->allocations()->with('layer')->orderByDesc('id')->get()->map(fn ($a) => ['expires_at' => Expiry::enabled() ? ($a->expires_at ?? $a->layer->expires_at?->toDateString()) : null, 'expiry_label' => Expiry::enabled() ? $a->layer->expires_at?->format('d M Y') : null, 'stock_price' => $a->layer->selling_price, 'quantity' => Money::quantity($a->quantity, '-'.$a->returned_quantity), 'units' => array_map(fn ($u) => array_diff_key($u, ['cost' => true]), app(ProductUnitService::class)->options($product, $a->layer->selling_price))])->all()];
             if (count($matches) === 5) {
                 break;
             }
@@ -204,7 +206,15 @@ class NoReceiptSalesReturnService
                 }
                 $supplierId = $supplier->id;
             }
-            $lines[$index] = ['track_stock' => $product->track_stock, 'sale_item_id' => null, 'product_id' => $product->id, 'unit_id' => $unit['id'], 'name' => $product->name, 'unit' => $unit['short_name'], 'quantity' => $qty, 'base_quantity' => $base, 'amount' => Money::mul($price, $qty), 'cost_total' => Money::mul($cost, $base), 'stock_action' => $action, 'reason' => $input['reason'] ?? $data['reason'], 'notes' => $input['notes'] ?? null, 'suggested_credit_price' => $suggestion['suggested_credit_price'], 'credit_price' => $price, 'credit_price_source' => $overridden ? 'MANUAL' : $suggestion['credit_price_source'], 'price_changed_by' => $overridden ? $user->id : null, 'price_override_reason' => $input['price_override_reason'] ?? null, 'cost_basis' => $cost, 'cost_basis_type' => 'ESTIMATED', 'cost_basis_source' => $suggestion['cost_basis_source'], 'cost_basis_reference' => $suggestion['cost_basis_reference'], 'stock_selling_price' => $selling, 'supplier_id' => $supplierId, 'purchased_on' => $input['purchased_on'] ?? null, 'fee_refund' => '0.00', 'allocations' => []];
+            $expiry = ['expires_at' => null, 'batch_number' => null];
+            if (Expiry::tracks($product)) {
+                if ($action === 'RESTOCK') {
+                    $expiry = app(ExpiryService::class)->incoming($product, $input, ! Expiry::setting('expiry_unknown_return'));
+                } else {
+                    $expiry = Validator::make($input, ['expires_at' => 'nullable|date_format:Y-m-d', 'batch_number' => 'nullable|string|max:100'])->validate();
+                }
+            }
+            $lines[$index] = $expiry + ['track_stock' => $product->track_stock, 'sale_item_id' => null, 'product_id' => $product->id, 'unit_id' => $unit['id'], 'name' => $product->name, 'unit' => $unit['short_name'], 'quantity' => $qty, 'base_quantity' => $base, 'amount' => Money::mul($price, $qty), 'cost_total' => Money::mul($cost, $base), 'stock_action' => $action, 'reason' => $input['reason'] ?? $data['reason'], 'notes' => $input['notes'] ?? null, 'suggested_credit_price' => $suggestion['suggested_credit_price'], 'credit_price' => $price, 'credit_price_source' => $overridden ? 'MANUAL' : $suggestion['credit_price_source'], 'price_changed_by' => $overridden ? $user->id : null, 'price_override_reason' => $input['price_override_reason'] ?? null, 'cost_basis' => $cost, 'cost_basis_type' => 'ESTIMATED', 'cost_basis_source' => $suggestion['cost_basis_source'], 'cost_basis_reference' => $suggestion['cost_basis_reference'], 'stock_selling_price' => $selling, 'supplier_id' => $supplierId, 'purchased_on' => $input['purchased_on'] ?? null, 'fee_refund' => '0.00', 'allocations' => []];
         }
         $duePlan = [];
         $fee = '0.00';
@@ -395,7 +405,7 @@ class NoReceiptSalesReturnService
                     $product = Product::with('unit')->findOrFail($item->product_id);
                     $layer = null;
                     if ($item->track_stock && $item->stock_action === 'RESTOCK') {
-                        $layer = app(StockLayerService::class)->receive($product, $item->base_quantity, $item->cost_basis, $item->stock_selling_price, 'NO_RECEIPT_SALES_RETURN', $r->reference, $user->id, $item->id, null, null, $item->cost_total);
+                        $layer = app(StockLayerService::class)->receive($product, $item->base_quantity, $item->cost_basis, $item->stock_selling_price, 'NO_RECEIPT_SALES_RETURN', $r->reference, $user->id, $item->id, null, null, $item->cost_total, $item->expires_at, $item->batch_number);
                     } elseif ($item->track_stock) {
                         app(StockService::class)->move($product, '0.000', 'NO_RECEIPT_'.$item->stock_action, $r->reference, $user->id, false);
                     }

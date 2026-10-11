@@ -34,7 +34,7 @@ class StockController extends Controller
             if (Money::compare(Money::quantity($p->stock, $quantity), 0) < 0) {
                 throw ValidationException::withMessages(['quantity' => 'An adjustment cannot make stock negative.']);
             }
-            app(StockLayerService::class)->adjust($p, $quantity, $request->validated('stock_layer_id'), $p->cost, $p->price, $p->sku.'-'.Str::uuid(), 'ADJUSTMENT: '.$request->validated('reason'), auth()->id());
+            app(StockLayerService::class)->adjust($p, $quantity, $request->validated('stock_layer_id'), $p->cost, $p->price, $p->sku.'-'.Str::uuid(), 'ADJUSTMENT: '.$request->validated('reason'), auth()->id(), $request->validated('expires_at'), $request->validated('batch_number'));
             Audit::record('stock.adjust', $p, [], $request->validated());
         });
 

@@ -222,3 +222,18 @@ if (discountType) {
   discountType.addEventListener('change', refreshDiscount);
   refreshDiscount();
 }
+
+const expiryToggle = document.getElementById('track-expiry');
+if (expiryToggle) {
+  const refreshExpiry = () => {
+    const enabled = expiryToggle.checked && trackStock?.checked;
+    document.querySelectorAll('[data-expiry-field]').forEach(field => {
+      field.hidden = !enabled;
+      field.querySelectorAll('input').forEach(input => { input.disabled = !enabled; });
+    });
+  };
+  expiryToggle.addEventListener('change', refreshExpiry);
+  trackStock?.addEventListener('change', refreshExpiry);
+  new MutationObserver(refreshExpiry).observe(document.querySelector('[data-opening-body]') || document.body, {childList: true, subtree: true});
+  refreshExpiry();
+}

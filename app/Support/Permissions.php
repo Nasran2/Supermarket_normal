@@ -102,6 +102,11 @@ class Permissions
         $add('supplier_returns.manage', 'Supplier returns', 'Manage', 'Send and settle supplier returns.');
         $add('returns.view_cost', 'Returns', 'View historical costs', 'See return costs and allocation costs.');
         $add('settings.returns', 'Settings', 'Return settings', 'Configure return business policies.');
+        foreach (['expiry.view' => 'View expiry reports', 'expiry.manage_settings' => 'Manage expiry settings', 'expiry.override_expired_sale' => 'Confirm expired sales', 'expiry.writeoff' => 'Write off expired stock', 'expiry.view_cost' => 'View expiry costs', 'purchase.expiry_edit' => 'Edit purchase expiry'] as $name => $label) {
+            $add($name, 'Expiry', $label, $label.'.', match ($name) {
+                'expiry.view' => ['reports.stock'], 'expiry.manage_settings' => ['settings.stock'], 'expiry.writeoff' => ['sales_returns.writeoff'], 'expiry.view_cost' => ['products.view_cost'], 'purchase.expiry_edit' => ['purchases.manage_prices'], default => []
+            });
+        }
         foreach (Hr::permissions() as $name => [$group, $label]) {
             $add($name, $group, $label, $label.'.', []);
         }
@@ -111,7 +116,7 @@ class Permissions
 
     public static function visible(): array
     {
-        return array_filter(self::all(), fn ($info, $name) => Hr::enabled() || ! str_starts_with($name, 'hr.'), ARRAY_FILTER_USE_BOTH);
+        return array_filter(self::all(), fn ($info, $name) => (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
     }
 
     public static function info(string $name): array

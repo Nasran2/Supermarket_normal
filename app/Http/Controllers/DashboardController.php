@@ -7,9 +7,11 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\SaleReturn;
+use App\Services\ExpiryReportService;
 use App\Services\ProfitLossService;
 use App\Services\RegisterService;
 use App\Services\ReportService;
+use App\Support\Expiry;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -50,12 +52,19 @@ class DashboardController extends Controller
                 $overview[] = ['label' => $date->format('d M'), 'amount' => $profit->calculate($day, $day)['revenue']];
             }
         }
-        $lowStock = $can('low_stock') ? Product::with('unit')->where('active', true)->where('track_stock', true)->whereColumn('stock', '<=', 'low_stock')->orderBy('stock')->limit(6)->get() : collect();
+        $lowStock = $can('low_stock') ? Product::with('unit')->where('active', true)->where('track_stock', true)->lowStock()->orderBy('stock')->limit(6)->get() : collect();
         $recentSales = $can('recent_sales') ? Sale::visibleTo()->with('user', 'payments')->latest('sold_at')->limit(6)->get() : collect();
         $recentExpenses = $can('recent_expenses') ? Expense::visibleSales()->with('category')->where('status', 'ACTIVE')->latest()->limit(5)->get() : collect();
         $topProducts = $can('top_products') ? SaleItem::whereHas('sale', fn ($q) => $q->visibleTo()->where('status', 'ACTIVE')->whereBetween('sold_at', [today()->subDays($days - 1)->startOfDay(), today()->endOfDay()]))->selectRaw('product_id, name, unit, SUM(quantity) as quantity, SUM(total) as total')->groupBy('product_id', 'name', 'unit')->orderByDesc('total')->limit(5)->get() : collect();
         $register = $can('register') ? $registers->current(auth()->id()) : null;
 
-        return view('dashboard', compact('period', 'from', 'to', 'summary', 'transactions', 'payments', 'days', 'overview', 'lowStock', 'recentSales', 'recentExpenses', 'topProducts', 'register'));
+        $expiryRows = collect();
+        $expiredBatches = 0;
+        if (Expiry::enabled() && $request->user()->hasPermission('expiry.view') && Expiry::setting('expiry_dashboard')) {
+            $expiryRows = app(ExpiryReportService::class)->query()->limit((int) Expiry::setting('expiry_dashboard_limit'))->get();
+            $expiredBatches = app(ExpiryReportService::class)->query(['tab' => 'expired'])->count();
+        }
+
+        return view('dashboard', compact('expiryRows', 'expiredBatches', 'period', 'from', 'to', 'summary', 'transactions', 'payments', 'days', 'overview', 'lowStock', 'recentSales', 'recentExpenses', 'topProducts', 'register'));
     }
 }

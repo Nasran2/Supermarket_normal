@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\Expiry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -10,14 +11,16 @@ class SettingsRequest extends FormRequest
     public function authorize(): bool
     {
         $g = $this->route('group');
+        abort_if($g === 'expiry' && ! Expiry::enabled(), 404);
 
         return $this->user()?->hasPermission(match ($g) {
-            'stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$g
+            'expiry' => 'expiry.manage_settings','stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$g
         });
     }
 
     public function rules(): array
     {
+        abort_if($this->route('group') === 'expiry' && ! Expiry::enabled(), 404);
         $config = config('pos.'.$this->route('group'));
         abort_unless($config, 404);
         $r = [];

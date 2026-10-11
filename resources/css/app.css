@@ -5648,3 +5648,14 @@ body.nav-collapsed .sidebar:not(.mobile-open) .nav-chevron {
 .pos-workspace .demo-notice{padding:6px 12px;margin-bottom:8px;font-size:11px}
 @media(max-width:640px){.demo-notice{align-items:flex-start;flex-direction:column;gap:4px}}
 @media print{.demo-notice{display:block;background:none;border:0;margin:0 0 8px;padding:0;color:#61776d}.demo-notice strong{margin-right:8px}}
+
+/* Batch expiry fields stay readable without expanding the standard layout. */
+.opening-price-row:has([data-expiry-field]:not([hidden])) { display:flex; flex-wrap:wrap; gap:16px; }
+.opening-price-row:has([data-expiry-field]:not([hidden])) .field { flex:1 1 140px; min-width:0; }
+.purchase-expiry-fields { display:flex; flex-wrap:wrap; gap:12px; grid-column:1 / -1; }
+.purchase-expiry-fields .field { flex:1 1 160px; }
+.purchase-expiry-fields[hidden] { display:none; }
+@media print { .report-workspace .heading-actions,.report-workspace .filter-bar,.no-print { display:none !important; } }
+
+.expiry-workspace .heading-actions { flex-wrap: wrap; max-width: 100%; }
+.expiry-workspace .page-heading > div { min-width: 0; }

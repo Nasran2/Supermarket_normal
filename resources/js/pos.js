@@ -88,6 +88,8 @@ function saveDraft() {
           id: p.id,
           line_key: p.line_key,
           stock_price: p.stock_price,
+          expires_at: p.expires_at ?? null,
+          expired_confirmed: p.expired_confirmed === true,
           stock_layer_id: p.stock_layer_id ?? null,
           stock_reference: p.stock_reference ?? '',
           name: p.name,
@@ -198,6 +200,11 @@ async function restoreDraft() {
       return {
         ...item,
         line_key: item.line_key || crypto.randomUUID(),
+        track_expiry: fresh?.track_expiry ?? false,
+        show_expiry: fresh?.show_expiry ?? false,
+        expiry_label: group?.expiry_label ?? item.expires_at,
+        days_remaining: group?.days_remaining,
+        expiry_status: group?.expiry_status,
         stock_price: group?.stock_price ?? item.stock_price,
         stock_reference:
           item.stock_layer_id != null ? (group?.reference ?? item.stock_reference ?? '') : '',
@@ -275,6 +282,8 @@ const payload = () => ({
   items: cart.map((p) => ({
     product_id: p.id,
     stock_price: p.stock_price,
+    expires_at: p.expires_at ?? null,
+    expired_confirmed: p.expired_confirmed === true,
     stock_layer_id: p.stock_layer_id ?? null,
     unit_id: p.unit_id,
     quantity: String(p.quantity),
@@ -404,20 +413,22 @@ function add(p) {
   if (!syncQuantities()) return false;
   const groups = sellingPriceOptions(p);
   if (!groups.length) {
-    message.textContent = `${p.name} is out of stock.`;
+    message.textContent = p.track_expiry ? `${p.name} has no sellable expiry stock. Check expired or undated batches.` : `${p.name} is out of stock.`;
     return false;
   }
   if (groups.length === 1) {
     return addPrice(p, groups[0]);
   }
   message.textContent = '';
+  $('price-choice-title').textContent = p.track_expiry ? 'Choose price & expiry batch' : 'Choose selling price';
+  $('price-choice-hint').textContent = p.track_expiry ? (groups.some(group => group.fefo) ? 'Choose the selling price. The system uses the earliest valid expiry dates first, at this same price.' : 'Choose the price and expiry date printed on the product. Each option shows the stock available for that date.') : 'Choose a selling price to add to your cart. Each price shows the total available quantity.';
   choosingProduct = p;
   choosingPrices = groups;
   $('price-choice-product').textContent = p.name;
   $('price-choice-options').innerHTML = groups
     .map(
       (group, index) =>
-        `<button type="button" class="price-choice" data-price-choice="${index}"><span class="price-choice-rate"><small>Selling price / ${escape(p.unit)}</small><strong>${moneyHTML(group.stock_price)}</strong>${group.reference ? `<small class="price-choice-source">${escape(group.reference)}</small>` : ''}${group.received ? `<small class="price-choice-received">${escape(group.received)}</small>` : ''}</span><span class="price-choice-stock"><strong>${Number(group.quantity).toLocaleString()} ${escape(p.unit)}</strong><small>Available stock</small><span class="price-choice-add">Add to cart <kbd>${index + 1}</kbd></span></span></button>`,
+        `<button type="button" class="price-choice" data-price-choice="${index}"><span class="price-choice-rate"><small>Selling price / ${escape(p.unit)}</small><strong>${moneyHTML(group.stock_price)}</strong>${p.track_expiry && p.show_expiry ? `<small>Expiry: ${escape(group.expiry_label)} · ${escape(group.expiry_status)}</small>${['Urgent', 'Expiring soon'].includes(group.expiry_status) ? `<small class="text-warning">Expires in ${group.days_remaining} days</small>` : ''}${group.recommended ? '<small>Recommended — earliest expiry</small>' : ''}` : ''}${group.reference ? `<small class="price-choice-source">${escape(group.reference)}</small>` : ''}${group.received ? `<small class="price-choice-received">${escape(group.received)}</small>` : ''}</span><span class="price-choice-stock"><strong>${Number(group.quantity).toLocaleString()} ${escape(p.unit)}</strong><small>Available stock</small><span class="price-choice-add">Add to cart <kbd>${index + 1}</kbd></span></span></button>`,
     )
     .join('');
   priceDialog.showModal();
@@ -425,11 +436,13 @@ function add(p) {
   return true;
 }
 function addPrice(p, group) {
+  if (group.expired && !window.confirm('This batch is expired. Confirm the manager-approved sale of expired stock?')) return false;
   const unit = group.units.find((option) => option.id === p.unit_id);
   const key = stockChoiceKey({
     id: p.id,
     unit_id: p.unit_id,
     stock_price: group.stock_price,
+    expires_at: group.expires_at ?? null,
     stock_layer_id: group.stock_layer_id,
   });
   const existing = cart.find((item) => stockChoiceKey(item) === key);
@@ -449,6 +462,11 @@ function addPrice(p, group) {
     cart.push({
       ...p,
       line_key: crypto.randomUUID(),
+      expires_at: group.expires_at ?? null,
+      expired_confirmed: group.expired === true,
+      expiry_label: group.expiry_label,
+      days_remaining: group.days_remaining,
+      expiry_status: group.expiry_status,
       stock_price: group.stock_price,
       stock_layer_id: group.stock_layer_id ?? null,
       stock_reference: group.reference ?? '',
@@ -508,7 +526,7 @@ function render(persist = true) {
     ? cart
         .map(
           (p) =>
-            `<div class="cart-line compact-cart-line" data-cart-id="${p.line_key}"><button class="cart-item-name ${lineDiscountCents(p) > 0n ? 'has-line-discount' : ''} ${p.unavailable ? 'unavailable' : ''}" data-action="edit" type="button" title="${escape(p.name)} · ${escape(p.unit)} · Edit price and line discount" aria-label="Edit ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><span>${escape(p.name)}</span><small>${escape(p.unit)} · ${moneyHTML(p.unit_price ?? p.price)}${p.stock_reference ? ` · ${escape(p.stock_reference)}` : ''}</small>${lineDiscountCents(p) > 0n ? `<small class="cart-item-discount">${p.use_default_discount ? 'Default' : 'Discount'} −${moneyHTML(Number(lineDiscountCents(p)) / 100)}</small>` : ''}</button><div class="cart-qty-controls"><button class="icon-button" data-action="minus" type="button" aria-label="Decrease quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>−</button><input class="cart-quantity" type="number" required max="999999" min="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" step="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" value="${p.quantity}" aria-label="Quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><button class="icon-button" data-action="plus" type="button" aria-label="Increase quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>+</button></div><strong class="cart-line-amount" title="${moneyHTML(Number(lineCents(p)) / 100)}">${moneyHTML(Number(lineCents(p)) / 100)}</strong><button class="icon-button cart-remove" ${orderLoading ? 'disabled' : ''} data-action="remove" title="Remove item" aria-label="Remove ${escape(p.name)}" type="button"><i data-lucide="x" style="width:14px"></i></button></div>`,
+            `<div class="cart-line compact-cart-line" data-cart-id="${p.line_key}"><button class="cart-item-name ${lineDiscountCents(p) > 0n ? 'has-line-discount' : ''} ${p.unavailable ? 'unavailable' : ''}" data-action="edit" type="button" title="${escape(p.name)} · ${escape(p.unit)} · Edit price and line discount" aria-label="Edit ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><span>${escape(p.name)}</span><small>${escape(p.unit)} · ${moneyHTML(p.unit_price ?? p.price)}${p.stock_reference ? ` · ${escape(p.stock_reference)}` : ''}</small>${p.track_expiry && p.show_expiry && (p.expires_at || p.expiry_label) ? `<small>Exp: ${escape(p.expiry_label || p.expires_at)}${['Urgent', 'Expiring soon'].includes(p.expiry_status) ? ` · Expires in ${p.days_remaining} days` : ''}</small>` : ''}${lineDiscountCents(p) > 0n ? `<small class="cart-item-discount">${p.use_default_discount ? 'Default' : 'Discount'} −${moneyHTML(Number(lineDiscountCents(p)) / 100)}</small>` : ''}</button><div class="cart-qty-controls"><button class="icon-button" data-action="minus" type="button" aria-label="Decrease quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>−</button><input class="cart-quantity" type="number" required max="999999" min="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" step="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" value="${p.quantity}" aria-label="Quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><button class="icon-button" data-action="plus" type="button" aria-label="Increase quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>+</button></div><strong class="cart-line-amount" title="${moneyHTML(Number(lineCents(p)) / 100)}">${moneyHTML(Number(lineCents(p)) / 100)}</strong><button class="icon-button cart-remove" ${orderLoading ? 'disabled' : ''} data-action="remove" title="Remove item" aria-label="Remove ${escape(p.name)}" type="button"><i data-lucide="x" style="width:14px"></i></button></div>`,
         )
         .join('')
     : '<div class="cart-empty"><i data-lucide="shopping-basket" style="width:35px;height:35px"></i><strong>Your order is empty</strong><small>Scan a barcode or choose a product.</small></div>';

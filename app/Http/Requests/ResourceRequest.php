@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Product;
+use App\Support\Expiry;
 use App\Support\Resources;
 use App\Support\SalesVisibility;
 use Illuminate\Foundation\Http\FormRequest;
@@ -119,13 +120,18 @@ class ResourceRequest extends FormRequest
         }
         if ($resource === 'products' && ! $id) {
             $r['opening_layers'] = ['sometimes', 'array', 'min:1', 'max:30'];
-            $r['opening_layers.*'] = ['array:quantity,cost,selling_price'];
+            $r['opening_layers.*'] = [Expiry::enabled() ? 'array:quantity,cost,selling_price,expires_at,batch_number' : 'array:quantity,cost,selling_price'];
             $r['opening_layers.*.quantity'] = ['required', 'numeric', 'min:0', 'max:999999', 'decimal:0,3'];
             foreach (['cost', 'selling_price'] as $key) {
                 $r['opening_layers.*.'.$key] = ['required', 'numeric', 'min:0', 'max:999999999', 'decimal:0,2'];
             }
         }
         if ($resource === 'products') {
+            if (Expiry::enabled()) {
+                $r['track_expiry'] = ['sometimes', 'boolean'];
+                $r['opening_layers.*.expires_at'] = ['nullable', 'date_format:Y-m-d'];
+                $r['opening_layers.*.batch_number'] = ['nullable', 'string', 'max:100'];
+            }
             $r['track_stock'] = ['sometimes', 'boolean'];
             $r['default_discount_type'] = ['sometimes', 'in:NONE,AMOUNT,PERCENT'];
             $r['default_discount_value'] = ['sometimes', 'numeric', 'min:0', 'max:'.($this->input('default_discount_type') === 'PERCENT' ? 100 : 999999999), 'decimal:0,2'];
@@ -160,5 +166,10 @@ class ResourceRequest extends FormRequest
                 $this->merge([$key => $this->boolean($key)]);
             }
         }
+    }
+
+    public function attributes(): array
+    {
+        return ['items.*.expires_at' => 'expiry date', 'items.*.batch_number' => 'batch number', 'opening_layers.*.expires_at' => 'opening stock expiry date', 'opening_layers.*.batch_number' => 'opening stock batch number', 'expires_at' => 'expiry date'];
     }
 }

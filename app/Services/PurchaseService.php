@@ -9,6 +9,7 @@ use App\Models\PurchaseReturn;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\Audit;
+use App\Support\Expiry;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -32,6 +33,7 @@ class PurchaseService
             }
             $before = [];
             $isNew = ! $purchase;
+            $originalItems = $purchase?->items()->get()->keyBy('id') ?? collect();
             $mode = $data['payment_mode'] ?? 'AUTO';
             if ($isNew && (in_array($mode, ['FULL', 'PARTIAL']) || ($mode === 'AUTO' && Money::compare((string) ($data['amount_paid'] ?? 0), 0) > 0))) {
                 $take = ! isset($data['take_from_register']) || $data['take_from_register'];
@@ -64,7 +66,7 @@ class PurchaseService
             }
             $total = '0.00';
             $lines = [];
-            foreach ($data['items'] as $item) {
+            foreach ($data['items'] as $index => $item) {
                 $p = $products->get($item['product_id']);
                 if (! $p || ! $p->active || ! $p->unit->active) {
                     throw ValidationException::withMessages(['items' => 'Choose active products and units.']);
@@ -84,7 +86,20 @@ class PurchaseService
                 }
                 $lineTotal = Money::mul((string) $item['cost'], (string) $item['quantity']);
                 $total = Money::add($total, $lineTotal);
-                $lines[] = ['track_stock' => $p->track_stock, 'product_id' => $p->id, 'name' => $p->name, 'unit' => $selected['short_name'], 'unit_id' => $selected['id'], 'base_quantity' => $selected['base_stock_quantity'], 'base_cost' => $baseCost, 'selling_price' => $selling, 'base_selling_price' => $baseSelling, 'quantity' => $item['quantity'], 'cost' => $item['cost'], 'total' => $lineTotal];
+                $expiry = app(ExpiryService::class)->incoming($p, $item, (bool) Expiry::setting('expiry_purchase_required'), $data['purchase_date']);
+                if (! $isNew) {
+                    $original = isset($item['purchase_item_id']) ? $originalItems->get($item['purchase_item_id']) : $originalItems->values()->get($index);
+                    if ($original && $original->product_id === $p->id && (! Expiry::enabled() || ! $user->hasPermission('purchase.expiry_edit'))) {
+                        if (Expiry::enabled() && (($item['expires_at'] ?? null) !== $original->expires_at || ($item['batch_number'] ?? null) !== $original->batch_number)) {
+                            abort(403, 'You do not have permission to edit purchase expiry.');
+                        }
+                        $expiry = $original->only('expires_at', 'batch_number');
+                    }
+                    if ($original && $original->product_id === $p->id && ! Expiry::setting('expiry_batch_enabled')) {
+                        $expiry['batch_number'] = $original->batch_number;
+                    }
+                }
+                $lines[] = $expiry + ['track_stock' => $p->track_stock, 'product_id' => $p->id, 'name' => $p->name, 'unit' => $selected['short_name'], 'unit_id' => $selected['id'], 'base_quantity' => $selected['base_stock_quantity'], 'base_cost' => $baseCost, 'selling_price' => $selling, 'base_selling_price' => $baseSelling, 'quantity' => $item['quantity'], 'cost' => $item['cost'], 'total' => $lineTotal];
             }
             $subtotal = $total;
             $charges = $data['charges'] ?? [];
@@ -114,7 +129,7 @@ class PurchaseService
                 $purchaseItem = $purchase->items()->create($line);
                 $p = $products[$line['product_id']];
                 if ($line['track_stock']) {
-                    app(StockLayerService::class)->receive($p, (string) $line['base_quantity'], $line['base_cost'], $line['base_selling_price'], 'PURCHASE', $purchase->reference, $userId, $purchaseItem->id, $purchase->purchase_date, $purchaseItem->id, $treatment === 'COST' && Money::compare($chargesTotal, 0) > 0 ? Money::add($line['total'], $line['allocated_charge']) : null);
+                    app(StockLayerService::class)->receive($p, (string) $line['base_quantity'], $line['base_cost'], $line['base_selling_price'], 'PURCHASE', $purchase->reference, $userId, $purchaseItem->id, $purchase->purchase_date, $purchaseItem->id, $treatment === 'COST' && Money::compare($chargesTotal, 0) > 0 ? Money::add($line['total'], $line['allocated_charge']) : null, $line['expires_at'], $line['batch_number']);
                 }
                 $p->update(['cost' => $line['base_cost']]);
             }

@@ -1,3 +1,4 @@
+import './expiry.js';
 import './expense-category.js';
 import './register.js';
 import {
@@ -67,6 +68,7 @@ import {
   Calculator,
 } from 'lucide';
 const icons = {
+  Receipt: ReceiptText,
   AlertCircle: CircleAlert,
   ShoppingBasket,
   LayoutDashboard,

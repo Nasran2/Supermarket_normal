@@ -10,7 +10,7 @@ final class AuditPresentation
 {
     private const LABELS = [
         'sku' => 'SKU', 'barcode' => 'Barcode', 'cost' => 'Cost price', 'price' => 'Selling price',
-        'stock' => 'Stock quantity', 'low_stock' => 'Low stock alert', 'track_stock' => 'Maintain stock',
+        'stock' => 'Stock quantity', 'low_stock' => 'Low stock alert', 'track_stock' => 'Maintain stock', 'track_expiry' => 'Track expiry', 'expires_at' => 'Expiry date', 'batch_number' => 'Batch number',
         'active' => 'Active', 'unit_id' => 'Unit', 'supplier_id' => 'Supplier',
         'category_id' => 'Category', 'expense_category_id' => 'Expense category', 'payment_method_id' => 'Payment method',
         'default_discount_type' => 'Default discount type', 'default_discount_value' => 'Default discount',
@@ -20,7 +20,7 @@ final class AuditPresentation
         'created_by' => 'Created by', 'updated_by' => 'Updated by',
     ];
 
-    private const BOOLEAN_FIELDS = ['active', 'track_stock', 'allow_decimal', 'system', 'allow_discount', 'barcode_enabled', 'auto_print', 'show_receipt'];
+    private const BOOLEAN_FIELDS = ['active', 'track_expiry', 'track_stock', 'allow_decimal', 'system', 'allow_discount', 'barcode_enabled', 'auto_print', 'show_receipt'];
 
     private const MONEY_FIELDS = ['cost', 'price', 'cost_price', 'selling_price', 'unit_price', 'amount', 'total', 'subtotal', 'discount', 'processing_charge', 'opening_cash', 'actual_cash', 'expected_cash', 'difference', 'amount_paid', 'sale_amount', 'customer_payable', 'due_balance', 'refund_amount', 'opening_due', 'opening_due_paid', 'base_cost', 'catalog_price', 'line_subtotal', 'line_discount', 'line_discounts', 'invoice_discount', 'stock_price', 'cogs_total', 'cost_total', 'remaining_cost_total', 'inventory_cost_total', 'business_expense', 'allocated_amount', 'remaining_amount', 'customer_processing_charge', 'change'];
 
@@ -95,6 +95,9 @@ final class AuditPresentation
     {
         $result = [];
         foreach ($values as $key => $value) {
+            if (! Expiry::enabled() && (in_array($key, ['track_expiry', 'expires_at', 'batch_number', 'expiry_source']) || str_starts_with((string) $key, 'expiry_'))) {
+                continue;
+            }
             $parts = [...$path, is_int($key) ? (string) ($key + 1) : $key];
             if (is_array($value) && $value && (! array_is_list($value) || collect($value)->contains(fn ($item) => is_array($item)))) {
                 $result += self::flatten($value, $parts);

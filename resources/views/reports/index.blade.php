@@ -9,4 +9,5 @@
 @endforeach
 <section class="report-library-section"><div class="report-library-grid">@foreach(['sales'=>'Sales Returns Report','purchase'=>'Purchase Returns Report'] as $kind=>$label)@can($kind.'_returns.view')<a class="card report-library-card" href="{{ route('returns.index',$kind) }}"><span class="tile-icon"><x-icon name="package-open"/></span><h3>{{ $label }}</h3></a>@endcan @endforeach @can('supplier_returns.view')<a class="card report-library-card" href="{{ route('returns.suppliers') }}"><span class="tile-icon"><x-icon name="truck"/></span><h3>Supplier Returns</h3></a>@endcan</div></section>
 @if(\App\Support\Hr::enabled())@include('hr.partials.report-cards')@endif
+@if(\App\Support\Expiry::enabled())@can('expiry.view')<section class="report-library-section"><div class="report-library-grid"><a class="card report-library-card" href="{{ route('expiry.index') }}"><span class="tile-icon"><x-icon name="calendar"/></span><div><h3>Expiry report</h3><p>Expiring soon, expired and all remaining batches.</p></div></a></div></section>@endcan @endif
 @endsection

@@ -8,6 +8,7 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockLayerMovement;
 use App\Support\Audit;
+use App\Support\Expiry;
 use App\Support\Money;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -38,20 +39,20 @@ class StockLayerService
         }
     }
 
-    private function create(Product $p, string $quantity, string $cost, string $price, string $source, string $reference, ?int $user, ?int $sourceId = null, $received = null, ?int $purchaseItem = null): ProductStockLayer
+    private function create(Product $p, string $quantity, string $cost, string $price, string $source, string $reference, ?int $user, ?int $sourceId = null, $received = null, ?int $purchaseItem = null, ?string $expiresAt = null, ?string $batchNumber = null): ProductStockLayer
     {
         if (Money::compare($cost, 0) < 0 || Money::compare($price, 0) < 0) {
             $this->fail('Cost and selling price must be zero or greater.');
         }
-        $layer = $p->stockLayers()->create(['primary_unit_id' => $p->unit_id, 'cost_price' => Money::round($cost), 'selling_price' => Money::round($price), 'original_quantity' => $quantity, 'remaining_quantity' => $quantity, 'source_type' => $source, 'source_id' => $sourceId, 'source_reference' => $reference, 'purchase_item_id' => $purchaseItem, 'received_at' => $received ?? now(), 'created_by' => $user]);
+        $layer = $p->stockLayers()->create(['expires_at' => $expiresAt, 'batch_number' => $batchNumber, 'expiry_source' => $expiresAt ? $source : null, 'primary_unit_id' => $p->unit_id, 'cost_price' => Money::round($cost), 'selling_price' => Money::round($price), 'original_quantity' => $quantity, 'remaining_quantity' => $quantity, 'source_type' => $source, 'source_id' => $sourceId, 'source_reference' => $reference, 'purchase_item_id' => $purchaseItem, 'received_at' => $received ?? now(), 'created_by' => $user]);
         Audit::record('stock.layer.create', $layer, [], $layer->getAttributes());
 
         return $layer;
     }
 
-    public function receive(Product $p, string $quantity, string $cost, string $price, string $source, string $reference, int $user, ?int $sourceId = null, $received = null, ?int $purchaseItem = null, ?string $inventoryCost = null): ProductStockLayer
+    public function receive(Product $p, string $quantity, string $cost, string $price, string $source, string $reference, int $user, ?int $sourceId = null, $received = null, ?int $purchaseItem = null, ?string $inventoryCost = null, ?string $expiresAt = null, ?string $batchNumber = null): ProductStockLayer
     {
-        return DB::transaction(function () use ($p, $quantity, $cost, $price, $source, $reference, $user, $sourceId, $received, $purchaseItem, $inventoryCost) {
+        return DB::transaction(function () use ($p, $quantity, $cost, $price, $source, $reference, $user, $sourceId, $received, $purchaseItem, $inventoryCost, $expiresAt, $batchNumber) {
             $locked = Product::whereKey($p->id)->lockForUpdate()->firstOrFail();
             $p->setRawAttributes($locked->getAttributes(), true);
             if (! $p->track_stock) {
@@ -59,7 +60,7 @@ class StockLayerService
             }
             app(StockService::class)->validateQuantity($p, $quantity);
             $this->ensureLegacy($p);
-            $layer = $this->create($p, $quantity, $cost, $price, $source, $reference, $user, $sourceId, $received, $purchaseItem);
+            $layer = $this->create($p, $quantity, $cost, $price, $source, $reference, $user, $sourceId, $received, $purchaseItem, $expiresAt, $batchNumber);
             if ($inventoryCost !== null) {
                 $layer->update(['inventory_cost_total' => $inventoryCost, 'remaining_cost_total' => $inventoryCost]);
             }
@@ -71,6 +72,9 @@ class StockLayerService
 
     public function groups(Product $p, ?Sale $editing = null): array
     {
+        if (Expiry::tracks($p)) {
+            return $this->expiryChoices($p, $editing);
+        }
         if (! $p->track_stock) {
             return [['stock_price' => $p->price, 'quantity' => '999999.000', 'stock_layer_id' => null, 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p))]];
         }
@@ -110,6 +114,9 @@ class StockLayerService
     /** Separate selectable stock rows, including rows with the same selling price. */
     public function choices(Product $p, ?Sale $editing = null): array
     {
+        if (Expiry::tracks($p)) {
+            return $this->expiryChoices($p, $editing);
+        }
         if (! $p->track_stock) {
             return [['stock_price' => $p->price, 'quantity' => '999999.000', 'stock_layer_id' => null, 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p))]];
         }
@@ -122,7 +129,35 @@ class StockLayerService
             ->map(fn ($layer) => ['stock_layer_id' => $layer->id, 'stock_price' => $layer->selling_price, 'quantity' => Money::quantity($layer->remaining_quantity, $credits[$layer->id] ?? '0'), 'reference' => $layer->source_reference, 'received' => $layer->received_at?->format('d M Y'), 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p, $layer->selling_price))])->values()->all();
     }
 
-    public function plan(Product $p, string $quantity, ?string $price, array &$reserved, bool $lock = false, ?Sale $editing = null, ?int $layerId = null, array $returnCredits = []): array
+    public function expiryChoices(Product $p, ?Sale $editing = null): array
+    {
+        $this->ensureLegacy($p);
+        $credits = $this->credits($editing, $p);
+        $layers = ! $editing && $p->relationLoaded('stockLayers') ? $p->stockLayers : $p->stockLayers()->where('status', 'ACTIVE')->where(fn ($q) => $q->where('remaining_quantity', '>', 0)->when($credits, fn ($q) => $q->orWhereIn('id', array_keys($credits))))->get();
+        $layers = $layers->sortBy(fn ($layer) => [$layer->expires_at?->toDateString() ?? '', $layer->received_at?->getTimestamp(), $layer->id]);
+        $override = ! Expiry::setting('expiry_block_expired') && Expiry::setting('expiry_allow_override') && auth()->user()?->hasPermission('expiry.override_expired_sale');
+        $groups = [];
+        foreach ($layers as $layer) {
+            $qty = Money::quantity($layer->remaining_quantity, $credits[$layer->id] ?? '0');
+            if ($layer->status !== 'ACTIVE' || Money::compare($qty, 0) <= 0 || ! $layer->expires_at || (Expiry::expired($layer->expires_at) && ! $override)) {
+                continue;
+            }
+            $date = $layer->expires_at->toDateString();
+            $fefo = Expiry::setting('expiry_selection_mode') === 'FEFO' && ! Expiry::expired($date);
+            $key = $layer->selling_price.'|'.($fefo ? 'FEFO' : $date);
+            $groups[$key] ??= ['stock_layer_id' => null, 'stock_price' => $layer->selling_price, 'expires_at' => $fefo ? null : $date, 'expiry_label' => $fefo ? 'Earliest expiry first' : $layer->expires_at->format('d M Y'), 'expiry_status' => Expiry::status($date), 'days_remaining' => Expiry::days($date), 'expired' => Expiry::expired($date), 'fefo' => $fefo, 'quantity' => '0.000', 'units' => array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->options($p, $layer->selling_price))];
+            $groups[$key]['quantity'] = Money::quantity($groups[$key]['quantity'], $qty);
+        }
+        $rows = array_values($groups);
+        usort($rows, fn ($a, $b) => ($a['expired'] <=> $b['expired']) ?: (($a['expires_at'] ?? '') <=> ($b['expires_at'] ?? '')) ?: Money::compare($a['stock_price'], $b['stock_price']));
+        if ($rows) {
+            $rows[0]['recommended'] = ! $rows[0]['expired'];
+        }
+
+        return $rows;
+    }
+
+    public function plan(Product $p, string $quantity, ?string $price, array &$reserved, bool $lock = false, ?Sale $editing = null, ?int $layerId = null, array $returnCredits = [], ?string $expiresAt = null, bool $expiredConfirmed = false): array
     {
         if (! $p->track_stock) {
             if ($layerId !== null || ($price !== null && Money::compare($price, $p->price) !== 0)) {
@@ -137,7 +172,28 @@ class StockLayerService
             $credits[$id] = Money::quantity($credits[$id] ?? '0', $credit['quantity']);
         }
         $query = $p->stockLayers()->where('status', 'ACTIVE')->where(fn ($q) => $q->where('remaining_quantity', '>', 0)->when($credits, fn ($q) => $q->orWhereIn('id', array_keys($credits))))->orderBy('received_at')->orderBy('id');
-        if ($layerId !== null) {
+        if (Expiry::tracks($p)) {
+            $override = ! Expiry::setting('expiry_block_expired') && Expiry::setting('expiry_allow_override') && auth()->user()?->hasPermission('expiry.override_expired_sale') && $expiredConfirmed;
+            $query->whereNotNull('expires_at');
+            if (! $override) {
+                $query->where('expires_at', '>=', Expiry::today()->toDateString());
+            }
+            if ($layerId !== null) {
+                $selected = $p->stockLayers()->whereKey($layerId)->first();
+                if (! $selected) {
+                    $this->fail('Choose a batch belonging to '.$p->name.'.');
+                }
+                $expiresAt = $selected->expires_at?->toDateString();
+                if (! $expiresAt) {
+                    $this->fail('The selected batch has no known expiry. Choose a valid dated batch.');
+                }
+                $price ??= $selected->selling_price;
+            }
+            if ($expiresAt !== null) {
+                $query->where('expires_at', $expiresAt);
+            }
+            $query->reorder()->orderBy('expires_at')->orderBy('received_at')->orderBy('id');
+        } elseif ($layerId !== null) {
             $query->whereKey($layerId);
         }
         if ($lock) {
@@ -153,6 +209,9 @@ class StockLayerService
             $price = $prices->first();
         }
         $price = Money::round($price);
+        if (Expiry::tracks($p) && Expiry::setting('expiry_selection_mode') !== 'FEFO' && $expiresAt === null && $eligible->where('selling_price', $price)->pluck('expires_at')->unique()->count() > 1) {
+            $this->fail('Choose an expiry batch for '.$p->name.'.');
+        }
         $available = '0.000';
         $allocations = [];
         $left = $quantity;
@@ -186,13 +245,13 @@ class StockLayerService
                 $lineCost = BigDecimal::of($pool)->multipliedBy($take)->dividedBy($qty, 2, RoundingMode::HALF_UP);
                 $reserved['cost_'.$layer->id] = Money::add($reserved['cost_'.$layer->id] ?? '0', (string) $lineCost);
             }
-            $allocations[] = ['stock_layer_id' => $layer->id, 'quantity' => $take, 'cost_price' => $layer->cost_price, 'cost_total' => Money::round((string) $lineCost)];
+            $allocations[] = ['expires_at' => $layer->expires_at?->toDateString(), 'batch_number' => $layer->batch_number, 'stock_layer_id' => $layer->id, 'quantity' => $take, 'cost_price' => $layer->cost_price, 'cost_total' => Money::round((string) $lineCost)];
             $cost = $cost->plus($lineCost);
             $reserved[$layer->id] = Money::quantity($reserved[$layer->id] ?? '0', $take);
             $left = Money::quantity($left, '-'.$take);
         }
         if (Money::compare($left, 0) > 0) {
-            $this->fail('Only '.$available.' '.$p->unit->short_name.' of '.$p->name.' are available at '.Money::display($price).'. Choose another price for the remaining quantity.');
+            $this->fail((Expiry::tracks($p) ? 'Only '.$available.' '.$p->unit->short_name.' are available in the selected expiry batch of '.$p->name.'. Add the remaining quantity from another batch separately.' : 'Only '.$available.' '.$p->unit->short_name.' of '.$p->name.' are available at '.Money::display($price).'. Choose another price for the remaining quantity.'));
         }
         $total = $hasLandedCost ? Money::sum(array_column($allocations, 'cost_total')) : (string) $cost->toScale(2, RoundingMode::HALF_UP);
         $last = count($allocations) - 1;
@@ -217,6 +276,9 @@ class StockLayerService
                 $values['remaining_cost_total'] = Money::sub($layer->remaining_cost_total, $row['cost_total']);
             }
             $layer->update($values);
+            if ($layer->expires_at?->toDateString() !== ($row['expires_at'] ?? null)) {
+                $this->fail('The expiry date changed. Review this sale again.');
+            }
             $item->allocations()->create($row);
             $moves[] = [$layer, '-'.$row['quantity'], '-'.$row['cost_total']];
         }
@@ -291,9 +353,9 @@ class StockLayerService
         }
     }
 
-    public function adjust(Product $p, string $delta, ?int $layerId, string $cost, string $price, string $reference, string $reason, int $user): void
+    public function adjust(Product $p, string $delta, ?int $layerId, string $cost, string $price, string $reference, string $reason, int $user, ?string $expiresAt = null, ?string $batchNumber = null): void
     {
-        DB::transaction(function () use ($p, $delta, $layerId, $cost, $price, $reference, $reason, $user) {
+        DB::transaction(function () use ($p, $delta, $layerId, $cost, $price, $reference, $reason, $user, $expiresAt, $batchNumber) {
             $locked = Product::whereKey($p->id)->lockForUpdate()->firstOrFail();
             $p->setRawAttributes($locked->getAttributes(), true);
             $this->ensureLegacy($p);
@@ -311,8 +373,17 @@ class StockLayerService
                 if ($layerId) {
                     $cost = $selected->cost_price;
                     $price = $selected->selling_price;
+                    $expiresAt = $selected->expires_at?->toDateString();
+                    $batchNumber = $selected->batch_number;
                 }
-                $layer = $this->create($p, $delta, $cost, $price, 'STOCK_ADJUSTMENT', $reference, $user);
+                if (Expiry::tracks($p)) {
+                    $expiresAt = $layerId ? $selected->expires_at?->toDateString() : $expiresAt;
+                    $batchNumber = $layerId ? $selected->batch_number : $batchNumber;
+                    if (! $expiresAt) {
+                        $this->fail('Enter the expiry date for this new batch.');
+                    }
+                }
+                $layer = $this->create($p, $delta, $cost, $price, 'STOCK_ADJUSTMENT', $reference, $user, null, null, null, $expiresAt, $batchNumber);
                 $this->movement($p, [[$layer, $delta]], $reason, $reference, $user);
 
                 return;

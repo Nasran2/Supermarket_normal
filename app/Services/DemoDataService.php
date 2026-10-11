@@ -21,7 +21,7 @@ class DemoDataService
         'purchases', 'purchase_items', 'purchase_payments', 'purchase_charges',
         'purchase_returns', 'purchase_return_items', 'supplier_returns',
         'return_stock_allocations', 'return_account_allocations', 'return_settlements',
-        'expenses', 'stock_movements', 'stock_adjustments', 'stock_adjustment_items',
+        'expiry_writeoffs', 'expenses', 'stock_movements', 'stock_adjustments', 'stock_adjustment_items',
         'product_stock_layers', 'sale_stock_allocations', 'stock_layer_movements',
         'document_sequences', 'audit_logs', 'hr_staff', 'hr_employment_events',
         'hr_attendances', 'hr_leaves', 'hr_payrolls', 'hr_payments',

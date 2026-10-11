@@ -7,6 +7,7 @@ use App\Models\ProductStockLayer;
 use App\Models\ReturnStockAllocation;
 use App\Models\SaleItem;
 use App\Models\SaleStockAllocation;
+use App\Support\Expiry;
 use App\Support\Money;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -38,7 +39,7 @@ class StockReturnService
             }
             $layer = ProductStockLayer::with('purchaseItem.purchase')->findOrFail($a->stock_layer_id);
             $cost = Money::sub($this->portion($a->cost_total, Money::quantity($a->returned_quantity, $take), $a->quantity), $this->portion($a->cost_total, $a->returned_quantity, $a->quantity));
-            $rows[] = ['allocation_id' => $a->id, 'stock_layer_id' => $a->stock_layer_id, 'quantity' => $take, 'cost_total' => $cost, 'supplier_id' => $layer->purchaseItem?->purchase?->supplier_id];
+            $rows[] = ['expires_at' => $a->expires_at ?? $layer->expires_at?->toDateString(), 'batch_number' => $a->batch_number ?? $layer->batch_number, 'allocation_id' => $a->id, 'stock_layer_id' => $a->stock_layer_id, 'quantity' => $take, 'cost_total' => $cost, 'supplier_id' => $layer->purchaseItem?->purchase?->supplier_id];
             $left = Money::quantity($left, '-'.$take);
         }
         if (Money::compare($left, 0) > 0) {
@@ -68,6 +69,9 @@ class StockReturnService
             $a->update(['returned_quantity' => Money::quantity($a->returned_quantity, $row['quantity'])]);
             ReturnStockAllocation::create(['sale_return_item_id' => $returnItem->id, 'sale_stock_allocation_id' => $a->id, 'stock_layer_id' => $layer->id, 'quantity' => $row['quantity'], 'cost_total' => $row['cost_total'], 'stock_action' => $action]);
             if ($action === 'RESTOCK') {
+                if (Expiry::enabled() && Expiry::expired($row['expires_at'] ?? $layer->expires_at)) {
+                    ReturnSettlementService::fail('This product has expired and cannot be returned to sellable stock. Choose Write off or Return to supplier.');
+                }
                 $values = ['remaining_quantity' => Money::quantity($layer->remaining_quantity, $row['quantity']), 'status' => 'ACTIVE'];
                 if ($layer->remaining_cost_total !== null) {
                     $values['remaining_cost_total'] = Money::add($layer->remaining_cost_total, $row['cost_total']);

@@ -1,10 +1,10 @@
 {
-  "_pos-price-options-BAhJc5iF.js": {
-    "file": "assets/pos-price-options-BAhJc5iF.js",
+  "_pos-price-options-BXcz7Ggt.js": {
+    "file": "assets/pos-price-options-BXcz7Ggt.js",
     "name": "pos-price-options"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Dz6NPSmt.css",
+    "file": "assets/app-Md7Gync3.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -13,31 +13,31 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-BGyzsEsA.js",
+    "file": "assets/app-rkIeRib4.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
-      "_pos-price-options-BAhJc5iF.js"
+      "_pos-price-options-BXcz7Ggt.js"
     ]
   },
   "resources/js/pos.js": {
-    "file": "assets/pos-zQOtcaEv.js",
+    "file": "assets/pos-CWYjvq6M.js",
     "name": "pos",
     "src": "resources/js/pos.js",
     "isEntry": true,
     "imports": [
-      "_pos-price-options-BAhJc5iF.js"
+      "_pos-price-options-BXcz7Ggt.js"
     ]
   },
   "resources/js/product-units.js": {
-    "file": "assets/product-units-BOi05TCT.js",
+    "file": "assets/product-units-B86SHXrY.js",
     "name": "product-units",
     "src": "resources/js/product-units.js",
     "isEntry": true
   },
   "resources/js/purchase.js": {
-    "file": "assets/purchase-DK3FvkU-.js",
+    "file": "assets/purchase-B4WYsA_q.js",
     "name": "purchase",
     "src": "resources/js/purchase.js",
     "isEntry": true
@@ -49,7 +49,7 @@
     "isEntry": true
   },
   "resources/js/stock-adjustments.js": {
-    "file": "assets/stock-adjustments-B_ieLIGP.js",
+    "file": "assets/stock-adjustments-D04M1Ytd.js",
     "name": "stock-adjustments",
     "src": "resources/js/stock-adjustments.js",
     "isEntry": true

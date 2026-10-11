@@ -71,3 +71,22 @@ test('different prices remain separate choices and same-price decimal quantities
   assert.equal(priceOptionForItem(product,{}),undefined);
   assert.deepEqual(sellingPriceOptions({}),[]);
 });
+
+test('expiry choices at the same selling price remain separate and restore the selected date', () => {
+  const january = {stock_price:'130.00',quantity:'2.000',expires_at:'2027-01-15',stock_layer_id:null};
+  const april = {...january,quantity:'10.000',expires_at:'2027-04-15'};
+  const product = {track_expiry:true,price_options:[january,april]};
+  assert.deepEqual(sellingPriceOptions(product),[january,april]);
+  const item = {id:8,unit_id:1,stock_price:'130.00',expires_at:'2027-04-15'};
+  assert.equal(priceOptionForItem(product,item),april);
+  assert.notEqual(stockChoiceKey(item),stockChoiceKey({...item,expires_at:'2027-01-15'}));
+  assert.equal(priceOptionForItem({...product,price_options:[january]},item),undefined);
+});
+
+test('FEFO keeps its server-provided aggregate and dormant expiry dates do not change normal price choices', () => {
+  const fefo = {stock_price:'130.00',quantity:'12.000',expires_at:null,fefo:true};
+  assert.deepEqual(sellingPriceOptions({track_expiry:true,price_options:[fefo]}),[fefo]);
+  const disabled = {track_expiry:false,price_options:[{...fefo,quantity:'2.000',expires_at:'2027-01-15'},{...fefo,quantity:'10.000',expires_at:'2027-04-15'}]};
+  assert.equal(sellingPriceOptions(disabled).length,1);
+  assert.equal(sellingPriceOptions(disabled)[0].quantity,'12.000');
+});
