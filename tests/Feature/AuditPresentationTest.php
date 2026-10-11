@@ -72,6 +72,7 @@ class AuditPresentationTest extends TestCase
         $nested = AuditPresentation::text(['items' => [['discount_type' => 'PERCENT', 'discount_value' => '12.50', 'cost_total' => '80.00']]]);
         $this->assertStringContainsString('Items → 1 → Discount Value: 12.5%', $nested);
         $this->assertStringContainsString('Items → 1 → Cost Total: Rs. 80.00', $nested);
+        $this->assertSame('Opened At: 11/10/2026 12:30 AM', AuditPresentation::text(['opened_at' => '2026-10-10T19:00:00Z'], ['timezone' => 'Asia/Colombo']));
     }
 
     public function test_audit_page_and_csv_are_readable_and_leave_original_snapshots_intact(): void

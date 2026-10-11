@@ -4,7 +4,7 @@
     "name": "pos-price-options"
   },
   "resources/css/app.css": {
-    "file": "assets/app-C1_qM0D1.css",
+    "file": "assets/app-Dz6NPSmt.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -22,7 +22,7 @@
     ]
   },
   "resources/js/pos.js": {
-    "file": "assets/pos-BZxn-B9C.js",
+    "file": "assets/pos-zQOtcaEv.js",
     "name": "pos",
     "src": "resources/js/pos.js",
     "isEntry": true,

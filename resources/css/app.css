@@ -5638,3 +5638,13 @@ body.nav-collapsed .sidebar:not(.mobile-open) .nav-chevron {
   }
 }
 
+
+/* Demo mode keeps the normal POS layout available and settings visibly locked. */
+.demo-notice{display:flex;align-items:center;gap:12px;padding:10px 16px;margin-bottom:20px;border:1px solid #e6dba5;border-radius:10px;background:#fffbeb;color:#6c5c28;font-size:12px;line-height:1.5}
+.demo-notice strong{white-space:nowrap;letter-spacing:.05em}
+.demo-readonly{border:0;padding:0;margin:0;min-width:0}
+.demo-readonly :disabled{cursor:not-allowed}
+.demo-readonly input:disabled,.demo-readonly select:disabled,.demo-readonly textarea:disabled{background:#f5f7f6;color:#75847b}
+.pos-workspace .demo-notice{padding:6px 12px;margin-bottom:8px;font-size:11px}
+@media(max-width:640px){.demo-notice{align-items:flex-start;flex-direction:column;gap:4px}}
+@media print{.demo-notice{display:block;background:none;border:0;margin:0 0 8px;padding:0;color:#61776d}.demo-notice strong{margin-right:8px}}

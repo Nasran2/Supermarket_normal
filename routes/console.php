@@ -2,7 +2,10 @@
 
 use App\Models\Role;
 use App\Models\User;
+use App\Services\DemoDataService;
+use App\Support\Demo;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 
 Artisan::command('pos:admin {email} {--name=Administrator} {--username= : Login username}', function () {
@@ -44,3 +47,17 @@ Artisan::command('pos:admin {email} {--name=Administrator} {--username= : Login 
     User::create(['name' => $this->option('name'), 'username' => $username, 'email' => $email, 'password' => $password, 'role_id' => $role->id, 'active' => true]);
     $this->info('Administrator created. Username: '.$username);
 })->purpose('Create an administrator without a default password');
+
+Artisan::command('demo:reset', function (DemoDataService $service) {
+    if (! Demo::enabled()) {
+        $this->info('Demo mode is disabled. No data was changed.');
+
+        return 0;
+    }
+    $state = $service->synchronized(fn () => $service->refresh());
+    $this->info(($state['reset'] ? 'Demo data restored.' : 'Demo cycle ready; no reset due.').' Next reset: '.$state['next_reset_at']->toDateTimeString());
+
+    return 0;
+})->purpose('Initialize the demo baseline or restore it when the ten-day cycle expires');
+
+Schedule::command('demo:reset')->everyMinute()->withoutOverlapping();

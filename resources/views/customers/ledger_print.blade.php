@@ -20,7 +20,7 @@
         }
     </style>
 </head>
-<body onload="window.print()">
+<body onload="window.print()"><x-demo-watermark :print-only="false"/>@if(\App\Support\Demo::enabled())<p class="demo-document-label">DEMO — Sample ledger</p>@endif
     <div class="no-print" style="margin-bottom:20px; text-align:right;">
         <button onclick="window.print()">Print</button>
     </div>

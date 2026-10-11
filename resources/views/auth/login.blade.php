@@ -70,6 +70,7 @@
 
     <main class="login-card w-full max-w-[420px] p-8 sm:p-10 transition-all duration-300">
         
+        <x-demo-notice/>
         <!-- Header -->
         <div class="text-center mb-8">
             @if(!empty($settings['logo']))

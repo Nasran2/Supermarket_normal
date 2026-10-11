@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\Demo;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Support\LazyCollection;
@@ -40,6 +41,7 @@ class PdfReportService
         $pdf->loadHtml(view('pdf.report', $data + ['settings' => $settings, 'logo' => $logo, 'landscape' => $landscape, 'generated' => now(), 'preparedBy' => auth()->user()?->name ?? 'System', 'subtitle' => '', 'cards' => [], 'contact' => [], 'notes' => '', 'filters' => []])->render());
         $pdf->render();
         $pdf->getCanvas()->page_text($landscape ? 735 : 490, $landscape ? 571 : 817, 'Page {PAGE_NUM} of {PAGE_COUNT}', $pdf->getFontMetrics()->getFont('DejaVu Sans'), 8, [0.35, 0.4, 0.38]);
+        Demo::watermarkPdf($pdf);
 
         return $pdf->output();
     }

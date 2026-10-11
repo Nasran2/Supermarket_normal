@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\Demo;
 use App\Support\Money;
 use Dompdf\Dompdf;
 
@@ -196,6 +197,8 @@ class LargeTablePdfRenderer
         }
         $canvas->page_text(30, $canvas->get_height() - 28, ($settings['business_name'] ?? 'Twinsofte').' | '.$data['title'].' | '.($settings['currency'] ?? 'LKR'), $font, 8, $muted);
         $canvas->page_text($canvas->get_width() - 110, $canvas->get_height() - 28, 'Page {PAGE_NUM} of {PAGE_COUNT}', $font, 8, $muted);
+
+        Demo::watermarkPdf($pdf);
 
         return $pdf->output();
     }

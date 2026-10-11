@@ -1,0 +1,11 @@
+Demo mode verification (11 October 2026)
+
+- DemoModeTest: 11 tests passed, 112 assertions. Tests cover protected administrator requests, read-only forms, normal-mode behavior, ten-day deadlines, repeat cycles, stock and transaction restore, password/settings preservation, stale form rejection, scheduled execution, failed-restore rollback, login and timezone differences.
+- BillVisibilityTest, DocumentationRoutingTest and AuditPresentationTest passed alongside the original nine demo tests: 26 tests, 356 assertions. Two later demo tests add login and timezone coverage.
+- A separate copy of the existing fictional UI database was used to restore all 43 business tables, including linked sales, returns, payments and stock records. Restored rows matched the starting snapshot; SQLite foreign_key_check returned no violations; users/settings were unchanged.
+- Browser verification: protected Business settings inputs and Save changes are disabled; POS remains usable; receipts have a narrow, light DEMO watermark. Captures: demo-protected-settings.png, demo-pos.png, demo-receipt.png.
+- Both regular and large-export PDF renderers were rendered to three pages. Every page contained DEMO and Sample document labels; first and final pages were visually checked for legibility. Capture: demo-pdf-watermark.png. Print styles include fixed watermarks for receipts, return slips, customer ledger printouts and the main application layout.
+- Production assets rebuilt; targeted PHP formatting and git diff whitespace checks passed. The demo_cycles migration was applied locally without clearing business data.
+- Broader existing tests: AuthenticationTest has 11 failures because its fixture duplicates the seeded admin username. RolePermissionsTest has one failure expecting hr.view while the HR module is disabled. Both representative failures were reproduced from an isolated archive of unchanged HEAD. These are independent of demo mode and were left outside this change.
+
+The host must run Laravel's schedule:run each minute for resets without traffic. The first subsequent web request performs any overdue reset if the host scheduler is unavailable. No operational database reset was executed during verification.

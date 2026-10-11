@@ -169,7 +169,9 @@ final class AuditPresentation
         }
         if (str_ends_with($key, '_at') || str_ends_with($key, '_date')) {
             try {
-                return Carbon::parse($value)->format(($settings['date_format'] ?? 'd/m/Y').(str_ends_with($key, '_at') ? ' h:i A' : ''));
+                $timezone = $settings['timezone'] ?? config('app.timezone', 'UTC');
+
+                return Carbon::parse($value, $timezone)->setTimezone($timezone)->format(($settings['date_format'] ?? 'd/m/Y').(str_ends_with($key, '_at') ? ' h:i A' : ''));
             } catch (\Throwable) {
                 return (string) $value;
             }

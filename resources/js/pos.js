@@ -65,7 +65,7 @@ const lineDiscountCents = (p) => {
   return preset && discount > grossLineCents(p) ? grossLineCents(p) : discount;
 };
 const lineCents = (p) => grossLineCents(p) - lineDiscountCents(p);
-const draftKey = `twinsofte-pos-draft:${new URL(pos.dataset.productsUrl).pathname}:${pos.dataset.userId}`;
+const draftKey = `twinsofte-pos-draft:${new URL(pos.dataset.productsUrl).pathname}:${pos.dataset.userId}${pos.dataset.demoCycle ? `:demo-${pos.dataset.demoCycle}` : ''}`;
 let store;
 try {
   if (!editMode) store = draftStore(localStorage, draftKey);

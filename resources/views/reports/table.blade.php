@@ -7,7 +7,7 @@
 .audit-report-table { table-layout: fixed; min-width: 960px; }
 .audit-report-table th:nth-child(1) { width: 120px; }
 .audit-report-table th:nth-child(2) { width: 100px; }
-.audit-report-table th:nth-child(3) { width: 125px; }
+.audit-report-table th:nth-child(3) { width: 145px; }
 .audit-report-table th:nth-child(4) { width: 105px; }
 .audit-report-table td { vertical-align: top; }
 .audit-values { display: grid; gap: 8px; margin: 0; }
@@ -22,7 +22,7 @@
 .audit-other summary { cursor: pointer; color: var(--green); font-size: 12px; font-weight: 600; padding: 6px 0; }
 .audit-other .audit-values { margin-top: 6px; }
 .audit-report-help { padding: 16px 22px; border-bottom: 1px solid var(--line); }
-@media print { .audit-other .audit-values { display: grid; } .audit-report-table { min-width: 0; } .audit-report-help { padding: 8px; } }
+@media print { .audit-other::details-content { display: block; content-visibility: visible; } .audit-other .audit-values { display: grid !important; } .audit-report-table { min-width: 0; } .audit-report-help { padding: 8px; } }
 </style>
 @endpush
 @endif
