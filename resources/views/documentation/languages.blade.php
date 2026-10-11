@@ -1,0 +1,1 @@
+<div class="documentation-languages"><x-icon name="book-open" :size="16"/><x-documentation-text text="Documentation languages"/><span lang="en">English</span>@if(config('documentation-languages.tamil'))<span lang="ta">தமிழ்</span>@endif @if(config('documentation-languages.sinhala'))<span lang="si">සිංහල</span>@endif</div>

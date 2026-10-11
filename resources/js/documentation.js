@@ -1,5 +1,19 @@
+// Language copies are scoped to documentation; the POS and management UI stay English.
+const renderCopy = (element, copies, replace = {}) => {
+  const copy = document.createElement('span');
+  copy.className = 'documentation-copy';
+  Object.entries(copies).forEach(([language, value]) => {
+    const span = document.createElement('span');
+    span.lang = language;
+    if (language !== 'en') span.className = 'documentation-translation';
+    span.textContent = value.replace(/:(\w+)/g, (token, key) => replace[key] ?? token);
+    copy.append(span);
+  });
+  element.replaceChildren(copy);
+};
 const library = document.querySelector('#documentation-library');
 if (library) {
+  const labels = JSON.parse(library.dataset.documentationLabels);
   const search = library.querySelector('#documentation-search');
   const categories = [...library.querySelectorAll('[data-documentation-category]')];
   const cards = [...library.querySelectorAll('[data-documentation-card]')];
@@ -14,8 +28,7 @@ if (library) {
       card.hidden = !matches;
       if (matches) count++;
     });
-    library.querySelector('#documentation-result-count').textContent =
-      `${count} ${count === 1 ? 'guide' : 'guides'}`;
+    renderCopy(library.querySelector('#documentation-result-count'), labels[count === 1 ? 'guide' : 'guides'], {count});
     library.querySelector('#documentation-no-results').hidden = count !== 0;
     categories.forEach((button) => {
       const selected = button.dataset.documentationCategory === category;
@@ -52,6 +65,7 @@ if (library) {
 
 const guide = document.querySelector('#documentation-guide');
 if (guide) {
+  const labels = JSON.parse(guide.dataset.documentationLabels);
   const scenes = [...guide.querySelectorAll('[data-demo-scene]')];
   const written = [...guide.querySelectorAll('[data-written-step]')];
   const seekButtons = [...guide.querySelectorAll('[data-demo-seek]')];
@@ -60,7 +74,7 @@ if (guide) {
   const previous = guide.querySelector('[data-demo-previous]');
   const next = guide.querySelector('[data-demo-next]');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const frameDuration = 3500;
+  const frameDuration = 3500 + 1500 * (Object.keys(labels.play).length - 1);
   let index = 0;
   let frameIndex = 0;
   let playing = false;
@@ -90,13 +104,14 @@ if (guide) {
     frames().forEach((frame, number) => {
       frame.hidden = number !== frameIndex;
     });
-    guide.querySelector('#documentation-demo-step').textContent =
-      `Step ${index + 1} of ${scenes.length}`;
-    guide.querySelector('#documentation-demo-caption').textContent =
-      written[index].querySelector('h3').textContent;
+    renderCopy(guide.querySelector('#documentation-demo-step'), labels.step, {current: index + 1, total: scenes.length});
+    guide.querySelector('#documentation-demo-caption').replaceChildren(written[index].querySelector('h3').firstElementChild.cloneNode(true));
+    renderCopy(guide.querySelector('[data-demo-frame-count]'), labels.screen, {current: frameIndex + 1, total: frames().length});
+    guide.querySelector('[data-demo-frame-previous]').disabled = frameIndex === 0;
+    guide.querySelector('[data-demo-frame-next]').disabled = frameIndex === frames().length - 1;
     previous.disabled = index === 0;
     next.disabled = index === scenes.length - 1;
-    playButton.textContent = playing ? 'Pause example' : 'Play example';
+    renderCopy(playButton, labels[playing ? 'pause' : 'play']);
     demo.classList.toggle('is-playing', playing);
     demo.classList.toggle('is-paused', !playing);
     const frame = frames()[frameIndex];
@@ -156,6 +171,16 @@ if (guide) {
     button.disabled = false;
     button.addEventListener('click', () => choose(Number(button.dataset.demoSeek)));
   });
+  const moveFrame = (delta) => {
+    stopTimer();
+    playing = false;
+    finished = false;
+    remaining = frameDuration;
+    frameIndex = Math.max(0, Math.min(frameIndex + delta, frames().length - 1));
+    render();
+  };
+  guide.querySelector('[data-demo-frame-previous]').addEventListener('click', () => moveFrame(-1));
+  guide.querySelector('[data-demo-frame-next]').addEventListener('click', () => moveFrame(1));
   previous.addEventListener('click', () => choose(index - 1));
   next.addEventListener('click', () => choose(index + 1));
   playButton.disabled = false;
@@ -188,7 +213,7 @@ if (guide) {
   overview.addEventListener('click', () => {
     const fullScreen = demo.classList.toggle('show-overview');
     overview.setAttribute('aria-pressed', String(fullScreen));
-    overview.textContent = fullScreen ? 'Zoom to control' : 'Show full screen';
+    renderCopy(overview, labels[fullScreen ? 'zoom' : 'overview']);
   });
   const player = guide.querySelector('.documentation-player');
   const dialog = guide.querySelector('#documentation-expanded');

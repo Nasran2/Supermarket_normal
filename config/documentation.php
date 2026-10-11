@@ -1,6 +1,6 @@
 <?php
 
-return [
+$guides = [
     'start-your-shift' => [
         'title' => 'Start your shift',
         'category' => 'Daily selling',
@@ -1349,3 +1349,23 @@ return [
         ],
     ],
 ];
+
+// Keep stock maintenance and discounts visible as separate, easy-to-find tasks.
+$product = &$guides['add-a-product'];
+$product['minutes'] = 5;
+$product['steps'][2]['title'] = 'Choose whether to maintain stock';
+$product['steps'][2]['text'] = 'Maintain stock is on by default. Leave it on for products you count. Turn it off for products sold without a stock count, such as a service. When it is off, stock quantities and low-stock alerts are not used, but cost, selling price and discounts still work.';
+$product['steps'][3]['text'] = 'Choose Primary stock unit, such as Piece (pcs) or Kilogram (kg). Opening stock means the goods already in your shop. Enter quantity, cost and selling price. Use Add another price for a separate opening price row. If Maintain stock is off, enter only cost and selling price. Do not enter a supplier delivery twice.';
+$discount = ['title' => 'Set the default discount', 'text' => 'Choose None, Fixed amount or Percentage (%) under Default discount. None means no automatic discount. Fixed amount is taken off once from the whole product line: 2 items at Rs. 100 with Rs. 10 fixed discount total Rs. 190. A 10% discount on the same Rs. 200 line takes off Rs. 20, leaving Rs. 180.'];
+$expiry = ['title' => 'Enter expiry dates when needed', 'text' => 'When expiry tracking is enabled by your server administrator, keep Maintain stock on and tick Track expiry for dated products. Enter the date printed on each opening batch. Add a separate row for a different date. Expired or unknown-date batches cannot normally be sold. Leave Track expiry off for products that do not need it.', 'requires_expiry' => true];
+array_splice($product['steps'], 4, 0, [$discount, $expiry]);
+unset($product);
+$guides['make-a-sale']['steps'][1]['text'] .= ' For expiry-tracked products, choose the selling price and expiry date together. In earliest-expiry mode, the system uses valid batches at the selected price. Expired stock is blocked by default.';
+$guides['make-a-sale']['steps'][2]['text'] .= ' A product default discount is added automatically. Check any line discount under that item; a fixed amount is for the whole line, not each unit.';
+$guides['receive-a-purchase']['steps'][2]['text'] .= ' For expiry-tracked products, enter the date on the received batch and the batch number when used. A different date creates a separate stock batch.';
+$guides['return-with-bill']['steps'][2]['text'] .= ' A dated return uses its original batch. If it is now expired, choose the approved write-off or supplier-return action instead of Restock.';
+$guides['return-without-bill']['steps'][3]['text'] .= ' If the product tracks expiry, read and enter its packaging date before restocking. An unknown expiry normally cannot be restocked.';
+$guides['read-reports']['steps'][2]['text'] .= ' The Audit log shows readable Before and After values. Expiry reports show batch dates and remaining stock when enabled.';
+$guides['store-settings']['tip'] .= ' In DEMO mode, business information and important settings are locked. DEMO labels appear on screens and printed documents, and sample data resets every 10 days.';
+
+return array_merge($guides, require __DIR__.'/documentation-extra.php');

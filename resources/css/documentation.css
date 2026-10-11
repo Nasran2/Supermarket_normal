@@ -1231,3 +1231,36 @@
     display: none !important;
   }
 }
+
+/* Optional translations live below the English instructions, inside help only. */
+.documentation-copy { display: inline; }
+.documentation-copy > [lang="en"] { display: inline; }
+.documentation-main .documentation-translation { display: block; margin-top: 5px; font-size: .88em; line-height: 1.8; font-weight: 400; letter-spacing: normal; font-family: "Noto Sans Tamil", "Noto Sans Sinhala", system-ui, sans-serif; }
+.documentation-main h1 .documentation-translation { font-size: .56em; }
+.documentation-languages { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 22px; color: #536d60; font-size: 12px; }
+.documentation-languages > span[lang] { padding: 4px 10px; border: 1px solid #dbe7df; border-radius: 6px; background: white; }
+.documentation-main .btn, .documentation-watch-step, .documentation-screen-tools button { white-space: normal; }
+.documentation-screen-tools { flex-wrap: wrap; align-items: start; }
+.documentation-screen-instruction { height: auto; min-height: 90px; }
+.documentation-frame-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; font-size: 11px; }
+.documentation-frame-tools .btn { padding: 8px 10px; font-size: 11px; min-height: 40px; }
+.documentation-frame-tools > span { text-align: center; }
+.documentation-player-heading { align-items: start; }
+.documentation-player-controls { align-items: stretch; }
+.documentation-player-controls > button { height: auto; min-height: 45px; }
+.documentation-main .documentation-card-footer { align-items: start; }
+@media (min-width: 1001px) {
+  .documentation-guide-layout > .documentation-player {
+    max-height: calc(100dvh - 48px);
+    overflow: auto;
+    scrollbar-gutter: stable;
+  }
+}
+/* Keep the help controls clear of the store's floating shortcut. */
+body:has(.documentation-main) #floating-pos-btn { display: none; }
+.documentation-expanded-heading .documentation-translation {
+  display: inline-block;
+  margin: 0 0 0 10px;
+  line-height: 1.7;
+}
+@media (max-width: 760px) { .documentation-frame-tools { gap: 6px; } .documentation-frame-tools .btn { padding: 8px; } }
