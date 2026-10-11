@@ -19,5 +19,14 @@
  @if($errors->any())<div class="notice error" role="alert"><x-icon name="circle-alert"/><div><strong>Please check the following</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div></div>@endif
  @yield('content')
 </main><footer class="app-footer">Powered by Twinsofte <span>{{ $settings['currency']??'LKR' }} · {{ $settings['timezone']??'Asia/Colombo' }}</span></footer></div>@stack('scripts')
+@if(!request()->routeIs('pos.*', 'sales.edit') && auth()->user()->hasPermission('pos.access'))
+<a href="{{ route('pos.index') }}" class="floating-pos-btn" id="floating-pos-btn" title="Point of sale" aria-label="Open Point of sale">
+    <span class="floating-pos-icon"><x-icon name="scan-line" :size="19"/></span>
+    <span class="floating-pos-label">Open POS</span>
+    @if($currentRegister)
+        <span class="floating-pos-pulse" title="Register open"></span>
+    @endif
+</a>
+@endif
 @if(auth()->user()->hasPermission('register.view') || auth()->user()->hasPermission('register.open') || auth()->user()->hasPermission('register.close'))@include('register.partials.dialogs')@endif
 </body></html>

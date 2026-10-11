@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ReportRequest;
+use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\PaymentMethod;
 use App\Models\Product;
@@ -10,6 +11,8 @@ use App\Models\User;
 use App\Services\PdfReportService;
 use App\Services\ProfitLossService;
 use App\Services\ReportService;
+use App\Services\SettingsService;
+use App\Support\AuditPresentation;
 use App\Support\Money;
 use App\Support\SalesVisibility;
 
@@ -34,6 +37,7 @@ class ReportController extends Controller
         $result = $service->build($report, $filters);
         $records = $result['query']->paginate(25)->withQueryString();
         $rows = $records->getCollection()->map($result['map']);
+        $auditComparisons = $report === 'audit' ? $records->getCollection()->map(fn ($record) => AuditPresentation::compare($record->before, $record->after, app(SettingsService::class)->all(), $record->action)) : collect();
         $headers = $result['headers'];
         $cards = $result['cards'];
         $methods = PaymentMethod::orderBy('display_order')->get();
@@ -43,7 +47,7 @@ class ReportController extends Controller
         $products = $report === 'stock' ? Product::where('track_stock', true)->orderBy('name')->get(['id', 'name']) : collect();
         $categories = $report === 'stock' ? Category::orderBy('name')->get(['id', 'name']) : collect();
 
-        return view('reports.table', compact('report', 'filters', 'title', 'records', 'rows', 'headers', 'cards', 'methods', 'users', 'rules', 'products', 'categories'));
+        return view('reports.table', compact('report', 'filters', 'title', 'records', 'rows', 'headers', 'cards', 'methods', 'users', 'rules', 'products', 'categories', 'auditComparisons'));
     }
 
     public function pdf(ReportRequest $request, string $report, ReportService $service, ProfitLossService $profit)
@@ -93,13 +97,7 @@ class ReportController extends Controller
                 ]);
             }
             if ($report === 'audit') {
-                $rows = $rows->map(function ($row) {
-                    foreach ([4, 5] as $index) {
-                        $row[$index] = wordwrap(json_encode(json_decode($row[$index], true), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 110, "\n", true);
-                    }
-
-                    return $row;
-                });
+                $rows = $rows->map(fn ($row) => AuditPresentation::formatRow($row, app(SettingsService::class)->all()));
             }
             $notes = match ($report) {
                 'returns' => '',
@@ -125,6 +123,9 @@ class ReportController extends Controller
             fputcsv($out, $result['headers']);
             foreach ($result['query']->lazy(500) as $record) {
                 $cells = ($result['map'])($record);
+                if ($record instanceof AuditLog) {
+                    $cells = AuditPresentation::formatRow($cells, app(SettingsService::class)->all());
+                }
                 $cells = array_map(fn ($v) => is_string($v) && preg_match('/^[=+@\-\t\r]/', $v) ? "'".$v : $v, $cells);
                 fputcsv($out, $cells);
             }fclose($out);
