@@ -35,7 +35,7 @@ class StockBatchController extends Controller
     public function products(Request $request)
     {
         $input = $request->validate(['q' => 'nullable|string|max:255']);
-        $query = Product::with('unit')->where('active', true)->whereHas('unit', fn ($q) => $q->where('active', true));
+        $query = Product::with('unit')->where('track_stock', true)->where('active', true)->whereHas('unit', fn ($q) => $q->where('active', true));
         $q = trim($input['q'] ?? '');
         if ($q !== '') {
             $query->where(fn ($query) => $query->where('name', 'like', '%'.$q.'%')->orWhere('sku', 'like', '%'.$q.'%')->orWhere('barcode', 'like', '%'.$q.'%'));

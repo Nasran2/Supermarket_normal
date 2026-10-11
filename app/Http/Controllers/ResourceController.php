@@ -47,7 +47,7 @@ class ResourceController extends Controller
             $query->where('active', $request->boolean('active'));
         }
         if ($resource === 'products' && $request->boolean('low_stock')) {
-            $query->whereColumn('stock', '<=', 'low_stock');
+            $query->where('track_stock', true)->whereColumn('stock', '<=', 'low_stock');
         }
         if ($resource === 'customers') {
             $query->withDueBalances();
@@ -92,9 +92,9 @@ class ResourceController extends Controller
         }
 
         if ($resource === 'products') {
-            $stats = Product::selectRaw('COUNT(*) as total, SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_count, SUM(CASE WHEN active = 1 AND stock <= low_stock THEN 1 ELSE 0 END) as low_count, 0 as stock_value')->first();
+            $stats = Product::selectRaw('COUNT(*) as total, SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_count, SUM(CASE WHEN active = 1 AND track_stock = 1 AND stock <= low_stock THEN 1 ELSE 0 END) as low_count, 0 as stock_value')->first();
 
-            $stats->stock_value = ProductStockLayer::available()->selectRaw('SUM(COALESCE(remaining_cost_total, remaining_quantity * cost_price)) as value')->value('value') ?? '0';
+            $stats->stock_value = ProductStockLayer::available()->whereHas('product', fn ($q) => $q->where('track_stock', true))->selectRaw('SUM(COALESCE(remaining_cost_total, remaining_quantity * cost_price)) as value')->value('value') ?? '0';
 
             return view('products.index', compact('resource', 'def', 'rows', 'stats'));
         }

@@ -60,7 +60,7 @@ class SaleLineTest extends TestCase
         $this->assertSame('0.00', $item->line_discount);
         $audit = AuditLog::where('action', 'sale.complete')->firstOrFail();
         $this->assertSame('90.00', $audit->after['items'][0]['price']);
-        $this->get(route('sales.receipt', $sale))->assertOk()->assertSee('90.00')->assertDontSee('>Discount<', false);
+        $this->get(route('sales.receipt', $sale))->assertOk()->assertSee('90.00')->assertDontSee('>Discount<', false)->assertDontSee('class="line-discount"', false);
         $this->assertSame('48.000', $this->product->fresh()->stock);
     }
 
@@ -72,7 +72,9 @@ class SaleLineTest extends TestCase
         $this->assertSame('170.00', $sale->sale_amount);
         $this->assertSame('10.00', $sale->items->first()->line_discount);
         $this->assertSame('170.00', $sale->items->first()->total);
-        $this->get(route('sales.receipt', $sale))->assertOk()->assertSee('85.00')->assertSee('170.00')->assertDontSee('>Discount<', false);
+        $this->get(route('sales.receipt', $sale))->assertOk()->assertSee('85.00')->assertSee('170.00')->assertDontSee('>Discount<', false)->assertSee('Line discount')->assertSee('10.00');
+        app(SettingsService::class)->put('receipt', ['show_line_discount' => false]);
+        $this->get(route('sales.receipt', $sale))->assertOk()->assertDontSee('class="line-discount"', false)->assertSee('170.00');
         $summary = app(RegisterService::class)->summary(app(RegisterService::class)->current($this->admin->id));
         $this->assertSame('170.00', $summary['expected']);
         $this->post(route('sales.void', $sale), ['reason' => 'QA reversal'])->assertRedirect();
@@ -86,7 +88,7 @@ class SaleLineTest extends TestCase
         $sale = $this->complete($data);
         $this->assertSame('30.00', $sale->discount);
         $this->assertSame('175.00', $sale->items->first()->total);
-        $this->get(route('sales.receipt', $sale))->assertOk()->assertSee('175.00')->assertSee('-5.00');
+        $this->get(route('sales.receipt', $sale))->assertOk()->assertSee('175.00')->assertSee('-5.00')->assertSee('Line discount (12.5%)')->assertSee('25.00');
     }
 
     public function test_line_discount_rounds_after_multiplying_fractional_quantity(): void

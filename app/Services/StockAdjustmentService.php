@@ -34,7 +34,7 @@ class StockAdjustmentService
             $changed = false;
             foreach ($data['items'] as $i => $input) {
                 $p = $products->get($input['product_id']);
-                if (! $p || ! $p->active || ! $p->unit->active) {
+                if (! $p || ! $p->track_stock || ! $p->active || ! $p->unit->active) {
                     $this->fail('Choose active products with active primary units.');
                 }
                 if ((int) $input['unit_id'] !== $p->unit_id || Money::compare($input['expected_stock'], $p->stock) !== 0 || Money::compare($input['expected_price'], $p->price) !== 0 || ($user->hasPermission('products.view_cost') && Money::compare($input['expected_cost'], $p->cost) !== 0)) {

@@ -8,7 +8,9 @@ class SaleReturnItem extends Model
 {
     protected $guarded = ['id'];
 
-    protected $casts = ['purchased_on' => 'date', 'suggested_credit_price' => 'decimal:2', 'credit_price' => 'decimal:2', 'cost_basis' => 'decimal:2', 'stock_selling_price' => 'decimal:2', 'fee_refund' => 'decimal:2', 'quantity' => 'decimal:3', 'base_quantity' => 'decimal:3', 'amount' => 'decimal:2', 'cost_total' => 'decimal:2'];
+    protected $attributes = ['track_stock' => true];
+
+    protected $casts = ['track_stock' => 'boolean', 'purchased_on' => 'date', 'suggested_credit_price' => 'decimal:2', 'credit_price' => 'decimal:2', 'cost_basis' => 'decimal:2', 'stock_selling_price' => 'decimal:2', 'fee_refund' => 'decimal:2', 'quantity' => 'decimal:3', 'base_quantity' => 'decimal:3', 'amount' => 'decimal:2', 'cost_total' => 'decimal:2'];
 
     public function product()
     {

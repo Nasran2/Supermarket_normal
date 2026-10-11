@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\PaymentChargeRule;
 use App\Models\PaymentMethod;
 use App\Models\Permission;
+use App\Models\ProductStockLayer;
 use App\Models\ProductUnit;
 use App\Models\PurchaseItem;
 use App\Models\Register;
@@ -145,6 +146,21 @@ class ResourceService
                     }
                 }
                 if ($resource === 'products') {
+                    $values['track_stock'] = $data['track_stock'] ?? ($id ? $record->track_stock : true);
+                    $values['default_discount_type'] = $data['default_discount_type'] ?? ($id ? $record->default_discount_type : 'NONE');
+                    $values['default_discount_value'] = $values['default_discount_type'] === 'NONE' ? '0.00' : Money::round((string) ($data['default_discount_value'] ?? ($id ? $record->default_discount_value : 0)));
+                    if ($id && ! auth()->user()->hasPermission('products.manage_prices') && ($values['default_discount_type'] !== $record->default_discount_type || Money::compare($values['default_discount_value'], $record->default_discount_value) !== 0)) {
+                        throw ValidationException::withMessages(['default_discount_value' => 'You do not have permission to change default discounts.']);
+                    }
+                    if ($id && $record->track_stock && ! $values['track_stock'] && (Money::compare($record->stock, 0) !== 0 || $record->stockLayers()->available()->exists())) {
+                        throw ValidationException::withMessages(['track_stock' => 'Adjust the remaining stock to zero before switching off stock tracking. Existing stock and history are preserved.']);
+                    }
+                    if (! $values['track_stock']) {
+                        $values['low_stock'] = '0.000';
+                        if (! $id && collect($data['opening_layers'] ?? [['quantity' => $data['stock'] ?? 0]])->contains(fn ($row) => Money::compare((string) $row['quantity'], 0) > 0)) {
+                            throw ValidationException::withMessages(['track_stock' => 'Opening stock must be zero when stock tracking is off.']);
+                        }
+                    }
                     if ($id && ! auth()->user()->hasPermission('products.view_cost')) {
                         $data['cost'] = $record->cost;
                         $values['cost'] = $record->cost;
@@ -264,9 +280,9 @@ class ResourceService
                     $record->permissions()->sync($permissionIds);
                 }
                 if ($resource === 'products' && $id && Money::compare((string) $before['price'], (string) $record->price) !== 0) {
-                    \App\Models\ProductStockLayer::where('product_id', $record->id)->where('status', 'ACTIVE')->update(['selling_price' => $record->price]);
+                    ProductStockLayer::where('product_id', $record->id)->where('status', 'ACTIVE')->update(['selling_price' => $record->price]);
                 }
-                if ($resource === 'products' && ! $id) {
+                if ($resource === 'products' && ! $id && $record->track_stock) {
                     $record->load('unit');
                     $opening = $data['opening_layers'] ?? [['quantity' => $data['stock'], 'cost' => $data['cost'], 'selling_price' => $data['price']]];
                     foreach ($opening as $index => $row) {

@@ -125,6 +125,11 @@ class ResourceRequest extends FormRequest
                 $r['opening_layers.*.'.$key] = ['required', 'numeric', 'min:0', 'max:999999999', 'decimal:0,2'];
             }
         }
+        if ($resource === 'products') {
+            $r['track_stock'] = ['sometimes', 'boolean'];
+            $r['default_discount_type'] = ['sometimes', 'in:NONE,AMOUNT,PERCENT'];
+            $r['default_discount_value'] = ['sometimes', 'numeric', 'min:0', 'max:'.($this->input('default_discount_type') === 'PERCENT' ? 100 : 999999999), 'decimal:0,2'];
+        }
         if ($resource === 'products' && $id) {
             unset($r['stock']);
         }

@@ -218,7 +218,7 @@ class ReportService
             $cards = ['Active expenses' => (string) (clone $query)->where('status', 'ACTIVE')->sum('amount')];
         } elseif ($kind === 'stock') {
             $canCost = auth()->user()?->hasPermission('products.view_cost') ?? false;
-            $lotQuery = ProductStockLayer::where('status', 'ACTIVE')->with('product.unit', 'product.categories');
+            $lotQuery = ProductStockLayer::where('status', 'ACTIVE')->whereHas('product', fn ($q) => $q->where('track_stock', true))->with('product.unit', 'product.categories');
             if (! empty($filters['q'])) {
                 $lotQuery->whereHas('product', fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%'));
             }
@@ -262,7 +262,7 @@ class ReportService
                 }
                 $map = fn ($l) => array_merge([$l->product->name, $l->product->sku, $l->product->unit->short_name, Money::display($l->selling_price), $l->remaining_quantity, $l->original_quantity, $l->source_reference ?? $l->source_type, $l->received_at->format('Y-m-d')], $canCost ? [Money::display($l->cost_price), Money::display($l->stock_value)] : []);
             } else {
-                $query = Product::with('unit', 'categories')->with(['stockLayers' => fn ($q) => $q->available()])->orderBy('name');
+                $query = Product::where('track_stock', true)->with('unit', 'categories')->with(['stockLayers' => fn ($q) => $q->available()])->orderBy('name');
                 if (! empty($filters['q'])) {
                     $query->where(fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%'));
                 }

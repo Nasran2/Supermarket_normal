@@ -712,7 +712,7 @@ return [
             ],
             [
                 'title' => 'Choose how you count it',
-                'text' => 'Select Primary stock unit. Use pieces for individually counted goods or kilograms for goods sold by weight. Use a decimal-enabled unit for fractions such as 0.250 kg.',
+                'text' => 'Maintain stock is checked by default. Leave it on for goods you count. Switch it off only when you do not keep a stock count for this product. Select Primary stock unit. Use pieces for individually counted goods or kilograms for goods sold by weight. Use a decimal-enabled unit for fractions such as 0.250 kg.',
                 'action' => 'Choose primary stock unit',
                 'fields' => [
                     'Primary stock unit' => 'Piece (pcs)',
@@ -722,7 +722,7 @@ return [
             ],
             [
                 'title' => 'Enter starting quantities and prices',
-                'text' => 'Opening stock is the quantity already in your shop when you add this product. Enter quantity, cost and selling price. Add another price row if part of the starting stock has a different price.',
+                'text' => 'Opening stock is the quantity already in your shop when you add this product. Enter quantity, cost and selling price. Add another price row if part of the starting stock has a different price. If Maintain stock is off, enter only cost and selling price. Under Default discount, choose None, Fixed amount or Percentage. A fixed discount applies once to the whole product line; a percentage applies to its total.',
                 'action' => 'Enter opening stock',
                 'fields' => [
                     'Quantity' => '20 pcs',
@@ -1123,7 +1123,7 @@ return [
             ],
             [
                 'title' => 'Set the shop details',
-                'text' => 'Business information contains the store name, address, phone and logo. These details help identify the shop on documents.',
+                'text' => 'Enter your store name, address, telephone, WhatsApp number and registration number in Business information. Tick Show on bill beside each detail you want customers to see. Untick it to hide the detail without deleting it. These choices apply to sales bills and return slips. For two logos, upload one picture under Business logo and another under Second bill logo. Keep Show on bill ticked for both, then save. They print side by side.',
                 'action' => 'Check business information',
                 'fields' => [
                     'Business name' => 'Your store name',
@@ -1133,7 +1133,7 @@ return [
             ],
             [
                 'title' => 'Set receipt and checkout preferences',
-                'text' => 'Receipt & printing controls paper width and receipt details. Choose the width your printer uses, such as 80mm or 58mm. Point of sale controls options such as scanner use and discounts.',
+                'text' => 'Receipt & printing controls paper width and receipt details. Choose the width your printer uses, such as 80mm or 58mm. Tick Show discount beside each item to print the discount below that product. Use Show on bill beside the footer and custom message to show or hide them. Point of sale controls options such as scanner use and discounts.',
                 'action' => 'Check paper width',
                 'fields' => [
                     'Thermal paper width' => '80mm',

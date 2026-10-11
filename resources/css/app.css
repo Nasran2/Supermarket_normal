@@ -5501,3 +5501,26 @@ body.nav-collapsed .sidebar:not(.mobile-open) .nav-chevron {
 @media(max-width:700px){.hr-action-grid,.hr-setup-grid{grid-template-columns:1fr}.hr-nav{flex-wrap:nowrap;overflow-x:auto}.hr-nav a{white-space:nowrap}.hr-sticky-footer{flex-wrap:wrap}.hr-sticky-footer .btn{width:100%}.hr-toolbar{width:100%}}
 
 .hr-salary-stats{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:700px){.hr-salary-stats{grid-template-columns:1fr}}
+
+/* Keep the product name readable when showing its automatic discount. */
+.cart-item-name.has-line-discount {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+}
+.cart-item-name.has-line-discount > span,
+.cart-item-name.has-line-discount > small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cart-item-name.has-line-discount > .cart-item-discount {
+  display: block;
+  color: #047857;
+}
+
+/* Independent visibility controls beside editable bill details. */
+.field .bill-visibility { display:flex; align-items:center; gap:8px; width:fit-content; cursor:pointer; font-size:13px; font-weight:500; color:var(--green); }
+.field .bill-visibility input[type="checkbox"] { width:17px; min-height:17px; height:17px; margin:0; flex-shrink:0; }

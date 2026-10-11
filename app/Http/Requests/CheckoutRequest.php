@@ -22,6 +22,7 @@ class CheckoutRequest extends FormRequest
             'items.*.stock_layer_id' => ['nullable', 'integer', 'min:1', 'exists:product_stock_layers,id'],
             'items.*.unit_id' => ['nullable', 'integer', 'exists:units,id'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0', 'max:999999999', 'decimal:0,2'],
+            'items.*.use_default_discount' => ['sometimes', 'boolean'],
             'items.*.discount_type' => ['nullable', 'in:AMOUNT,PERCENT'],
             'items.*.discount_value' => ['nullable', 'numeric', 'min:0', 'max:999999999', 'decimal:0,2'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'max:999999', 'decimal:0,3'],

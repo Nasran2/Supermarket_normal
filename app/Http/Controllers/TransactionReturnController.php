@@ -140,7 +140,7 @@ class TransactionReturnController extends Controller
                     $remaining = Money::quantity($item->quantity, '-'.Money::quantity('0', (string) $prior));
                     $physical = Money::quantity('0', (string) $item->stockLayers->where('status', 'ACTIVE')->sum('remaining_quantity'));
                     $primary = $item->base_quantity ?? $item->quantity;
-                    $available = app(StockReturnService::class)->portion($item->quantity, $physical, $primary, 3);
+                    $available = $item->track_stock ? app(StockReturnService::class)->portion($item->quantity, $physical, $primary, 3) : $remaining;
                     $lines[] = ['id' => $item->id, 'product_id' => $item->product_id, 'unit_id' => $item->unit_id, 'name' => $item->name, 'unit' => $item->unit, 'sold' => $item->quantity, 'returned' => (string) $prior, 'remaining' => ReturnSettlementService::minimum($remaining, $available), 'physical' => $physical, 'decimal' => (Unit::find($item->unit_id) ?? $item->product->unit)->allow_decimal, 'price' => $item->cost, 'net' => $item->total];
                 }
             }

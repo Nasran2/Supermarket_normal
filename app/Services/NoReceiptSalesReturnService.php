@@ -204,7 +204,7 @@ class NoReceiptSalesReturnService
                 }
                 $supplierId = $supplier->id;
             }
-            $lines[$index] = ['sale_item_id' => null, 'product_id' => $product->id, 'unit_id' => $unit['id'], 'name' => $product->name, 'unit' => $unit['short_name'], 'quantity' => $qty, 'base_quantity' => $base, 'amount' => Money::mul($price, $qty), 'cost_total' => Money::mul($cost, $base), 'stock_action' => $action, 'reason' => $input['reason'] ?? $data['reason'], 'notes' => $input['notes'] ?? null, 'suggested_credit_price' => $suggestion['suggested_credit_price'], 'credit_price' => $price, 'credit_price_source' => $overridden ? 'MANUAL' : $suggestion['credit_price_source'], 'price_changed_by' => $overridden ? $user->id : null, 'price_override_reason' => $input['price_override_reason'] ?? null, 'cost_basis' => $cost, 'cost_basis_type' => 'ESTIMATED', 'cost_basis_source' => $suggestion['cost_basis_source'], 'cost_basis_reference' => $suggestion['cost_basis_reference'], 'stock_selling_price' => $selling, 'supplier_id' => $supplierId, 'purchased_on' => $input['purchased_on'] ?? null, 'fee_refund' => '0.00', 'allocations' => []];
+            $lines[$index] = ['track_stock' => $product->track_stock, 'sale_item_id' => null, 'product_id' => $product->id, 'unit_id' => $unit['id'], 'name' => $product->name, 'unit' => $unit['short_name'], 'quantity' => $qty, 'base_quantity' => $base, 'amount' => Money::mul($price, $qty), 'cost_total' => Money::mul($cost, $base), 'stock_action' => $action, 'reason' => $input['reason'] ?? $data['reason'], 'notes' => $input['notes'] ?? null, 'suggested_credit_price' => $suggestion['suggested_credit_price'], 'credit_price' => $price, 'credit_price_source' => $overridden ? 'MANUAL' : $suggestion['credit_price_source'], 'price_changed_by' => $overridden ? $user->id : null, 'price_override_reason' => $input['price_override_reason'] ?? null, 'cost_basis' => $cost, 'cost_basis_type' => 'ESTIMATED', 'cost_basis_source' => $suggestion['cost_basis_source'], 'cost_basis_reference' => $suggestion['cost_basis_reference'], 'stock_selling_price' => $selling, 'supplier_id' => $supplierId, 'purchased_on' => $input['purchased_on'] ?? null, 'fee_refund' => '0.00', 'allocations' => []];
         }
         $duePlan = [];
         $fee = '0.00';
@@ -245,6 +245,9 @@ class NoReceiptSalesReturnService
             if ($line['stock_action'] === 'RESTOCK') {
                 foreach ($line['allocations'] as $a) {
                     $id = $a['stock_layer_id'];
+                    if ($id === null) {
+                        continue;
+                    }
                     $returnCredits[$id] = ['quantity' => Money::quantity($returnCredits[$id]['quantity'] ?? '0', $a['quantity']), 'cost_total' => Money::add($returnCredits[$id]['cost_total'] ?? '0', $a['cost_total'])];
                 }
             }
@@ -391,9 +394,9 @@ class NoReceiptSalesReturnService
                 } else {
                     $product = Product::with('unit')->findOrFail($item->product_id);
                     $layer = null;
-                    if ($item->stock_action === 'RESTOCK') {
+                    if ($item->track_stock && $item->stock_action === 'RESTOCK') {
                         $layer = app(StockLayerService::class)->receive($product, $item->base_quantity, $item->cost_basis, $item->stock_selling_price, 'NO_RECEIPT_SALES_RETURN', $r->reference, $user->id, $item->id, null, null, $item->cost_total);
-                    } else {
+                    } elseif ($item->track_stock) {
                         app(StockService::class)->move($product, '0.000', 'NO_RECEIPT_'.$item->stock_action, $r->reference, $user->id, false);
                     }
                     $item->allocations()->create(['stock_layer_id' => $layer?->id, 'quantity' => $item->base_quantity, 'cost_total' => $item->cost_total, 'stock_action' => $item->stock_action]);

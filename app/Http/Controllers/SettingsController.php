@@ -10,6 +10,7 @@ use App\Services\SettingsService;
 use App\Support\Audit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class SettingsController extends Controller
 {
@@ -35,16 +36,31 @@ class SettingsController extends Controller
     public function update(SettingsRequest $request, string $group, SettingsService $service)
     {
         $data = $request->validated();
-        $oldLogo = $service->get('logo');
-        $path = null;
-        if ($request->hasFile('logo')) {
-            $path = $data['logo'] = $request->file('logo')->store('branding', 'public');
-        } elseif ($request->boolean('remove_logo')) {
-            $data['logo'] = null;
-        } else {
-            unset($data['logo']);
-        }unset($data['remove_logo']);
+        foreach (config('bill_fields.'.$group, []) as $option) {
+            if (array_key_exists($option['setting'], $data)) {
+                $data[$option['setting']] = $request->boolean($option['setting']);
+            }
+        }
+        $fileKeys = array_keys(array_filter(config('pos.'.$group), fn ($field) => $field[1] === 'file'));
+        $uploads = [];
+        $oldPaths = [];
         try {
+            foreach ($fileKeys as $key) {
+                if ($request->hasFile($key)) {
+                    $oldPaths[$key] = $service->get($key);
+                    $path = $request->file($key)->store('branding', 'public');
+                    if (! $path) {
+                        throw ValidationException::withMessages([$key => 'The logo could not be saved. Please try again.']);
+                    }
+                    $uploads[] = $data[$key] = $path;
+                } elseif ($request->boolean('remove_'.$key)) {
+                    $oldPaths[$key] = $service->get($key);
+                    $data[$key] = null;
+                } else {
+                    unset($data[$key]);
+                }
+                unset($data['remove_'.$key]);
+            }
             DB::transaction(function () use ($data, $group, $service) {
                 $before = Setting::where('group', $group)->lockForUpdate()->pluck('value', 'key')->all();
                 $service->put($group, $data);
@@ -52,13 +68,16 @@ class SettingsController extends Controller
                 Audit::record('settings.'.$group, $subject, $before, $data);
             });
         } catch (\Throwable $e) {
-            if ($path) {
-                Storage::disk('public')->delete($path);
+            if ($uploads) {
+                Storage::disk('public')->delete($uploads);
             }
             throw $e;
         }
-        if ($oldLogo && ($path || $request->boolean('remove_logo'))) {
-            Storage::disk('public')->delete($oldLogo);
+        $currentPaths = array_map(fn ($key) => $service->get($key), $fileKeys);
+        foreach ($oldPaths as $oldPath) {
+            if ($oldPath && ! in_array($oldPath, $currentPaths, true)) {
+                Storage::disk('public')->delete($oldPath);
+            }
         }
 
         return back()->with('success', 'Settings saved.');

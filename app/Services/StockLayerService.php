@@ -24,7 +24,7 @@ class StockLayerService
     /** Compatibility import for integrations that created a balance before adopting layers. */
     public function ensureLegacy(Product $product): void
     {
-        if (Money::compare($product->stock, 0) <= 0 || ($product->relationLoaded('stockLayers') && $product->stockLayers->isNotEmpty())) {
+        if (! $product->track_stock || Money::compare($product->stock, 0) <= 0 || ($product->relationLoaded('stockLayers') && $product->stockLayers->isNotEmpty())) {
             return;
         }
         if (! $product->stockLayers()->exists() && Money::compare($product->stock, 0) > 0) {
@@ -54,6 +54,9 @@ class StockLayerService
         return DB::transaction(function () use ($p, $quantity, $cost, $price, $source, $reference, $user, $sourceId, $received, $purchaseItem, $inventoryCost) {
             $locked = Product::whereKey($p->id)->lockForUpdate()->firstOrFail();
             $p->setRawAttributes($locked->getAttributes(), true);
+            if (! $p->track_stock) {
+                $this->fail('Stock tracking is off for '.$p->name.'.');
+            }
             app(StockService::class)->validateQuantity($p, $quantity);
             $this->ensureLegacy($p);
             $layer = $this->create($p, $quantity, $cost, $price, $source, $reference, $user, $sourceId, $received, $purchaseItem);
@@ -68,6 +71,9 @@ class StockLayerService
 
     public function groups(Product $p, ?Sale $editing = null): array
     {
+        if (! $p->track_stock) {
+            return [['stock_price' => $p->price, 'quantity' => '999999.000', 'stock_layer_id' => null, 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p))]];
+        }
         $this->ensureLegacy($p);
         $credits = $this->credits($editing, $p);
         $layers = ! $editing && $p->relationLoaded('stockLayers') ? $p->stockLayers : $p->stockLayers()->where('status', 'ACTIVE')->where(fn ($q) => $q->where('remaining_quantity', '>', 0)->when($credits, fn ($q) => $q->orWhereIn('id', array_keys($credits))))->orderBy('selling_price')->get();
@@ -104,6 +110,9 @@ class StockLayerService
     /** Separate selectable stock rows, including rows with the same selling price. */
     public function choices(Product $p, ?Sale $editing = null): array
     {
+        if (! $p->track_stock) {
+            return [['stock_price' => $p->price, 'quantity' => '999999.000', 'stock_layer_id' => null, 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p))]];
+        }
         $this->ensureLegacy($p);
         $credits = $this->credits($editing, $p);
         $layers = ! $editing && $p->relationLoaded('stockLayers') ? $p->stockLayers : $p->stockLayers()->where('status', 'ACTIVE')->where(fn ($q) => $q->where('remaining_quantity', '>', 0)->when($credits, fn ($q) => $q->orWhereIn('id', array_keys($credits))))->get();
@@ -115,6 +124,13 @@ class StockLayerService
 
     public function plan(Product $p, string $quantity, ?string $price, array &$reserved, bool $lock = false, ?Sale $editing = null, ?int $layerId = null, array $returnCredits = []): array
     {
+        if (! $p->track_stock) {
+            if ($layerId !== null || ($price !== null && Money::compare($price, $p->price) !== 0)) {
+                $this->fail('The price or stock option changed for '.$p->name.'. Refresh the product.');
+            }
+
+            return ['stock_price' => $p->price, 'base_cost' => $p->cost, 'cogs_total' => Money::mul($quantity, $p->cost), 'allocations' => []];
+        }
         $this->ensureLegacy($p);
         $credits = $this->credits($editing, $p);
         foreach ($returnCredits as $id => $credit) {
@@ -187,6 +203,9 @@ class StockLayerService
 
     public function consume(Product $p, SaleItem $item, array $allocations, string $reason, string $ref, int $user): void
     {
+        if (! $item->track_stock) {
+            return;
+        }
         $moves = [];
         foreach ($allocations as $row) {
             $layer = ProductStockLayer::whereKey($row['stock_layer_id'])->lockForUpdate()->firstOrFail();
@@ -208,6 +227,9 @@ class StockLayerService
     /** Preserve legacy sale snapshots; this bridge is only used when an old sale is edited/returned. */
     public function legacyAllocation(SaleItem $item, Product $p): void
     {
+        if (! $item->track_stock) {
+            return;
+        }
         if ($item->allocations()->exists()) {
             return;
         }
@@ -221,6 +243,9 @@ class StockLayerService
 
     public function restore(Product $p, SaleItem $item, string $quantity, string $reason, string $reference, int $user): string
     {
+        if (! $item->track_stock) {
+            return Money::mul($quantity, $item->base_cost ?? $item->cost);
+        }
         $this->legacyAllocation($item, $p);
         $left = $quantity;
         $moves = [];
@@ -272,6 +297,9 @@ class StockLayerService
             $locked = Product::whereKey($p->id)->lockForUpdate()->firstOrFail();
             $p->setRawAttributes($locked->getAttributes(), true);
             $this->ensureLegacy($p);
+            if (! $p->track_stock) {
+                $this->fail('Stock tracking is off for '.$p->name.'. Enable Maintain stock before making an adjustment.');
+            }
             if ($layerId) {
                 $selected = $p->stockLayers()->whereKey($layerId)->where('status', 'ACTIVE')->lockForUpdate()->first();
                 if (! $selected) {

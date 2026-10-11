@@ -95,7 +95,7 @@ class SalesReturnService
                 }
             }
             unset($a);
-            $lines[] = ['sale_item_id' => $item->id, 'product_id' => $item->product_id, 'unit_id' => $item->unit_id, 'quantity' => $qty, 'base_quantity' => $base, 'amount' => $amount, 'cost_total' => Money::sum(array_column($allocations, 'cost_total')), 'stock_action' => $action, 'reason' => $input['reason'] ?? $data['reason'], 'name' => $item->name, 'unit' => $item->unit, 'allocations' => $allocations];
+            $lines[] = ['track_stock' => $item->track_stock, 'sale_item_id' => $item->id, 'product_id' => $item->product_id, 'unit_id' => $item->unit_id, 'quantity' => $qty, 'base_quantity' => $base, 'amount' => $amount, 'cost_total' => Money::sum(array_column($allocations, 'cost_total')), 'stock_action' => $action, 'reason' => $input['reason'] ?? $data['reason'], 'name' => $item->name, 'unit' => $item->unit, 'allocations' => $allocations];
         }
         if (! $lines) {
             ReturnSettlementService::fail('Enter a positive return quantity for at least one product.');
@@ -119,6 +119,9 @@ class SalesReturnService
             if ($line['stock_action'] === 'RESTOCK') {
                 foreach ($line['allocations'] as $a) {
                     $id = $a['stock_layer_id'];
+                    if ($id === null) {
+                        continue;
+                    }
                     $returnCredits[$id] = ['quantity' => Money::quantity($returnCredits[$id]['quantity'] ?? '0', $a['quantity']), 'cost_total' => Money::add($returnCredits[$id]['cost_total'] ?? '0', $a['cost_total'])];
                 }
             }

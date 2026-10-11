@@ -96,3 +96,53 @@ document.getElementById('product-image-input')?.addEventListener('change', (even
   image.alt = 'Selected product image';
   document.getElementById('product-image-preview').replaceChildren(image);
 });
+
+const trackStock = document.getElementById('track-stock');
+if (trackStock) {
+  const refreshTracking = () => {
+    const enabled = trackStock.checked;
+    document.querySelectorAll('[data-stock-only]').forEach((item) => {
+      item.hidden = !enabled;
+    });
+    document.getElementById('stock-tracking-note').hidden = enabled;
+    const low = document.querySelector('[name="low_stock"]');
+    if (!enabled && low) low.value = '0';
+    const opening = document.querySelector('[data-opening-prices]');
+    if (opening) {
+      opening.querySelector('h3').textContent = enabled
+        ? 'Opening stock & pricing'
+        : 'Cost & selling price';
+      opening.querySelector('.opening-prices-header p').textContent = enabled
+        ? 'Enter one price, or add another row for stock with a different cost or selling price.'
+        : 'These prices are used at checkout. No stock quantity is needed.';
+      opening.querySelector('[data-add-opening]').hidden = !enabled;
+      opening.querySelectorAll('[data-opening-row]').forEach((row, index) => {
+        row.hidden = !enabled && index > 0;
+        row.querySelectorAll('input').forEach((input) => {
+          input.disabled = !enabled && index > 0;
+        });
+        const quantity = row.querySelector('[name$="[quantity]"]');
+        quantity.closest('label').hidden = !enabled;
+        if (!enabled) quantity.value = '0';
+      });
+    }
+  };
+  trackStock.addEventListener('change', refreshTracking);
+  refreshTracking();
+}
+const discountType = document.getElementById('product-discount-type');
+if (discountType) {
+  const refreshDiscount = () => {
+    const percent = discountType.value === 'PERCENT';
+    document.getElementById('product-discount-value-field').hidden = discountType.value === 'NONE';
+    document.getElementById('product-discount-value').max = percent ? '100' : '999999999';
+    document.getElementById('product-discount-value-label').textContent = percent
+      ? 'Discount percentage (%)'
+      : 'Fixed discount amount';
+    document.getElementById('product-discount-help').textContent = percent
+      ? 'The percentage is taken off the entire product line.'
+      : 'This amount is taken off once from the entire product line, even when the customer buys several units.';
+  };
+  discountType.addEventListener('change', refreshDiscount);
+  refreshDiscount();
+}

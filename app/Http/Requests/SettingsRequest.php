@@ -23,8 +23,13 @@ class SettingsRequest extends FormRequest
         $r = [];
         foreach ($config as $k => $f) {
             $r[$k] = explode('|', $f[3]);
+            if ($f[1] === 'file') {
+                $r['remove_'.$k] = ['nullable', 'boolean'];
+            }
         }
-        $r['remove_logo'] = ['nullable', 'boolean'];
+        foreach (config('bill_fields.'.$this->route('group'), []) as $option) {
+            $r[$option['setting']] = ['sometimes', 'boolean'];
+        }
         if (isset($r['default_payment_method'])) {
             $r['default_payment_method'] = ['required', 'integer', Rule::exists('payment_methods', 'id')->where('active', true)];
         }

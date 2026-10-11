@@ -50,7 +50,7 @@ class DashboardController extends Controller
                 $overview[] = ['label' => $date->format('d M'), 'amount' => $profit->calculate($day, $day)['revenue']];
             }
         }
-        $lowStock = $can('low_stock') ? Product::with('unit')->where('active', true)->whereColumn('stock', '<=', 'low_stock')->orderBy('stock')->limit(6)->get() : collect();
+        $lowStock = $can('low_stock') ? Product::with('unit')->where('active', true)->where('track_stock', true)->whereColumn('stock', '<=', 'low_stock')->orderBy('stock')->limit(6)->get() : collect();
         $recentSales = $can('recent_sales') ? Sale::visibleTo()->with('user', 'payments')->latest('sold_at')->limit(6)->get() : collect();
         $recentExpenses = $can('recent_expenses') ? Expense::visibleSales()->with('category')->where('status', 'ACTIVE')->latest()->limit(5)->get() : collect();
         $topProducts = $can('top_products') ? SaleItem::whereHas('sale', fn ($q) => $q->visibleTo()->where('status', 'ACTIVE')->whereBetween('sold_at', [today()->subDays($days - 1)->startOfDay(), today()->endOfDay()]))->selectRaw('product_id, name, unit, SUM(quantity) as quantity, SUM(total) as total')->groupBy('product_id', 'name', 'unit')->orderByDesc('total')->limit(5)->get() : collect();

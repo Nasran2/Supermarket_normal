@@ -84,12 +84,15 @@ class PurchaseService
                 }
                 $lineTotal = Money::mul((string) $item['cost'], (string) $item['quantity']);
                 $total = Money::add($total, $lineTotal);
-                $lines[] = ['product_id' => $p->id, 'name' => $p->name, 'unit' => $selected['short_name'], 'unit_id' => $selected['id'], 'base_quantity' => $selected['base_stock_quantity'], 'base_cost' => $baseCost, 'selling_price' => $selling, 'base_selling_price' => $baseSelling, 'quantity' => $item['quantity'], 'cost' => $item['cost'], 'total' => $lineTotal];
+                $lines[] = ['track_stock' => $p->track_stock, 'product_id' => $p->id, 'name' => $p->name, 'unit' => $selected['short_name'], 'unit_id' => $selected['id'], 'base_quantity' => $selected['base_stock_quantity'], 'base_cost' => $baseCost, 'selling_price' => $selling, 'base_selling_price' => $baseSelling, 'quantity' => $item['quantity'], 'cost' => $item['cost'], 'total' => $lineTotal];
             }
             $subtotal = $total;
             $charges = $data['charges'] ?? [];
             $chargesTotal = Money::sum(array_column($charges, 'amount'));
             $treatment = $data['charge_treatment'] ?? 'EXPENSE';
+            if ($treatment === 'COST' && Money::compare($chargesTotal, 0) > 0 && collect($lines)->contains(fn ($line) => ! $line['track_stock'])) {
+                throw ValidationException::withMessages(['charge_treatment' => 'Choose Expense for shipping or other charges when this purchase includes products without stock tracking.']);
+            }
             if ($treatment === 'COST' && Money::compare($chargesTotal, 0) > 0) {
                 $lines = app(PurchaseChargeService::class)->allocate($lines, $chargesTotal);
             }
@@ -110,7 +113,9 @@ class PurchaseService
                 $line['previous_cost'] = $products[$line['product_id']]->cost;
                 $purchaseItem = $purchase->items()->create($line);
                 $p = $products[$line['product_id']];
-                app(StockLayerService::class)->receive($p, (string) $line['base_quantity'], $line['base_cost'], $line['base_selling_price'], 'PURCHASE', $purchase->reference, $userId, $purchaseItem->id, $purchase->purchase_date, $purchaseItem->id, $treatment === 'COST' && Money::compare($chargesTotal, 0) > 0 ? Money::add($line['total'], $line['allocated_charge']) : null);
+                if ($line['track_stock']) {
+                    app(StockLayerService::class)->receive($p, (string) $line['base_quantity'], $line['base_cost'], $line['base_selling_price'], 'PURCHASE', $purchase->reference, $userId, $purchaseItem->id, $purchase->purchase_date, $purchaseItem->id, $treatment === 'COST' && Money::compare($chargesTotal, 0) > 0 ? Money::add($line['total'], $line['allocated_charge']) : null);
+                }
                 $p->update(['cost' => $line['base_cost']]);
             }
             app(PurchaseChargeService::class)->replace($purchase, $charges, $userId);
@@ -134,7 +139,7 @@ class PurchaseService
         foreach ($purchase->items()->orderBy('product_id')->get() as $item) {
             $p = Product::whereKey($item->product_id)->lockForUpdate()->firstOrFail();
             $layers = $item->stockLayers()->lockForUpdate()->get();
-            if ($layers->isEmpty()) {
+            if ($item->track_stock && $layers->isEmpty()) {
                 throw ValidationException::withMessages(['items' => 'This purchase predates stock price tracking. Use a stock adjustment to correct it.']);
             }
             foreach ($layers as $layer) {

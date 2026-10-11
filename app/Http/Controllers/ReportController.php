@@ -40,7 +40,7 @@ class ReportController extends Controller
         $users = User::orderBy('name')->get();
         $rules = collect(); // Deprecated
 
-        $products = $report === 'stock' ? Product::orderBy('name')->get(['id', 'name']) : collect();
+        $products = $report === 'stock' ? Product::where('track_stock', true)->orderBy('name')->get(['id', 'name']) : collect();
         $categories = $report === 'stock' ? Category::orderBy('name')->get(['id', 'name']) : collect();
 
         return view('reports.table', compact('report', 'filters', 'title', 'records', 'rows', 'headers', 'cards', 'methods', 'users', 'rules', 'products', 'categories'));

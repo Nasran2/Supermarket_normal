@@ -21,6 +21,12 @@ class StockReturnService
 
     public function salePlan(SaleItem $item, string $quantity, bool $lock = false): array
     {
+        if (! $item->track_stock) {
+            $returned = (string) $item->returns()->sum('base_quantity');
+            $cost = Money::sub($this->portion($item->cogs_total ?? Money::mul($item->base_quantity ?? $item->quantity, $item->base_cost ?? $item->cost), Money::quantity($returned, $quantity), $item->base_quantity ?? $item->quantity), (string) $item->returns()->sum('cost_total'));
+
+            return [['allocation_id' => null, 'stock_layer_id' => null, 'quantity' => $quantity, 'cost_total' => $cost, 'supplier_id' => null]];
+        }
         $q = $item->allocations()->orderByDesc('id');
         $allocations = ($lock ? $q->lockForUpdate() : $q)->get();
         $left = $quantity;
@@ -49,6 +55,13 @@ class StockReturnService
     {
         $product = Product::with('unit')->whereKey($returnItem->item->product_id)->lockForUpdate()->firstOrFail();
         $moves = [];
+        if (! $returnItem->item->track_stock) {
+            foreach ($rows as $row) {
+                ReturnStockAllocation::create(['sale_return_item_id' => $returnItem->id, 'quantity' => $row['quantity'], 'cost_total' => $row['cost_total'], 'stock_action' => $action]);
+            }
+
+            return;
+        }
         foreach ($rows as $row) {
             $layer = ProductStockLayer::whereKey($row['stock_layer_id'])->lockForUpdate()->firstOrFail();
             $a = SaleStockAllocation::whereKey($row['allocation_id'])->lockForUpdate()->firstOrFail();
@@ -72,6 +85,9 @@ class StockReturnService
 
     public function purchasePlan($item, string $quantity, bool $lock = false): array
     {
+        if (! $item->track_stock) {
+            return [['stock_layer_id' => null, 'quantity' => $quantity, 'cost_total' => Money::mul($quantity, $item->base_cost ?? $item->cost)]];
+        }
         $q = $item->stockLayers()->where('status', 'ACTIVE')->orderByDesc('id');
         $layers = ($lock ? $q->lockForUpdate() : $q)->get();
         $left = $quantity;
@@ -93,6 +109,13 @@ class StockReturnService
 
     public function applyPurchase($returnItem, array $rows, string $reference, int $user): void
     {
+        if (! $returnItem->item->track_stock) {
+            foreach ($rows as $row) {
+                ReturnStockAllocation::create(['purchase_return_item_id' => $returnItem->id, 'quantity' => $row['quantity'], 'cost_total' => $row['cost_total'], 'stock_action' => 'PURCHASE_RETURN']);
+            }
+
+            return;
+        }
         $product = Product::with('unit')->whereKey($returnItem->item->product_id)->lockForUpdate()->firstOrFail();
         $moves = [];
         foreach ($rows as $row) {
@@ -119,7 +142,7 @@ class StockReturnService
                     $a = SaleStockAllocation::whereKey($row->sale_stock_allocation_id)->lockForUpdate()->firstOrFail();
                     $a->update(['returned_quantity' => Money::quantity($a->returned_quantity, '-'.$row->quantity)]);
                 }
-                if (! $sale || $row->stock_action === 'RESTOCK') {
+                if ($layer && (! $sale || $row->stock_action === 'RESTOCK')) {
                     $qty = $sale ? '-'.$row->quantity : $row->quantity;
                     $cost = $sale ? '-'.$row->cost_total : $row->cost_total;
                     if (Money::compare(Money::quantity($layer->remaining_quantity, $qty), 0) < 0 || ($layer->remaining_cost_total !== null && Money::compare(Money::add($layer->remaining_cost_total, $cost), 0) < 0)) {

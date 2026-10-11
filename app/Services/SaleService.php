@@ -44,6 +44,7 @@ class SaleService
         $subtotal = '0.00';
         $cost = '0.00';
         $lineDiscounts = '0.00';
+        $manualDiscounts = '0.00';
         $discountBudget = '0.00';
         $referenceSubtotal = '0.00';
         foreach ($data['items'] as $item) {
@@ -57,19 +58,33 @@ class SaleService
             $allocation = app(StockLayerService::class)->plan($p, $baseQuantity, isset($item['stock_price']) ? (string) $item['stock_price'] : null, $reserved, $lock, $editing, isset($item['stock_layer_id']) ? (int) $item['stock_layer_id'] : null, $returnCredits);
             $selected = $units->resolve($p, $item['unit_id'] ?? null, $q, $allocation['stock_price']);
             abort_if(! $historicalExchange && isset($item['unit_price']) && Money::compare($item['unit_price'], $selected['price']) !== 0 && ! $user->hasPermission('pos.override_price'), 403);
+            $useDefault = (bool) ($item['use_default_discount'] ?? (! isset($item['discount_type']) && ! isset($item['discount_value'])));
+            if ($useDefault) {
+                $item['discount_type'] = $p->default_discount_type === 'PERCENT' ? 'PERCENT' : 'AMOUNT';
+                $item['discount_value'] = $this->settings->get('allow_discount', true) && $p->default_discount_type !== 'NONE' ? $p->default_discount_value : '0.00';
+                if ($item['discount_type'] === 'AMOUNT') {
+                    $lineAmount = Money::mul((string) ($item['unit_price'] ?? $selected['price']), $q);
+                    if (Money::compare($item['discount_value'], $lineAmount) > 0) {
+                        $item['discount_value'] = $lineAmount;
+                    }
+                }
+            }
             $adjustment = app(SaleLineService::class)->calculate($item, $selected['price']);
             $catalogTotal = Money::mul($selected['price'], $q);
             $priceReduction = Money::sub($catalogTotal, $adjustment['line_subtotal']);
-            $discountBudget = Money::add($discountBudget, Money::add(Money::compare($priceReduction, 0) > 0 ? $priceReduction : '0', $adjustment['line_discount']));
+            $discountBudget = Money::add($discountBudget, Money::add(Money::compare($priceReduction, 0) > 0 ? $priceReduction : '0', ($useDefault ? '0.00' : $adjustment['line_discount'])));
             $referenceSubtotal = Money::add($referenceSubtotal, Money::compare($catalogTotal, $adjustment['line_subtotal']) > 0 ? $catalogTotal : $adjustment['line_subtotal']);
             $lineDiscounts = Money::add($lineDiscounts, $adjustment['line_discount']);
+            if (! $useDefault) {
+                $manualDiscounts = Money::add($manualDiscounts, $adjustment['line_discount']);
+            }
             $subtotal = Money::add($subtotal, $adjustment['line_subtotal']);
             $cost = Money::add($cost, $allocation['cogs_total']);
-            $lines[] = ['product_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit' => $selected['short_name'], 'unit_id' => $selected['id'], 'base_quantity' => $baseQuantity, 'base_cost' => $allocation['allocations'][0]['cost_price'], 'quantity' => Money::quantity('0', $q), 'cost' => $units->rate($allocation['allocations'][0]['cost_price'], $selected['base_quantity'], $selected['converted_quantity'])] + $adjustment + $allocation;
+            $lines[] = ['track_stock' => $p->track_stock, 'use_default_discount' => $useDefault, 'product_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit' => $selected['short_name'], 'unit_id' => $selected['id'], 'base_quantity' => $baseQuantity, 'base_cost' => ($allocation['base_cost'] ?? $allocation['allocations'][0]['cost_price']), 'quantity' => Money::quantity('0', $q), 'cost' => $units->rate(($allocation['base_cost'] ?? $allocation['allocations'][0]['cost_price']), $selected['base_quantity'], $selected['converted_quantity'])] + $adjustment + $allocation;
         }
         $invoiceDiscount = app(SaleLineService::class)->billDiscount($data, Money::sub($subtotal, $lineDiscounts));
         $discount = Money::add($lineDiscounts, $invoiceDiscount);
-        abort_if(! $historicalExchange && Money::compare($discount, 0) > 0 && ! $user->hasPermission('pos.discount'), 403);
+        abort_if(! $historicalExchange && Money::compare(Money::add($manualDiscounts, $invoiceDiscount), 0) > 0 && ! $user->hasPermission('pos.discount'), 403);
         $discountBudget = Money::add($discountBudget, $invoiceDiscount);
         if (! $historicalExchange && Money::compare($discountBudget, 0) > 0) {
             if (! $this->settings->get('allow_discount', true)) {

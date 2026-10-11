@@ -80,7 +80,7 @@ class SaleController extends Controller
 
                 $allocation = $i->allocations->count() === 1 ? $i->allocations->first() : null;
 
-                return ['stock_layer_id' => $allocation?->stock_layer_id, 'stock_reference' => $allocation?->layer?->source_reference ?? '', 'stock_price' => $stockPrice, 'line_key' => (string) Str::uuid(), 'id' => $i->product_id, 'name' => $i->name, 'units' => $options, 'unit_id' => $id, 'unit' => $i->unit, 'decimal' => $selected['decimal'] ?? false, 'price' => $i->catalog_price ?? $i->price, 'unit_price' => $i->price, 'quantity' => $i->quantity, 'discount_type' => $i->discount_type ?? 'AMOUNT', 'discount_value' => $i->discount_value ?? '0', 'unavailable' => ! $selected || ! $i->product->active || ! $i->product->unit->active];
+                return ['use_default_discount' => false, 'track_stock' => $i->track_stock, 'stock_layer_id' => $allocation?->stock_layer_id, 'stock_reference' => $allocation?->layer?->source_reference ?? '', 'stock_price' => $stockPrice, 'line_key' => (string) Str::uuid(), 'id' => $i->product_id, 'name' => $i->name, 'units' => $options, 'unit_id' => $id, 'unit' => $i->unit, 'decimal' => $selected['decimal'] ?? false, 'price' => $i->catalog_price ?? $i->price, 'unit_price' => $i->price, 'quantity' => $i->quantity, 'discount_type' => $i->discount_type ?? 'AMOUNT', 'discount_value' => $i->discount_value ?? '0', 'unavailable' => ! $selected || ! $i->product->active || ! $i->product->unit->active];
             })->all()];
 
         return view('pos.index', compact('register', 'methods', 'customers', 'categories', 'editingSale', 'editSeed'));

@@ -80,9 +80,9 @@ return [
         'add-a-product' => [
             [$frame('product-details', 'name', 'Enter the product name and barcode / SKU.')],
             [$frame('product-details', 'category', 'Choose the product category.'), $frame('product-details', 'supplier', 'Choose the supplier who provides this product.')],
-            [$frame('product-stock', 'unit', 'Choose the primary stock unit: pieces, weight or volume.')],
-            [$frame('product-stock', 'price', 'Check opening quantities, cost and selling price.')],
-            [$frame('product-stock', 'save', 'Check the product is active, then Create product.')],
+            [$frame('product-tracking', 'tracking', 'Maintain stock is on by default. Switch it off only when you do not keep a stock count.'), $frame('product-tracking', 'unit', 'Choose the primary unit: pieces, weight or volume.')],
+            [$frame('product-stock', 'price', 'Check opening quantities, cost and selling price.'), $frame('product-discount', 'type', 'Choose None, Fixed amount or Percentage for the default discount.'), $frame('product-discount', 'value', 'Enter the discount. A fixed amount applies once to the entire product line.')],
+            [$frame('product-save', 'save', 'Check the product is active, then Create product.')],
         ],
         'adjust-stock' => [
             [$frame('adjustment-form', 'quantity', 'Count the physical products before entering a correction.')],
@@ -93,7 +93,7 @@ return [
         'units-and-categories' => [
             [$frame('category-form', 'name', 'Name a category, such as Groceries or Personal Care.')],
             [$frame('unit-form', 'name', 'Name the unit and its short name.'), $frame('unit-form', 'decimal', 'Allow decimals for weight or volume when needed.')],
-            [$frame('product-stock', 'conversions', 'Additional units & conversions defines how a pack relates to the primary unit.')],
+            [$frame('product-save', 'conversions', 'Additional units & conversions defines how a pack relates to the primary unit.')],
             [$frame('pos-cart-two', 'quantity', 'Check the selling unit and quantity in the cart.')],
         ],
         'customers-and-suppliers' => [
@@ -123,10 +123,10 @@ return [
         ],
         'store-settings' => [
             [$frame('settings-overview', 'business', 'Choose the settings card for the change you need.')],
-            [$frame('settings-business', 'name', 'Check the shop name, address and contact details.')],
+            [$frame('settings-business', 'name', 'Check the shop name and address.'), $frame('settings-bill-details', 'whatsapp', 'Enter your WhatsApp number and registration number.'), $frame('settings-bill-details', 'visibility', 'Tick Show on bill to print a detail. Untick it to hide it without deleting it.'), $frame('settings-bill-logos', 'second', 'Choose a separate second logo and tick Show on bill for both logos. Save to print them side by side.')],
             [$frame('settings-receipt', 'width', 'Match the thermal paper width to your printer.')],
             [$frame('settings-returns', 'rule', 'Review stock and return rules with your manager.')],
-            [$frame('settings-receipt', 'save', 'Review the changes, then click Save changes.')],
+            [$frame('settings-receipt-footer', 'save', 'Review the changes, then click Save changes.')],
         ],
         'users-and-access' => [
             [$frame('role-form', 'name', 'Review the role that matches the staff member’s job.')],

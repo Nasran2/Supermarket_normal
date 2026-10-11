@@ -40,9 +40,19 @@ export function draftStore(storage, key) {
           (item.unit_price !== null && !/^\d+(?:\.\d{1,2})?$/.test(String(item.unit_price)))
         )
           throw new Error('Invalid saved item');
+        if (
+          item.use_default_discount !== undefined &&
+          typeof item.use_default_discount !== 'boolean'
+        )
+          throw new Error('Invalid saved discount selection');
         ids.add(stockChoiceKey(item));
-        if (item.stock_layer_id != null && (!Number.isSafeInteger(item.stock_layer_id) || item.stock_layer_id < 1)) throw new Error('Invalid saved stock row');
-        if (item.stock_price != null && !/^\d+(?:\.\d{1,2})?$/.test(String(item.stock_price))) throw new Error('Invalid saved stock price');
+        if (
+          item.stock_layer_id != null &&
+          (!Number.isSafeInteger(item.stock_layer_id) || item.stock_layer_id < 1)
+        )
+          throw new Error('Invalid saved stock row');
+        if (item.stock_price != null && !/^\d+(?:\.\d{1,2})?$/.test(String(item.stock_price)))
+          throw new Error('Invalid saved stock price');
       }
       return value;
     },

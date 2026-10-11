@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
-    protected $fillable = ['name', 'sku', 'barcode', 'unit_id', 'supplier_id', 'cost', 'price', 'stock', 'low_stock', 'active', 'image', 'created_by', 'updated_by'];
+    protected $fillable = ['track_stock', 'default_discount_type', 'default_discount_value', 'name', 'sku', 'barcode', 'unit_id', 'supplier_id', 'cost', 'price', 'stock', 'low_stock', 'active', 'image', 'created_by', 'updated_by'];
 
-    protected $casts = ['active' => 'boolean', 'cost' => 'decimal:2', 'price' => 'decimal:2', 'stock' => 'decimal:3', 'low_stock' => 'decimal:3'];
+    protected $attributes = ['track_stock' => true, 'default_discount_type' => 'NONE', 'default_discount_value' => '0.00'];
+
+    protected $casts = ['track_stock' => 'boolean', 'default_discount_value' => 'decimal:2', 'active' => 'boolean', 'cost' => 'decimal:2', 'price' => 'decimal:2', 'stock' => 'decimal:3', 'low_stock' => 'decimal:3'];
 
     public function supplier()
     {

@@ -4,7 +4,7 @@
     "name": "pos-price-options"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CsddfhBa.css",
+    "file": "assets/app-CWw8efQy.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -22,7 +22,7 @@
     ]
   },
   "resources/js/pos.js": {
-    "file": "assets/pos-C9obRlIL.js",
+    "file": "assets/pos-CWMZnLA9.js",
     "name": "pos",
     "src": "resources/js/pos.js",
     "isEntry": true,
@@ -31,7 +31,7 @@
     ]
   },
   "resources/js/product-units.js": {
-    "file": "assets/product-units-r8KRWtin.js",
+    "file": "assets/product-units-CTh0CJvT.js",
     "name": "product-units",
     "src": "resources/js/product-units.js",
     "isEntry": true

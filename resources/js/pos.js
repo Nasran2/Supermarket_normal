@@ -49,10 +49,18 @@ function scaled(value, places) {
 }
 const grossLineCents = (p) =>
   (scaled(p.unit_price ?? p.price, 2) * scaled(p.quantity, 3) + 500n) / 1000n;
-const lineDiscountCents = (p) =>
-  p.discount_type === 'PERCENT'
-    ? (grossLineCents(p) * scaled(p.discount_value, 2) + 5000n) / 10000n
-    : scaled(p.discount_value, 2);
+const lineDiscountCents = (p) => {
+  const preset = p.use_default_discount === true;
+  const type = preset ? p.default_discount_type : p.discount_type;
+  const value = preset
+    ? pos.dataset.allowDiscount !== '0' && type !== 'NONE'
+      ? p.default_discount_value
+      : '0'
+    : p.discount_value;
+  const discount =
+    type === 'PERCENT' ? (grossLineCents(p) * scaled(value, 2) + 5000n) / 10000n : scaled(value, 2);
+  return preset && discount > grossLineCents(p) ? grossLineCents(p) : discount;
+};
 const lineCents = (p) => grossLineCents(p) - lineDiscountCents(p);
 const draftKey = `twinsofte-pos-draft:${new URL(pos.dataset.productsUrl).pathname}:${pos.dataset.userId}`;
 let store;
@@ -86,6 +94,10 @@ function saveDraft() {
           price: p.price,
           quantity: String(p.quantity),
           unit_price: p.unit_price ?? null,
+          use_default_discount: p.use_default_discount === true,
+          default_discount_type: p.default_discount_type || 'NONE',
+          default_discount_value: p.default_discount_value || '0',
+          track_stock: p.track_stock !== false,
           discount_type: p.discount_type || 'AMOUNT',
           discount_value: String(p.discount_value || '0'),
         })),
@@ -181,11 +193,20 @@ async function restoreDraft() {
         ...item,
         line_key: item.line_key || crypto.randomUUID(),
         stock_price: group?.stock_price ?? item.stock_price,
-        stock_reference: item.stock_layer_id != null ? (group?.reference ?? item.stock_reference ?? '') : '',
+        stock_reference:
+          item.stock_layer_id != null ? (group?.reference ?? item.stock_reference ?? '') : '',
         units: group?.units || [],
         unavailable: !unit,
         ...(unit
-          ? { name: fresh.name, unit: unit.short_name, decimal: unit.decimal, price: unit.price }
+          ? {
+              name: fresh.name,
+              track_stock: fresh.track_stock,
+              default_discount_type: fresh.default_discount_type,
+              default_discount_value: fresh.default_discount_value,
+              unit: unit.short_name,
+              decimal: unit.decimal,
+              price: unit.price,
+            }
           : {}),
       };
     });
@@ -227,7 +248,8 @@ function renderSummary() {
   const amount = billDiscountCents();
   $('discount').value = (Number(amount) / 100).toFixed(2);
   if ($('edit-bill-discount')) {
-    $('edit-bill-discount').disabled = pos.dataset.canDiscount !== '1' || !cart.length || orderLoading;
+    $('edit-bill-discount').disabled =
+      pos.dataset.canDiscount !== '1' || !cart.length || orderLoading;
     $('bill-discount-label').textContent =
       amount > 0n
         ? billDiscount.type === 'PERCENT'
@@ -251,6 +273,7 @@ const payload = () => ({
     unit_id: p.unit_id,
     quantity: String(p.quantity),
     unit_price: p.unit_price ?? null,
+    use_default_discount: p.use_default_discount === true,
     discount_type: p.discount_type || 'AMOUNT',
     discount_value: p.discount_value || '0',
   })),
@@ -314,7 +337,7 @@ async function search(scanner = false) {
       ? products
           .map(
             (p) =>
-              `<button class="product-tile" data-product="${p.id}" type="button">${p.image ? `<img src="${escape(p.image)}" alt="${escape(p.name)}">` : `<span class="product-art"><i data-lucide="package"></i></span>`}<strong>${escape(p.name)}</strong><small>${escape(p.category)} · ${escape(p.sku)}</small><span class="tile-bottom"><b>${priceRange(p)}</b><span>${Number(p.stock)} ${escape(p.unit)}</span></span></button>`,
+              `<button class="product-tile" data-product="${p.id}" type="button">${p.image ? `<img src="${escape(p.image)}" alt="${escape(p.name)}">` : `<span class="product-art"><i data-lucide="package"></i></span>`}<strong>${escape(p.name)}</strong><small>${escape(p.category)} · ${escape(p.sku)}</small><span class="tile-bottom"><b>${priceRange(p)}</b><span>${p.track_stock === false ? 'Stock not maintained' : `${Number(p.stock)} ${escape(p.unit)}`}</span></span></button>`,
           )
           .join('')
       : '<div class="empty-state col-span-full"><i data-lucide="search-x"></i><h3>No products found</h3><p>Add products or change your search.</p></div>';
@@ -327,7 +350,8 @@ async function search(scanner = false) {
 function priceRange(p) {
   const prices = sellingPriceOptions(p).map((group) => Number(group.stock_price));
   if (!prices.length) return moneyHTML(p.price);
-  const low = Math.min(...prices), high = Math.max(...prices);
+  const low = Math.min(...prices),
+    high = Math.max(...prices);
   return low === high ? moneyHTML(low) : `${moneyHTML(low)} – ${moneyHTML(high)}`;
 }
 const priceDialog = $('price-choice-dialog');
@@ -335,37 +359,73 @@ let choosingProduct = null;
 let choosingPrices = [];
 function add(p) {
   if (!p || orderLoading || pending) return;
-  if (checkoutAttempted) { dialog.close(); restoreDraft(); return; }
+  if (checkoutAttempted) {
+    dialog.close();
+    restoreDraft();
+    return;
+  }
   if (!syncQuantities()) return;
   const groups = sellingPriceOptions(p);
-  if (!groups.length) { message.textContent = `${p.name} is out of stock.`; return; }
-  if (groups.length === 1) { addPrice(p, groups[0]); return; }
+  if (!groups.length) {
+    message.textContent = `${p.name} is out of stock.`;
+    return;
+  }
+  if (groups.length === 1) {
+    addPrice(p, groups[0]);
+    return;
+  }
   choosingProduct = p;
   choosingPrices = groups;
   $('price-choice-product').textContent = p.name;
-  $('price-choice-options').innerHTML = groups.map((group, index) => `<button type="button" class="price-choice" data-price-choice="${index}"><span class="price-choice-rate"><small>Selling price / ${escape(p.unit)}</small><strong>${moneyHTML(group.stock_price)}</strong>${group.reference?`<small class="price-choice-source">${escape(group.reference)}</small>`:''}${group.received?`<small class="price-choice-received">${escape(group.received)}</small>`:''}</span><span class="price-choice-stock"><strong>${Number(group.quantity).toLocaleString()} ${escape(p.unit)}</strong><small>Available stock</small><span class="price-choice-add">Add to cart <kbd>${index + 1}</kbd></span></span></button>`).join('');
+  $('price-choice-options').innerHTML = groups
+    .map(
+      (group, index) =>
+        `<button type="button" class="price-choice" data-price-choice="${index}"><span class="price-choice-rate"><small>Selling price / ${escape(p.unit)}</small><strong>${moneyHTML(group.stock_price)}</strong>${group.reference ? `<small class="price-choice-source">${escape(group.reference)}</small>` : ''}${group.received ? `<small class="price-choice-received">${escape(group.received)}</small>` : ''}</span><span class="price-choice-stock"><strong>${Number(group.quantity).toLocaleString()} ${escape(p.unit)}</strong><small>Available stock</small><span class="price-choice-add">Add to cart <kbd>${index + 1}</kbd></span></span></button>`,
+    )
+    .join('');
   priceDialog.showModal();
   $('price-choice-options').querySelector('button').focus();
 }
 function addPrice(p, group) {
   const unit = group.units.find((option) => option.id === p.unit_id);
-  const key = stockChoiceKey({id:p.id, unit_id:p.unit_id, stock_price:group.stock_price, stock_layer_id:group.stock_layer_id});
+  const key = stockChoiceKey({
+    id: p.id,
+    unit_id: p.unit_id,
+    stock_price: group.stock_price,
+    stock_layer_id: group.stock_layer_id,
+  });
   const existing = cart.find((item) => stockChoiceKey(item) === key);
   const maxQty = Number(group.quantity);
-  
+
   if (existing) {
     if (Number(existing.quantity) + 1 > maxQty) {
       message.textContent = `Only ${maxQty} available.`;
       return;
     }
     existing.quantity = Number((Number(existing.quantity) + 1).toFixed(3));
-  }
-  else {
+  } else {
     if (1 > maxQty) {
       message.textContent = `Only ${maxQty} available.`;
       return;
     }
-    cart.push({ ...p, line_key: crypto.randomUUID(), stock_price: group.stock_price, stock_layer_id: group.stock_layer_id ?? null, stock_reference: group.reference ?? '', max_quantity: maxQty, units: group.units, price: unit.price, quantity: 1, unit_price: null, discount_type: 'AMOUNT', discount_value: '0' });
+    cart.push({
+      ...p,
+      line_key: crypto.randomUUID(),
+      stock_price: group.stock_price,
+      stock_layer_id: group.stock_layer_id ?? null,
+      stock_reference: group.reference ?? '',
+      max_quantity: maxQty,
+      units: group.units,
+      price: unit.price,
+      quantity: 1,
+      unit_price: null,
+      use_default_discount: true,
+      discount_type: p.default_discount_type === 'PERCENT' ? 'PERCENT' : 'AMOUNT',
+      discount_value:
+        pos.dataset.allowDiscount !== '0' && p.default_discount_type !== 'NONE'
+          ? p.default_discount_value || '0'
+          : '0',
+    });
   }
   quote = null;
   message.textContent = '';
@@ -389,12 +449,17 @@ priceDialog.addEventListener('close', () => {
   $('product-search').focus({ preventScroll: true });
 });
 priceDialog.addEventListener('keydown', (event) => {
-  if (/^[1-9]$/.test(event.key)) { event.preventDefault(); selectPrice(Number(event.key) - 1); }
+  if (/^[1-9]$/.test(event.key)) {
+    event.preventDefault();
+    selectPrice(Number(event.key) - 1);
+  }
   if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
     event.preventDefault();
     const buttons = [...$('price-choice-options').querySelectorAll('button')];
     const index = buttons.indexOf(document.activeElement);
-    buttons[(index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length].focus();
+    buttons[
+      (index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length
+    ].focus();
   }
 });
 function render(persist = true) {
@@ -404,12 +469,13 @@ function render(persist = true) {
     ? cart
         .map(
           (p) =>
-            `<div class="cart-line compact-cart-line" data-cart-id="${p.line_key}"><button class="cart-item-name ${p.unavailable ? 'unavailable' : ''}" data-action="edit" type="button" title="${escape(p.name)} · ${escape(p.unit)} · Edit price and line discount" aria-label="Edit ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><span>${escape(p.name)}</span><small>${escape(p.unit)} · ${moneyHTML(p.unit_price ?? p.price)}${p.stock_reference?` · ${escape(p.stock_reference)}`:''}</small></button><div class="cart-qty-controls"><button class="icon-button" data-action="minus" type="button" aria-label="Decrease quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>−</button><input class="cart-quantity" type="number" required max="999999" min="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" step="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" value="${p.quantity}" aria-label="Quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><button class="icon-button" data-action="plus" type="button" aria-label="Increase quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>+</button></div><strong class="cart-line-amount" title="${moneyHTML(Number(lineCents(p)) / 100)}">${moneyHTML(Number(lineCents(p)) / 100)}</strong><button class="icon-button cart-remove" ${orderLoading ? 'disabled' : ''} data-action="remove" title="Remove item" aria-label="Remove ${escape(p.name)}" type="button"><i data-lucide="x" style="width:14px"></i></button></div>`,
+            `<div class="cart-line compact-cart-line" data-cart-id="${p.line_key}"><button class="cart-item-name ${lineDiscountCents(p) > 0n ? 'has-line-discount' : ''} ${p.unavailable ? 'unavailable' : ''}" data-action="edit" type="button" title="${escape(p.name)} · ${escape(p.unit)} · Edit price and line discount" aria-label="Edit ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><span>${escape(p.name)}</span><small>${escape(p.unit)} · ${moneyHTML(p.unit_price ?? p.price)}${p.stock_reference ? ` · ${escape(p.stock_reference)}` : ''}</small>${lineDiscountCents(p) > 0n ? `<small class="cart-item-discount">${p.use_default_discount ? 'Default' : 'Discount'} −${moneyHTML(Number(lineDiscountCents(p)) / 100)}</small>` : ''}</button><div class="cart-qty-controls"><button class="icon-button" data-action="minus" type="button" aria-label="Decrease quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>−</button><input class="cart-quantity" type="number" required max="999999" min="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" step="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" value="${p.quantity}" aria-label="Quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><button class="icon-button" data-action="plus" type="button" aria-label="Increase quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>+</button></div><strong class="cart-line-amount" title="${moneyHTML(Number(lineCents(p)) / 100)}">${moneyHTML(Number(lineCents(p)) / 100)}</strong><button class="icon-button cart-remove" ${orderLoading ? 'disabled' : ''} data-action="remove" title="Remove item" aria-label="Remove ${escape(p.name)}" type="button"><i data-lucide="x" style="width:14px"></i></button></div>`,
         )
         .join('')
     : '<div class="cart-empty"><i data-lucide="shopping-basket" style="width:35px;height:35px"></i><strong>Your order is empty</strong><small>Scan a barcode or choose a product.</small></div>';
   renderSummary();
-  $('open-payment').disabled = pos.dataset.canCheckout !== '1' ||
+  $('open-payment').disabled =
+    pos.dataset.canCheckout !== '1' ||
     invalidBillDiscount() ||
     !cart.length ||
     orderLoading ||
@@ -529,7 +595,8 @@ $('cart-items').addEventListener('input', (e) => {
       Number(lineCents(p)) / 100,
     );
     renderSummary();
-    $('open-payment').disabled = pos.dataset.canCheckout !== '1' ||
+    $('open-payment').disabled =
+      pos.dataset.canCheckout !== '1' ||
       invalidBillDiscount() ||
       lineCents(p) < 0n ||
       cart.some((item) => item.unavailable || lineCents(item) < 0n);
@@ -616,8 +683,15 @@ function openLine(item) {
   select.value = item.unit_id;
   $('line-quantity').value = item.quantity;
   $('line-price').value = item.unit_price ?? item.price;
-  $('line-discount-type').value = item.discount_type || 'AMOUNT';
-  $('line-discount-value').value = item.discount_value || '0';
+  $('line-use-default').checked = item.use_default_discount === true;
+  $('line-discount-type').value = item.use_default_discount
+    ? item.default_discount_type === 'PERCENT'
+      ? 'PERCENT'
+      : 'AMOUNT'
+    : item.discount_type || 'AMOUNT';
+  $('line-discount-value').value = item.use_default_discount
+    ? item.default_discount_value || '0'
+    : item.discount_value || '0';
   $('line-editor-error').hidden = true;
   updateLineEditor();
   lineDialog.showModal();
@@ -635,6 +709,7 @@ function currentLineEdit() {
     price: unit?.price || '0',
     unit_price: unit && scaled(price, 2) === scaled(unit.price, 2) ? null : price,
     quantity: $('line-quantity').value,
+    use_default_discount: $('line-use-default').checked,
     discount_type: $('line-discount-type').value,
     discount_value: $('line-discount-value').value || '0',
     unavailable: !unit,
@@ -656,7 +731,9 @@ $('line-unit').addEventListener('change', () => {
   const unit = editingLine.units.find((u) => u.id === Number($('line-unit').value));
   $('line-price').value = unit?.price || '0';
   $('line-quantity').value = '1';
-  $('line-discount-value').value = '0';
+  $('line-discount-value').value = $('line-use-default').checked
+    ? editingLine.default_discount_value || '0'
+    : '0';
   updateLineEditor();
 });
 $('line-form').addEventListener('input', updateLineEditor);
@@ -666,8 +743,24 @@ $('line-form').addEventListener('input', updateLineEditor);
 $('reset-line-price').addEventListener('click', () => {
   const unit = editingLine.units.find((u) => u.id === Number($('line-unit').value));
   $('line-price').value = unit?.price || '0';
-  $('line-discount-value').value = '0';
-  $('line-discount-type').value = 'AMOUNT';
+  $('line-use-default').checked = true;
+  $('line-discount-value').value = editingLine.default_discount_value || '0';
+  $('line-discount-type').value =
+    editingLine.default_discount_type === 'PERCENT' ? 'PERCENT' : 'AMOUNT';
+  updateLineEditor();
+});
+for (const id of ['line-discount-type', 'line-discount-value']) {
+  $(id).addEventListener('input', () => {
+    $('line-use-default').checked = false;
+    updateLineEditor();
+  });
+}
+$('line-use-default').addEventListener('change', () => {
+  if ($('line-use-default').checked) {
+    $('line-discount-type').value =
+      editingLine.default_discount_type === 'PERCENT' ? 'PERCENT' : 'AMOUNT';
+    $('line-discount-value').value = editingLine.default_discount_value || '0';
+  }
   updateLineEditor();
 });
 $('line-form').addEventListener('submit', (event) => {

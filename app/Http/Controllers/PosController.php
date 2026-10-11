@@ -95,7 +95,7 @@ class PosController extends Controller
         return $products->map(function ($p) {
             $groups = app(StockLayerService::class)->choices($p, request()->route('sale'));
 
-            return ['price_options' => $groups, 'units' => array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->options($p)), 'unit_id' => $p->unit_id, 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => $p->barcode, 'price' => $p->price, 'stock' => $p->stock, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'category' => $p->categories->pluck('name')->join(', '), 'image' => $p->image ? asset('storage/'.$p->image) : null];
+            return ['track_stock' => $p->track_stock, 'default_discount_type' => $p->default_discount_type, 'default_discount_value' => $p->default_discount_value, 'price_options' => $groups, 'units' => array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->options($p)), 'unit_id' => $p->unit_id, 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => $p->barcode, 'price' => $p->price, 'stock' => $p->stock, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'category' => $p->categories->pluck('name')->join(', '), 'image' => $p->image ? asset('storage/'.$p->image) : null];
         });
     }
 
