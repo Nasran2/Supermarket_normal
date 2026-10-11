@@ -83,7 +83,7 @@ class ResourceRequest extends FormRequest
         }
         if ($resource === 'users') {
             $r['username'] = ['required', 'string', 'max:64', 'regex:/^[a-z0-9][a-z0-9._-]*$/', Rule::unique('users', 'username')->ignore($id)];
-            $r['password'] = ['nullable', 'string', 'min:10', 'max:128'];
+            $r['password'] = ['nullable', 'string', 'max:128'];
             if (! $id) {
                 $r['password'][0] = 'required';
             }
