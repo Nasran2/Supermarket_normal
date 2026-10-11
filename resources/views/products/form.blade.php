@@ -4,6 +4,9 @@
 @push('head')
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
 <style>
+    .product-reference-control { display:flex; align-items:flex-start; gap:10px; }
+    .product-reference-control > select, .product-reference-control > .ts-wrapper { flex:1; min-width:0; width:auto; }
+    .product-reference-add { flex:0 0 44px; width:44px; height:44px; padding:0; }
     .ts-control { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.625rem; font-family: inherit; font-size: 0.9375rem; background-color: var(--card-bg); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: border-color 0.15s, box-shadow 0.15s; }
     .ts-control.focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
     .ts-dropdown { border-radius: var(--radius-md); border: 1px solid var(--border); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1); font-size: 0.9375rem; z-index: 50; }
@@ -20,21 +23,24 @@
     <div class="product-fields">
         <label class="field full"><span>Product name <b class="required">*</b></span><input name="name" value="{{ old('name',$record->name) }}" placeholder="e.g. Ceylon Tea 200g" maxlength="255" required autofocus></label>
         <label class="field full"><span>Barcode / SKU <small>optional, auto-generated if blank</small></span><input name="sku" value="{{ old('sku',$record->sku) }}" placeholder="Scan barcode or enter SKU" maxlength="255"></label>
-        <label class="field full"><span>Categories</span>
+        <div class="field full"><label for="categories-select">Categories</label><div class="product-reference-control">
             <select name="categories[]" id="categories-select" multiple placeholder="Search and select categories...">
                 @foreach($options['categories'] as $id => $name)
                     <option value="{{ $id }}" @selected(in_array($id, old('categories', $record->exists ? $record->categories->pluck('id')->toArray() : [])))>{{ $name }}</option>
                 @endforeach
             </select>
-        </label>
-        <label class="field full"><span>Supplier <small>optional</small></span>
+            @can('categories.create')<button type="button" class="btn secondary product-reference-add" data-open-product-reference="product-categories-dialog" aria-label="Add category" title="Add category"><x-icon name="plus"/></button>@endcan
+        </div></div>
+        <div class="field full"><label for="supplier-select">Supplier <small>optional</small></label><div class="product-reference-control">
             <select name="supplier_id" id="supplier-select" placeholder="Search and select a supplier...">
                 <option value=""></option>
                 @foreach($options['supplier_id'] as $id => $name)
                     <option value="{{ $id }}" @selected(old('supplier_id', $record->supplier_id) == $id)>{{ $name }}</option>
                 @endforeach
             </select>
-        </label>
+            @can('suppliers.create')<button type="button" class="btn secondary product-reference-add" data-open-product-reference="product-suppliers-dialog" aria-label="Add supplier" title="Add supplier"><x-icon name="plus"/></button>@endcan
+        </div></div>
+        <p class="muted full" data-reference-status role="status" hidden></p>
     </div>
 </section>
 <aside class="card product-image-card">
@@ -73,6 +79,8 @@
 @include('products.partials.conversions',['product'=>true])
 <div class="customer-editor-footer"><a class="btn secondary" href="{{ route('manage.index','products') }}">Cancel</a><button class="btn primary" type="submit"><x-icon name="check"/>{{ $record->exists?'Save product':'Create product' }}</button></div>
 </form>
+@include('products.partials.add-reference',['reference'=>'categories','singular'=>'category','selectId'=>'categories-select'])
+@include('products.partials.add-reference',['reference'=>'suppliers','singular'=>'supplier','selectId'=>'supplier-select'])
 @endsection
 @push('scripts')
 @vite('resources/js/product-units.js')

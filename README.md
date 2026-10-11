@@ -119,7 +119,7 @@ Enter the amount given to automatically mark a purchase Unpaid, Partial, or Paid
 
 Payment method views open on Today with saved bill-level charges, cash received/change, later due collections, account payments and refunds. Quick ranges and inclusive custom dates drive the collection, charge, refund and net-collection cards. The payment-method directory shows the same filtered totals across all methods. Voided sales are excluded and customer invoice allocations are counted once.
 
-Category View shows its products with search and status filters. Supplier lists show dues; supplier accounts include filtered purchase/payment histories and PDF/CSV ledgers with opening and running balances. Customer **Collect Payment** is available in Actions only when due exists. Expense forms can create and select a category using the adjacent plus button without losing the draft.
+Category View shows its products with search and status filters. Supplier lists show dues; supplier accounts include filtered purchase/payment histories and PDF/CSV ledgers with opening and running balances. Customer **Collect Payment** is available in Actions only when due exists. Expense forms can create and select a category using the adjacent plus button without losing the draft. Product create/edit forms also have plus buttons beside Categories and Supplier: save a new entry in the popup to select it without losing product details or previously selected categories. Each button requires its corresponding create permission.
 
 All 16 reports offer formatted PDF downloads with company letterhead from Business settings, applied filters, report-specific tables or statements, totals and page numbers. Downloads include all matching records across screen pages. See [account/report workflow and validation](docs/ACCOUNT-REPORTS.md).
 
@@ -159,3 +159,7 @@ Business settings include a **Show on bill** checkbox beside every business deta
 Sales receipts show each applied line discount below its product, including the percentage when applicable and the actual amount deducted from the entire line. In Settings → Receipt, **Show discount beside each item** controls this display and is enabled by default.
 
 To print two logos side by side, upload separate pictures under **Business logo** and **Second bill logo** in Settings → Business, tick **Show on bill** for each and save. PNG, JPG and WEBP pictures up to 2 MB each are supported. Either logo can be replaced, hidden or removed independently. A single visible logo remains centred. Both sales receipts and return slips use this layout.
+
+Expense history includes **Edit expense** beside each active manual expense reference. Saving changes updates the existing entry and its audit history; cash expense changes recalculate the open register total. Automatic and reversed expenses remain protected, and cash expenses require their original register to be open.
+
+With barcode scanning enabled, a complete barcode or SKU adds the matching active product to the POS cart after input settles, with or without an Enter suffix. Repeat scans increase quantity. Name searches stay in the catalogue; stock and multiple-price checks still apply. Enter scans use separate queued lookups so rapid scans cannot use another search’s results. Completed or cleared orders reset the search and category for the next customer.

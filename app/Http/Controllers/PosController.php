@@ -35,25 +35,27 @@ class PosController extends Controller
     public function products(Request $request, SettingsService $settings, RegisterService $registers)
     {
         $this->requireRegister($registers);
-        $data = $request->validate(['q' => 'nullable|string|max:255', 'scan' => 'nullable|boolean', 'category_id' => 'nullable|integer|exists:categories,id', 'ids' => 'nullable|array|max:300', 'ids.*' => 'integer|min:1']);
+        $data = $request->validate(['q' => 'nullable|string|max:255', 'scan' => 'nullable|boolean', 'auto_scan' => 'nullable|boolean', 'category_id' => 'nullable|integer|exists:categories,id', 'ids' => 'nullable|array|max:300', 'ids.*' => 'integer|min:1']);
         $q = trim($data['q'] ?? '');
         $products = Product::with(['unit', 'categories', 'conversions.unit', 'stockLayers' => fn ($q) => $q->available()])->where('active', true)->whereHas('unit', fn ($u) => $u->where('active', true));
         if (array_key_exists('ids', $data)) {
             return $this->productPayload($products->whereIn('id', $data['ids'] ?? [])->get());
         }
         $scanning = ($data['scan'] ?? false) && $settings->get('barcode_enabled', true);
+        $autoScanning = ($data['auto_scan'] ?? false) && $settings->get('barcode_enabled', true);
         $mode = $scanning ? 'all' : $settings->get('search_mode', 'all');
+        $exactMode = $autoScanning ? 'all' : $mode;
         $exact = null;
-        if ($q !== '' && $mode !== 'name') {
-            $exactQuery = (clone $products)->where(function ($query) use ($mode, $q) {
-                foreach ($mode === 'all' ? ['barcode', 'sku'] : [$mode] as $column) {
+        if ($q !== '' && $exactMode !== 'name') {
+            $exactQuery = (clone $products)->where(function ($query) use ($exactMode, $q) {
+                foreach ($exactMode === 'all' ? ['barcode', 'sku'] : [$exactMode] as $column) {
                     $query->orWhere($column, $q);
                 }
             });
-            if (! empty($data['category_id']) && ! $scanning) {
+            if (! empty($data['category_id']) && ! $scanning && ! $autoScanning) {
                 $exactQuery->whereHas('categories', fn ($q) => $q->where('categories.id', $data['category_id']));
             }
-            $exact = $exactQuery->first();
+            $exact = $exactQuery->orderByRaw('CASE WHEN barcode = ? THEN 0 ELSE 1 END', [$q])->first();
         }
         if ($exact) {
             return $this->productPayload(collect([$exact]));

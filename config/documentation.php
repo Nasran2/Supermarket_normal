@@ -69,7 +69,7 @@ return [
         'steps' => [
             [
                 'title' => 'Find the product',
-                'text' => 'Click the search box and scan the barcode, or type the product name. You can also choose a category and scroll down the product list.',
+                'text' => 'Click the search box and scan the barcode. A complete matching barcode or SKU adds the product automatically and clears the box for the next scan. Scan it again to add another. If asked, choose its selling price. To find an item by name, type the name and click its product card. You can also choose a category and scroll down the product list. After completing a sale, the search is cleared and All products is selected for the next customer.',
                 'action' => 'Choose Bath Soap',
                 'fields' => [
                     'Search' => 'Bath Soap',
@@ -702,7 +702,7 @@ return [
             ],
             [
                 'title' => 'Choose its category and supplier',
-                'text' => 'Choose a useful category, such as Personal Care. Select the supplier if known. These choices help organize products.',
+                'text' => 'Choose a useful category, such as Personal Care. Select the supplier if known. If either is missing, click the + button beside its box, enter the name and click Save category or Save supplier. The new entry is selected automatically, and the product details you entered stay in place. Ask your manager if you cannot see the + button.',
                 'action' => 'Choose category',
                 'fields' => [
                     'Category' => 'Personal Care',
@@ -965,7 +965,7 @@ return [
             ],
             [
                 'title' => 'Check it in history',
-                'text' => 'Open All expenses or the expense report to confirm it appears once. Do not enter a supplier purchase or an automatic return write-off again as another expense.',
+                'text' => 'Open All expenses or the expense report to confirm it appears once. To correct a manual expense, click Edit expense beside its reference, change the details and click Save changes. Cash expenses need their original register to remain open. Do not enter a supplier purchase or an automatic return write-off again as another expense.',
                 'action' => 'Check All expenses',
                 'fields' => [
                     'Electricity bill' => 'Recorded once',

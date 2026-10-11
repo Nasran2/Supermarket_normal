@@ -1,4 +1,80 @@
 const editor = document.getElementById('unit-editor');
+document.querySelectorAll('[data-product-reference-dialog]').forEach((dialog) => {
+  const form = dialog.querySelector('form');
+  const select = document.getElementById(dialog.dataset.select);
+  const error = form.querySelector('[data-reference-error]');
+  const submit = form.querySelector('[type="submit"]');
+  const closeButtons = dialog.querySelectorAll('[data-close-product-reference]');
+  let saving = false;
+  document
+    .querySelector(`[data-open-product-reference="${dialog.id}"]`)
+    .addEventListener('click', () => {
+      error.hidden = true;
+      select.tomselect?.close();
+      dialog.showModal();
+      form.elements.name.focus();
+    });
+  closeButtons.forEach((button) => button.addEventListener('click', () => dialog.close()));
+  dialog.addEventListener('cancel', (event) => {
+    if (saving) event.preventDefault();
+  });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (saving) return;
+    form.elements.name.value = form.elements.name.value.trim();
+    if (!form.reportValidity()) return;
+    saving = true;
+    submit.disabled = true;
+    closeButtons.forEach((button) => {
+      button.disabled = true;
+    });
+    error.hidden = true;
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { Accept: 'application/json' },
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.id || typeof result.name !== 'string') {
+        throw new Error(
+          Object.values(result?.errors || {})
+            .flat()
+            .join(' ') ||
+            result?.message ||
+            'Unable to save. Please try again.',
+        );
+      }
+      const id = String(result.id);
+      if (select.tomselect) {
+        select.tomselect.addOption({ value: id, text: result.name });
+        if (select.multiple) select.tomselect.addItem(id);
+        else select.tomselect.setValue(id);
+        select.tomselect.refreshOptions(false);
+      } else {
+        select.add(new Option(result.name, id, true, true));
+        if (!select.multiple) select.value = id;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      const status = editor.querySelector('[data-reference-status]');
+      status.textContent = `${result.name} was added and selected.`;
+      status.hidden = false;
+      form.reset();
+      dialog.close();
+      if (select.tomselect) select.tomselect.focus();
+      else select.focus();
+    } catch (failure) {
+      error.textContent = failure.message;
+      error.hidden = false;
+    } finally {
+      saving = false;
+      submit.disabled = false;
+      closeButtons.forEach((button) => {
+        button.disabled = false;
+      });
+    }
+  });
+});
 const rows = document.getElementById('conversion-rows');
 const primary = document.getElementById('primary-unit');
 const price = document.getElementById('primary-price');

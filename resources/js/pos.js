@@ -1,5 +1,6 @@
 import { draftStore } from './pos-draft.js';
 import { sellingPriceOptions, priceOptionForItem, stockChoiceKey } from './pos-price-options.js';
+import { createProductScanner, exactProductMatch } from './pos-scanner.js';
 const pos = document.getElementById('pos');
 const $ = (id) => document.getElementById(id),
   money = (v) => {
@@ -17,6 +18,8 @@ let products = [],
   quote = null,
   searchTimer,
   requestNumber = 0,
+  orderVersion = 0,
+  scanNumber = 0,
   quoteNumber = 0,
   token = crypto.randomUUID(),
   pending = false,
@@ -108,6 +111,8 @@ function saveDraft() {
   }
 }
 function resetOrder() {
+  orderVersion++;
+  clearProductSearch(true);
   cart = [];
   quote = null;
   pendingCompletion = null;
@@ -118,6 +123,7 @@ function resetOrder() {
   $('customer').value = defaultCustomer;
   updateCustomerDue();
   render();
+  search();
 }
 async function completedDraft() {
   const params = new URLSearchParams({ checkout_token: token });
@@ -315,22 +321,52 @@ async function api(url, data, failureMessage = 'Unable to save this order. Pleas
   }
   return result;
 }
-async function search(scanner = false) {
+function clearProductSearch(resetCategory = false) {
+  clearTimeout(searchTimer);
+  requestNumber++;
+  $('product-search').value = '';
+  if (resetCategory) {
+    $('product-category').value = '';
+    document.querySelectorAll('[data-category]').forEach((button) => {
+      const selected = button.dataset.category === '';
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+  }
+  if (!document.querySelector('dialog[open]')) $('product-search').focus({ preventScroll: true });
+}
+async function fetchProducts(params) {
+  const response = await fetch(`${pos.dataset.productsUrl}?${new URLSearchParams(params)}`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw new Error('Unable to load products. Please sign in again or retry.');
+  return response.json();
+}
+async function search(autoAdd = false) {
   const current = ++requestNumber;
+  const query = $('product-search').value.trim();
+  const category = $('product-category').value;
   $('product-count').textContent = 'Loading products…';
   try {
-    const params = new URLSearchParams({
-      q: $('product-search').value,
-      category_id: $('product-category').value,
-      scan: scanner === true ? '1' : '0',
+    const data = await fetchProducts({
+      q: query,
+      category_id: category,
+      auto_scan: autoAdd === true && pos.dataset.barcode === '1' ? '1' : '0',
     });
-    const response = await fetch(`${pos.dataset.productsUrl}?${params}`, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!response.ok) throw new Error('Unable to load products. Please sign in again or retry.');
-    const data = await response.json();
-    if (current !== requestNumber) return;
+    if (
+      current !== requestNumber ||
+      query !== $('product-search').value.trim() ||
+      category !== $('product-category').value
+    )
+      return;
     products = data;
+    const exact =
+      autoAdd === true && pos.dataset.barcode === '1' ? exactProductMatch(data, query) : null;
+    if (exact && add(exact)) {
+      clearProductSearch();
+      search();
+      return;
+    }
     $('product-count').textContent =
       `${products.length}${products.length === 60 ? '+' : ''} products`;
     $('product-results').innerHTML = products.length
@@ -343,6 +379,7 @@ async function search(scanner = false) {
       : '<div class="empty-state col-span-full"><i data-lucide="search-x"></i><h3>No products found</h3><p>Add products or change your search.</p></div>';
     window.refreshIcons?.();
   } catch (e) {
+    if (current !== requestNumber) return;
     $('product-results').textContent = e.message;
     $('product-count').textContent = 'Products unavailable';
   }
@@ -358,22 +395,22 @@ const priceDialog = $('price-choice-dialog');
 let choosingProduct = null;
 let choosingPrices = [];
 function add(p) {
-  if (!p || orderLoading || pending) return;
+  if (!p || orderLoading || pending) return false;
   if (checkoutAttempted) {
     dialog.close();
     restoreDraft();
-    return;
+    return false;
   }
-  if (!syncQuantities()) return;
+  if (!syncQuantities()) return false;
   const groups = sellingPriceOptions(p);
   if (!groups.length) {
     message.textContent = `${p.name} is out of stock.`;
-    return;
+    return false;
   }
   if (groups.length === 1) {
-    addPrice(p, groups[0]);
-    return;
+    return addPrice(p, groups[0]);
   }
+  message.textContent = '';
   choosingProduct = p;
   choosingPrices = groups;
   $('price-choice-product').textContent = p.name;
@@ -385,6 +422,7 @@ function add(p) {
     .join('');
   priceDialog.showModal();
   $('price-choice-options').querySelector('button').focus();
+  return true;
 }
 function addPrice(p, group) {
   const unit = group.units.find((option) => option.id === p.unit_id);
@@ -400,13 +438,13 @@ function addPrice(p, group) {
   if (existing) {
     if (Number(existing.quantity) + 1 > maxQty) {
       message.textContent = `Only ${maxQty} available.`;
-      return;
+      return false;
     }
     existing.quantity = Number((Number(existing.quantity) + 1).toFixed(3));
   } else {
     if (1 > maxQty) {
       message.textContent = `Only ${maxQty} available.`;
-      return;
+      return false;
     }
     cart.push({
       ...p,
@@ -430,6 +468,7 @@ function addPrice(p, group) {
   quote = null;
   message.textContent = '';
   render();
+  return true;
 }
 function selectPrice(index) {
   const group = choosingPrices[index];
@@ -489,11 +528,14 @@ $('product-results').addEventListener('click', (e) => {
   if (button) add(products.find((p) => p.id === Number(button.dataset.product)));
 });
 $('product-search').addEventListener('input', () => {
+  message.textContent = '';
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(search, 220);
+  requestNumber++;
+  searchTimer = setTimeout(() => search(true), 220);
 });
 document.querySelectorAll('[data-category]').forEach((button) =>
   button.addEventListener('click', () => {
+    clearTimeout(searchTimer);
     $('product-category').value = button.dataset.category;
     document.querySelectorAll('[data-category]').forEach((b) => {
       b.classList.toggle('selected', b === button);
@@ -502,19 +544,37 @@ document.querySelectorAll('[data-category]').forEach((button) =>
     search();
   }),
 );
-$('product-search').addEventListener('keydown', async (e) => {
+const scanProduct = createProductScanner({
+  lookup: (code) => fetchProducts({ q: code, scan: '1' }),
+  add: async (product, context) => {
+    if (priceDialog.open)
+      await new Promise((resolve) =>
+        priceDialog.addEventListener('close', resolve, { once: true }),
+      );
+    return context.version === orderVersion && add(product);
+  },
+  missing: (code, context) => {
+    if (context.version !== orderVersion) return;
+    message.textContent =
+      'No exact barcode or SKU match. Select a product from the results or check the code.';
+    if (context.scan === scanNumber && !$('product-search').value) {
+      $('product-search').value = code;
+      search();
+    }
+  },
+  error: (failure, context) => {
+    if (context.version === orderVersion) message.textContent = failure.message;
+  },
+});
+$('product-search').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && pos.dataset.barcode === '1') {
     e.preventDefault();
-    clearTimeout(searchTimer);
-    const barcode = $('product-search').value;
-    await search(true);
-    const p = products.find((p) => p.barcode === barcode || p.sku === barcode);
-    if (p) {
-      add(p);
-      $('product-search').value = '';
-      search();
-    } else
-      message.textContent = 'No exact barcode or SKU match. Select a product from the results.';
+    if (e.repeat) return;
+    const code = $('product-search').value.trim();
+    if (!code) return;
+    clearProductSearch();
+    scanProduct(code, { version: orderVersion, scan: ++scanNumber });
+    search();
   }
 });
 $('cart-items').addEventListener('click', (e) => {
@@ -1488,7 +1548,6 @@ async function completeCheckout(mode) {
       link.textContent = 'Open receipt';
       message.append(link);
     }
-    search();
     if (result.show_receipt || result.auto_print) showReceipt(result);
   } catch (e) {
     if (e.validationErrors) {

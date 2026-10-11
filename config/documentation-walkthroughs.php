@@ -14,7 +14,7 @@ return [
             [$frame('pos-catalog', 'search', 'Your register is open. Start with the product search.')],
         ],
         'make-a-sale' => [
-            [$frame('pos-catalog', 'search', 'Type the product name or scan its barcode.'), $frame('pos-search', 'product', 'Click the Bath Soap product card.')],
+            [$frame('pos-catalog', 'search', 'Scan a complete barcode to add it automatically, or type a product name to search.'), $frame('pos-search', 'product', 'When searching by name, click the Bath Soap product card.')],
             [$frame('pos-price', 'price', 'Choose Rs. 130.00 from the real price options.'), $frame('pos-cart-one', 'quantity', 'Bath Soap is now in Your cart.')],
             [$frame('pos-cart-one', 'plus', 'Click + to add one more piece.'), $frame('pos-cart-two', 'quantity', 'Check: 2 pieces × Rs. 130 = Rs. 260.')],
             [$frame('pos-cart-two', 'customer', 'Leave Walk-in customer for an ordinary sale. Choose a name when needed.')],
@@ -79,7 +79,7 @@ return [
         ],
         'add-a-product' => [
             [$frame('product-details', 'name', 'Enter the product name and barcode / SKU.')],
-            [$frame('product-details', 'category', 'Choose the product category.'), $frame('product-details', 'supplier', 'Choose the supplier who provides this product.')],
+            [$frame('product-details', 'category', 'Choose the product category.'), $frame('product-details', 'category_add', 'If the category is missing, click + beside Categories.'), $frame('product-category-add', 'save', 'Enter the category name and click Save category. It is selected automatically.'), $frame('product-details', 'supplier', 'Choose the supplier who provides this product.'), $frame('product-details', 'supplier_add', 'If the supplier is missing, click + beside Supplier.'), $frame('product-supplier-add', 'save', 'Enter the supplier name and any contact details, then Save supplier. Your product details stay in place.')],
             [$frame('product-tracking', 'tracking', 'Maintain stock is on by default. Switch it off only when you do not keep a stock count.'), $frame('product-tracking', 'unit', 'Choose the primary unit: pieces, weight or volume.')],
             [$frame('product-stock', 'price', 'Check opening quantities, cost and selling price.'), $frame('product-discount', 'type', 'Choose None, Fixed amount or Percentage for the default discount.'), $frame('product-discount', 'value', 'Enter the discount. A fixed amount applies once to the entire product line.')],
             [$frame('product-save', 'save', 'Check the product is active, then Create product.')],
@@ -106,7 +106,7 @@ return [
             [$frame('expense-form', 'category', 'Choose a useful category, such as Utility Bills.')],
             [$frame('expense-form', 'amount', 'Enter the actual amount.'), $frame('expense-form', 'description', 'Explain what the spending was for.')],
             [$frame('expense-form', 'method', 'Check how you paid.'), $frame('expense-form', 'save', 'Click Create expense after reviewing it.')],
-            [$frame('expense-history', 'table', 'Find the saved expense in history.')],
+            [$frame('expense-history', 'table', 'Find the saved expense in history.'), $frame('expense-history', 'edit', 'To correct a manual expense, click Edit expense beside its reference.'), $frame('expense-edit', 'amount', 'Change the details that need correcting. The saved date is filled in for you.'), $frame('expense-edit', 'save', 'Click Save changes. This updates the same expense and its totals.')],
         ],
         'read-reports' => [
             [$frame('reports-library', 'sales', 'Choose the report you need.')],

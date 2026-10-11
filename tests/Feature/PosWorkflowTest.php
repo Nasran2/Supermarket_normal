@@ -596,7 +596,12 @@ class PosWorkflowTest extends TestCase
         app(SettingsService::class)->put('pos', ['search_mode' => 'name']);
         $this->getJson(route('pos.products', ['q' => $p->barcode]))->assertOk()->assertJsonCount(0);
         $this->getJson(route('pos.products', ['q' => $p->barcode, 'scan' => 1, 'category_id' => $category->id]))->assertOk()->assertJsonPath('0.id', $p->id);
+        $this->getJson(route('pos.products', ['q' => ' '.$p->barcode.' ', 'auto_scan' => 1, 'category_id' => $category->id]))->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $p->id);
+        $this->getJson(route('pos.products', ['q' => $p->sku, 'auto_scan' => 1, 'category_id' => $category->id]))->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $p->id);
+        $this->getJson(route('pos.products', ['q' => substr($p->barcode, 0, 5), 'auto_scan' => 1]))->assertOk()->assertJsonCount(0);
+        $this->getJson(route('pos.products', ['q' => 'Long supermarket', 'auto_scan' => 1]))->assertOk()->assertJsonPath('0.id', $p->id);
         app(SettingsService::class)->put('pos', ['barcode_enabled' => false]);
         $this->getJson(route('pos.products', ['q' => $p->barcode, 'scan' => 1]))->assertOk()->assertJsonCount(0);
+        $this->getJson(route('pos.products', ['q' => $p->barcode, 'auto_scan' => 1]))->assertOk()->assertJsonCount(0);
     }
 }

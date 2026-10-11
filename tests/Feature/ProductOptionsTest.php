@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Category;
 use App\Models\PaymentMethod;
 use App\Models\Permission;
 use App\Models\Product;
@@ -58,6 +59,34 @@ class ProductOptionsTest extends TestCase
     private function productData(array $extra = []): array
     {
         return $extra + ['name' => 'Another sample', 'sku' => 'OPTIONS-NEW', 'unit_id' => $this->product->unit_id, 'cost' => '20', 'price' => '100', 'stock' => '0', 'low_stock' => '0', 'active' => true];
+    }
+
+    public function test_product_form_can_create_and_save_new_categories_and_supplier(): void
+    {
+        $this->get(route('manage.create', 'products'))->assertOk()->assertSee('aria-label="Add category"', false)->assertSee('aria-label="Add supplier"', false);
+        $category = $this->postJson(route('manage.store', 'categories'), ['name' => 'Quick product category'])->assertCreated()->json();
+        $this->postJson(route('manage.store', 'categories'), ['name' => 'Quick product category'])->assertUnprocessable()->assertJsonValidationErrors('name');
+        $supplier = $this->postJson(route('manage.store', 'suppliers'), ['name' => 'Quick product supplier', 'phone' => '0770001234', 'email' => 'supplier@example.test', 'address' => 'Sample supplier road', 'active' => true])->assertCreated()->json();
+        $existing = Category::firstOrFail();
+        $this->post(route('manage.store', 'products'), $this->productData(['categories' => [$existing->id, $category['id']], 'supplier_id' => $supplier['id']]))->assertSessionHasNoErrors()->assertRedirect();
+        $product = Product::where('sku', 'OPTIONS-NEW')->firstOrFail();
+        $this->assertEqualsCanonicalizing([$existing->id, $category['id']], $product->categories->pluck('id')->all());
+        $this->assertSame($supplier['id'], $product->supplier_id);
+        $this->assertTrue(Supplier::findOrFail($supplier['id'])->active);
+        $this->get(route('manage.edit', ['products', $product->id]))->assertOk()->assertSee('Quick product category')->assertSee('Quick product supplier');
+    }
+
+    public function test_quick_category_and_supplier_creation_requires_their_own_permissions(): void
+    {
+        $role = Role::create(['name' => 'Product creator only', 'sales_visibility' => 'OWN']);
+        $role->permissions()->sync(Permission::where('name', 'products.create')->pluck('id'));
+        $user = User::create(['name' => 'Product creator', 'username' => 'product-creator-only', 'email' => 'creator@example.test', 'password' => 'test-password', 'role_id' => $role->id, 'active' => true]);
+        $this->actingAs($user);
+        $this->get(route('manage.create', 'products'))->assertOk()->assertDontSee('aria-label="Add category"', false)->assertDontSee('aria-label="Add supplier"', false);
+        $this->postJson(route('manage.store', 'categories'), ['name' => 'Forbidden category'])->assertForbidden();
+        $this->postJson(route('manage.store', 'suppliers'), ['name' => 'Forbidden supplier', 'active' => true])->assertForbidden();
+        $this->assertDatabaseMissing('categories', ['name' => 'Forbidden category']);
+        $this->assertDatabaseMissing('suppliers', ['name' => 'Forbidden supplier']);
     }
 
     public function test_products_keep_stock_tracking_and_no_discount_by_default(): void
