@@ -14,7 +14,8 @@
 <section class="pos-catalog">
     <div class="catalog-tools"><label class="search-field"><x-icon name="search"/><input id="product-search" type="search" maxlength="255" placeholder="{{ ($settings['barcode_enabled']??true)?'Scan a barcode or search products…':'Search products…' }}" autocomplete="off" aria-label="Find products" autofocus><kbd>F1</kbd></label></div>
     <div class="category-chips" aria-label="Product categories"><input type="hidden" id="product-category" value=""><button class="category-chip selected" type="button" data-category="" aria-pressed="true">All products</button>@foreach($categories as $c)<button class="category-chip" type="button" data-category="{{ $c->id }}" aria-pressed="false">{{ $c->name }}</button>@endforeach</div>
-    <div class="catalog-status"><span id="product-count">Loading products…</span><span>Tap a product to add it</span></div><div id="product-results" class="product-grid" aria-live="polite"></div>
+    <div class="catalog-status"><span id="product-count">Loading products…</span><span>Tap a product to add it</span></div><div class="catalog-results"><div id="product-results" class="product-grid" aria-live="polite"></div></div>
+    <nav id="product-pagination" class="catalog-pagination" aria-label="Product pages" hidden></nav>
 </section>
 <aside class="card cart-panel {{ isset($editingSale)?'sale-edit-cart':'' }}">
     <div class="card-heading"><div><span class="eyebrow">{{ isset($editingSale)?$editingSale->invoice:'CURRENT ORDER' }}</span><h2>{{ isset($editingSale)?'Invoice items':'Your cart' }} <span id="cart-count" class="badge slate">0</span></h2></div><button class="text-link text-danger" id="clear-cart" type="button">{{ isset($editingSale)?'Reset changes':'Clear order' }}</button></div>

@@ -24,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(PurchaseReturn::class, TransactionReturnPolicy::class);
         Schema::defaultStringLength(191);
         Paginator::useTailwind();
+        Paginator::defaultView('components.pagination');
         Gate::before(fn ($user, $ability) => $user->hasPermission($ability) ? true : null);
     }
 }

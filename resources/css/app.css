@@ -736,27 +736,65 @@ tbody tr:hover {
   border-top: 1px solid var(--line);
   font-size: 11px;
 }
-/* Force pagination to light mode to prevent unreadable dark mode colors */
-.pagination nav span[aria-current="page"] > span,
-.pagination nav span[aria-current="page"] {
-  background-color: var(--primary) !important;
-  color: #ffffff !important;
-  border-color: var(--primary) !important;
+.app-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
 }
-.pagination nav a,
-.pagination nav span.cursor-default,
-.pagination nav span[aria-disabled="true"] > span {
-  background-color: #ffffff !important;
-  color: var(--muted) !important;
-  border-color: var(--line) !important;
+.pagination-summary {
+  margin: 0;
+  color: #52685c;
+  font-size: 12px;
 }
-.pagination nav a:hover {
-  background-color: #f0faf5 !important;
-  color: var(--primary-dark) !important;
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
 }
-.pagination nav svg {
-  width: 16px;
-  height: 16px;
+.pagination-control,
+.pagination-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.pagination-control {
+  background: #fff;
+  color: #172b27;
+  border: 1px solid #d5e0d9;
+  border-radius: 7px;
+  text-decoration: none;
+}
+.pagination-control:is(a, button):hover {
+  background: #e8f5ee;
+  color: #065f46;
+  border-color: #047857;
+}
+.pagination-control[aria-current='page'],
+.pagination-control[aria-current='page']:hover {
+  background: #047857;
+  color: #fff;
+  border-color: #047857;
+}
+.pagination-control[aria-disabled='true'],
+.pagination-control:disabled {
+  background: #f5f7f6;
+  color: #52685c;
+  cursor: not-allowed;
+  opacity: 1;
+}
+.pagination-ellipsis {
+  color: #52685c;
+  padding-inline: 4px;
+  min-width: 24px;
 }
 .filter-bar {
   display: flex;
@@ -2150,12 +2188,32 @@ body.pos-workspace {
   font-size: 18px;
 }
 .pos-workspace .pos-catalog {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   height: 100%;
-  overflow-y: auto;
+  overflow: hidden;
   max-height: none;
   padding-right: 4px;
+}
+.pos-catalog > .catalog-tools,
+.pos-catalog > .category-chips,
+.pos-catalog > .catalog-status,
+.pos-catalog > .catalog-pagination {
+  flex-shrink: 0;
+}
+.catalog-results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 4px 4px 0;
+}
+.catalog-pagination {
+  padding-top: 12px;
+}
+.catalog-pagination[hidden] {
+  display: none;
 }
 .pos-workspace .catalog-tools .search-field {
   height: 54px;
@@ -2554,6 +2612,10 @@ body.pos-workspace {
   .pos-workspace .pos-catalog {
     order: -1;
     height: auto;
+    overflow: visible;
+  }
+  .catalog-results {
+    flex: none;
     overflow: visible;
   }
   .pos-workspace .product-grid {

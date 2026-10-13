@@ -351,15 +351,43 @@ async function fetchProducts(params) {
   if (!response.ok) throw new Error('Unable to load products. Please sign in again or retry.');
   return response.json();
 }
-async function search(autoAdd = false) {
+function renderProductPagination(data) {
+  const nav = $('product-pagination');
+  nav.hidden = data.last_page <= 1;
+  if (nav.hidden) {
+    nav.innerHTML = '';
+    return;
+  }
+  const current = data.current_page;
+  const last = data.last_page;
+  const pages = [...new Set([1, last, current - 2, current - 1, current, current + 1, current + 2])]
+    .filter((page) => page >= 1 && page <= last)
+    .sort((a, b) => a - b);
+  const button = (page, label, disabled = false) =>
+    `<button class="pagination-control" type="button" data-product-page="${page}" ${disabled ? 'disabled' : ''} ${page === current ? 'aria-current="page"' : ''} aria-label="${label === 'Previous' || label === 'Next' ? `${label} product page` : `Go to product page ${page}`}">${label}</button>`;
+  nav.innerHTML = `<div class="pagination-controls">${button(current - 1, 'Previous', current === 1)}${pages
+    .map(
+      (page, index) =>
+        `${index && page > pages[index - 1] + 1 ? '<span class="pagination-ellipsis" aria-hidden="true">…</span>' : ''}${button(page, page)}`,
+    )
+    .join('')}${button(current + 1, 'Next', current === last)}</div>`;
+}
+async function search(autoAdd = false, page = 1) {
   const current = ++requestNumber;
   const query = $('product-search').value.trim();
   const category = $('product-category').value;
   $('product-count').textContent = 'Loading products…';
+  $('product-results').setAttribute('aria-busy', 'true');
+  $('product-pagination')
+    .querySelectorAll('button')
+    .forEach((button) => {
+      button.disabled = true;
+    });
   try {
     const data = await fetchProducts({
       q: query,
       category_id: category,
+      page: String(page),
       auto_scan: autoAdd === true && pos.dataset.barcode === '1' ? '1' : '0',
     });
     if (
@@ -368,16 +396,17 @@ async function search(autoAdd = false) {
       category !== $('product-category').value
     )
       return;
-    products = data;
+    products = data.data;
     const exact =
-      autoAdd === true && pos.dataset.barcode === '1' ? exactProductMatch(data, query) : null;
+      autoAdd === true && pos.dataset.barcode === '1' ? exactProductMatch(products, query) : null;
     if (exact && add(exact)) {
       clearProductSearch();
       search();
       return;
     }
-    $('product-count').textContent =
-      `${products.length}${products.length === 60 ? '+' : ''} products`;
+    $('product-count').textContent = data.total
+      ? `${data.from}–${data.to} of ${data.total} products`
+      : '0 products';
     $('product-results').innerHTML = products.length
       ? products
           .map(
@@ -386,11 +415,21 @@ async function search(autoAdd = false) {
           )
           .join('')
       : '<div class="empty-state col-span-full"><i data-lucide="search-x"></i><h3>No products found</h3><p>Add products or change your search.</p></div>';
+    renderProductPagination(data);
+    $('product-results').scrollTop = 0;
+    $('product-results').parentElement.scrollTop = 0;
+    if (page > 1)
+      $('product-pagination')
+        .querySelector('[aria-current="page"]')
+        ?.focus({ preventScroll: true });
     window.refreshIcons?.();
   } catch (e) {
     if (current !== requestNumber) return;
     $('product-results').textContent = e.message;
     $('product-count').textContent = 'Products unavailable';
+    $('product-pagination').hidden = true;
+  } finally {
+    if (current === requestNumber) $('product-results').setAttribute('aria-busy', 'false');
   }
 }
 function priceRange(p) {
@@ -545,10 +584,17 @@ $('product-results').addEventListener('click', (e) => {
   const button = e.target.closest('[data-product]');
   if (button) add(products.find((p) => p.id === Number(button.dataset.product)));
 });
+$('product-pagination').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-product-page]');
+  if (!button || button.disabled) return;
+  clearTimeout(searchTimer);
+  search(false, Number(button.dataset.productPage));
+});
 $('product-search').addEventListener('input', () => {
   message.textContent = '';
   clearTimeout(searchTimer);
   requestNumber++;
+  $('product-pagination').hidden = true;
   searchTimer = setTimeout(() => search(true), 220);
 });
 document.querySelectorAll('[data-category]').forEach((button) =>

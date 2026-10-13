@@ -22,6 +22,7 @@ use App\Services\SettingsService;
 use App\Support\Audit;
 use App\Support\Money;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -91,13 +92,15 @@ class SaleController extends Controller
         $service->assertEditable($sale, auth()->id());
         $products = $pos->products($request, $settings, $registers);
 
-        return $products->map(function ($p) use ($sale) {
+        $restoreStock = function ($p) use ($sale) {
             foreach ($sale->items->where('product_id', $p['id']) as $original) {
                 $p['stock'] = Money::quantity($p['stock'], $original->base_quantity ?? $original->quantity);
             }
 
             return $p;
-        });
+        };
+
+        return $products instanceof LengthAwarePaginator ? $products->through($restoreStock) : $products->map($restoreStock);
     }
 
     public function editQuote(SaleRevisionRequest $request, Sale $sale, SaleRevisionService $service)

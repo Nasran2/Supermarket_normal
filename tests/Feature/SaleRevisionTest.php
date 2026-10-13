@@ -75,6 +75,7 @@ class SaleRevisionTest extends TestCase
         $sale = $this->sale();
         $this->get(route('sales.edit', $sale))->assertOk()->assertSee('Edit '.$sale->invoice)->assertSee('id="sale-edit-seed"', false)->assertSee('Review payment')->assertSee('Reset changes')->assertDontSee('Edit sale details')->assertSee('"quantity":"2.000"', false)->assertSee('"value":"10.00"', false);
         $this->getJson(route('sales.edit.products', $sale))->assertOk()->assertJsonFragment(['stock' => '10.000']);
+        $this->getJson(route('sales.edit.products', [$sale, 'page' => 1]))->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.stock', '10.000');
         $this->assertSame('8.000', $this->product->fresh()->stock);
         $this->assertDatabaseCount('sale_revisions', 0);
     }

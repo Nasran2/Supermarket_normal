@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Models\ProductStockLayer;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\RegisterService;
@@ -44,11 +45,11 @@ class BulkSampleProductTest extends TestCase
         $this->assertSame(120, Product::count());
         $this->assertSame('1.000', $first->fresh()->stock);
         $this->assertSame('Staff renamed sample', $first->fresh()->name);
-        $this->assertSame($layerCount, \App\Models\ProductStockLayer::count());
+        $this->assertSame($layerCount, ProductStockLayer::count());
         $this->assertSame($admin->id, auth()->id());
 
         app(RegisterService::class)->open($admin->id, '0');
-        $this->getJson(route('pos.products'))->assertOk()->assertJsonCount(60);
+        $this->getJson(route('pos.products'))->assertOk()->assertJsonCount(100);
         $last = $products->firstWhere('sku', 'SAMPLE-120');
         $this->getJson(route('pos.products', ['q' => $last->barcode]))->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $last->id);
         $this->getJson(route('pos.products', ['q' => 'SAMPLE-119']))->assertOk()->assertJsonCount(1)->assertJsonPath('0.name', 'Sanitary Pads 10 Pack (Sample)');
