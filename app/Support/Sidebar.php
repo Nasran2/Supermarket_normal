@@ -43,6 +43,9 @@ class Sidebar
         }
         $expenses['active'] = collect($expenses['children'])->contains('active', true);
         $inventory = [$products, $resource('categories', 'Categories', 'tags', 'category'), $resource('units', 'Units', 'ruler', 'unit'), $resource('unit-presets', 'Multiple units', 'boxes', 'unit preset'), $group('Suppliers', 'truck', [$link('All suppliers', 'manage.index', 'suppliers', 'suppliers.view'), $link('Add supplier', 'manage.create', 'suppliers', 'suppliers.create'), $link('Supplier Returns', 'returns.suppliers', [], 'supplier_returns.view', request()->routeIs('returns.suppliers'))]), $resource('customers', 'Customers', 'contact', 'customer'), $expenses];
+        if (config('features.barcode')) {
+            $inventory[] = $group('Barcode Labels', 'barcode', [$link('Print Labels', 'barcode.index', [], 'barcode.view', request()->routeIs('barcode.index', 'barcode.print')), $link('Presets', 'barcode.presets.index', [], 'barcode.manage_presets', request()->routeIs('barcode.presets.*')), $link('Print history', 'barcode.history', [], 'barcode.view_history', request()->routeIs('barcode.history'))]);
+        }
         $reports = [$link('All reports', 'reports.index', [], [], request()->routeIs('reports.index'))];
         foreach (ReportService::TITLES as $key => $title) {
             $reports[] = $link($title, 'reports.show', $key, ReportService::permission($key), request()->route('report') === $key);
@@ -65,6 +68,9 @@ class Sidebar
         $settings = [$link('Overview', 'settings.index', [], 'settings.view', request()->routeIs('settings.index'))];
         foreach (['business' => ['Business', 'settings.business'], 'pos' => ['Point of sale', 'settings.pos'], 'receipt' => ['Receipt', 'settings.receipt'], 'stock' => ['Stock controls', 'settings.stock'], 'system' => ['System', 'settings.system']] as $key => [$title, $permission]) {
             $settings[] = $link($title, 'settings.edit', $key, $permission, request()->route('group') === $key);
+        }
+        if (config('features.barcode')) {
+            $settings[] = $link('Barcode', 'barcode.settings', [], 'barcode.manage_settings', request()->routeIs('barcode.settings*'));
         }
         if (Expiry::enabled()) {
             $settings[] = $link('Expiry dates', 'settings.edit', 'expiry', 'expiry.manage_settings', request()->route('group') === 'expiry');

@@ -206,7 +206,7 @@ class TransactionReturnController extends Controller
         if ($request->has('ids')) {
             $q->whereIn('id', $request->ids);
         } elseif ($request->filled('q')) {
-            $q->where(fn ($q) => $q->where('name', 'like', '%'.$request->q.'%')->orWhere('sku', 'like', '%'.$request->q.'%')->orWhere('barcode', $request->q));
+            $q->where(fn ($q) => $q->where('name', 'like', '%'.$request->q.'%')->orWhere('sku', 'like', '%'.$request->q.'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', $request->q)));
         }
         if ($request->category_id) {
             $q->whereHas('categories', fn ($q) => $q->where('categories.id', $request->category_id));
@@ -223,7 +223,7 @@ class TransactionReturnController extends Controller
             unset($unit);
             $recent = PurchaseItem::where('product_id', $p->id)->whereHas('purchase', fn ($q) => $q->where('status', 'ACTIVE'))->with('purchase.supplier')->latest('id')->limit(10)->get()->unique(fn ($i) => $i->purchase->supplier_id)->take(5)->map(fn ($i) => ['id' => $i->purchase->supplier_id, 'name' => $i->purchase->supplier->name, 'date' => $i->purchase->purchase_date->format('d M Y')])->values();
 
-            return ['batch_enabled' => Expiry::enabled() && Expiry::setting('expiry_batch_enabled'), 'track_expiry' => Expiry::tracks($p), 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => $p->barcode, 'unit_id' => $p->unit_id, 'units' => $units, 'price_options' => app(StockLayerService::class)->choices($p), 'recent_suppliers' => $recent];
+            return ['batch_enabled' => Expiry::enabled() && Expiry::setting('expiry_batch_enabled'), 'track_expiry' => Expiry::tracks($p), 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => config('features.barcode') ? $p->barcode : null, 'unit_id' => $p->unit_id, 'units' => $units, 'price_options' => app(StockLayerService::class)->choices($p), 'recent_suppliers' => $recent];
         });
     }
 
@@ -235,13 +235,13 @@ class TransactionReturnController extends Controller
         if ($request->has('ids')) {
             $q->whereIn('id', $request->ids);
         } elseif ($request->filled('q')) {
-            $q->where(fn ($q) => $q->where('name', 'like', '%'.$request->q.'%')->orWhere('barcode', $request->q)->orWhere('sku', 'like', '%'.$request->q.'%'));
+            $q->where(fn ($q) => $q->where('name', 'like', '%'.$request->q.'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', $request->q))->orWhere('sku', 'like', '%'.$request->q.'%'));
         }
         if ($request->filled('category_id')) {
             $q->whereHas('categories', fn ($q) => $q->where('categories.id', $request->category_id));
         }
 
-        return $q->orderBy('name')->limit(60)->get()->map(fn ($p) => ['batch_enabled' => Expiry::enabled() && Expiry::setting('expiry_batch_enabled'), 'track_expiry' => Expiry::tracks($p), 'id' => $p->id, 'sku' => $p->sku, 'barcode' => $p->barcode, 'name' => $p->name, 'unit_id' => $p->unit_id, 'unit' => $p->unit->short_name, 'price' => $p->price, 'cost' => $kind === 'purchase' && auth()->user()->hasPermission('returns.view_cost') ? $p->cost : null, 'units' => array_map(fn ($u) => array_diff_key($u, ['cost' => true]), app(ProductUnitService::class)->options($p)), 'price_options' => app(StockLayerService::class)->choices($p)]);
+        return $q->orderBy('name')->limit(60)->get()->map(fn ($p) => ['batch_enabled' => Expiry::enabled() && Expiry::setting('expiry_batch_enabled'), 'track_expiry' => Expiry::tracks($p), 'id' => $p->id, 'sku' => $p->sku, 'barcode' => config('features.barcode') ? $p->barcode : null, 'name' => $p->name, 'unit_id' => $p->unit_id, 'unit' => $p->unit->short_name, 'price' => $p->price, 'cost' => $kind === 'purchase' && auth()->user()->hasPermission('returns.view_cost') ? $p->cost : null, 'units' => array_map(fn ($u) => array_diff_key($u, ['cost' => true]), app(ProductUnitService::class)->options($p)), 'price_options' => app(StockLayerService::class)->choices($p)]);
     }
 
     public function quote(TransactionReturnRequest $request, string $kind)

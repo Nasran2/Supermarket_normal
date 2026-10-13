@@ -28,7 +28,16 @@ class SettingsController extends Controller
         abort_unless(auth()->user()->hasPermission(match ($group) {
             'expiry' => 'expiry.manage_settings','stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$group
         }), 403);
+        if (! config('features.barcode')) {
+            unset($fields['barcode_enabled']);
+            if ($group === 'receipt') {
+                $fields['show_sku'][0] = 'Show SKU';
+            }
+        }
         $values = $service->all();
+        if (! config('features.barcode') && ($values['search_mode'] ?? '') === 'barcode') {
+            $values['search_mode'] = 'all';
+        }
         $paymentMethods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
         $customers = Customer::where('active', true)->orderBy('name')->get();
 

@@ -7,11 +7,21 @@ use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
-    protected $fillable = ['track_expiry', 'track_stock', 'default_discount_type', 'default_discount_value', 'name', 'sku', 'barcode', 'unit_id', 'supplier_id', 'cost', 'price', 'stock', 'low_stock', 'active', 'image', 'created_by', 'updated_by'];
+    protected $fillable = ['track_expiry', 'track_stock', 'default_discount_type', 'default_discount_value', 'name', 'sku', 'barcode', 'barcode_type', 'unit_id', 'supplier_id', 'cost', 'price', 'stock', 'low_stock', 'active', 'image', 'created_by', 'updated_by'];
 
     protected $attributes = ['track_stock' => true, 'default_discount_type' => 'NONE', 'default_discount_value' => '0.00'];
 
     protected $casts = ['track_expiry' => 'boolean', 'track_stock' => 'boolean', 'default_discount_value' => 'decimal:2', 'active' => 'boolean', 'cost' => 'decimal:2', 'price' => 'decimal:2', 'stock' => 'decimal:3', 'low_stock' => 'decimal:3'];
+
+    protected function getArrayableAttributes()
+    {
+        $attributes = parent::getArrayableAttributes();
+        if (! config('features.barcode')) {
+            unset($attributes['barcode'], $attributes['barcode_type']);
+        }
+
+        return $attributes;
+    }
 
     public static function sellableStockSql(): string
     {

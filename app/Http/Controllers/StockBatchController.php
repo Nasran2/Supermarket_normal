@@ -39,10 +39,10 @@ class StockBatchController extends Controller
         $query = Product::with('unit')->where('track_stock', true)->where('active', true)->whereHas('unit', fn ($q) => $q->where('active', true));
         $q = trim($input['q'] ?? '');
         if ($q !== '') {
-            $query->where(fn ($query) => $query->where('name', 'like', '%'.$q.'%')->orWhere('sku', 'like', '%'.$q.'%')->orWhere('barcode', 'like', '%'.$q.'%'));
+            $query->where(fn ($query) => $query->where('name', 'like', '%'.$q.'%')->orWhere('sku', 'like', '%'.$q.'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', 'like', '%'.$q.'%')));
         }
 
-        if ($q !== '') {
+        if ($q !== '' && config('features.barcode')) {
             $query->orderByRaw('CASE WHEN barcode = ? THEN 0 WHEN sku = ? THEN 1 ELSE 2 END', [$q, $q]);
         }
 
@@ -53,7 +53,7 @@ class StockBatchController extends Controller
     {
         app(StockLayerService::class)->ensureLegacy($p);
 
-        return ['batch_enabled' => Expiry::enabled() && Expiry::setting('expiry_batch_enabled'), 'track_expiry' => Expiry::tracks($p), 'barcode' => $p->barcode, 'layers' => $p->stockLayers()->available()->get(['id', 'selling_price', 'cost_price', 'remaining_quantity', 'expires_at', 'batch_number'])->map(fn ($l) => ['expires_at' => Expiry::enabled() ? $l->expires_at?->toDateString() : null, 'id' => $l->id, 'selling_price' => $l->selling_price, 'cost_price' => auth()->user()->hasPermission('products.view_cost') ? $l->cost_price : null, 'quantity' => $l->remaining_quantity])->all(), 'product_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit_id' => $p->unit_id, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'expected_stock' => $p->stock, 'expected_price' => $p->price, 'expected_cost' => auth()->user()->hasPermission('products.view_cost') ? $p->cost : null];
+        return ['batch_enabled' => Expiry::enabled() && Expiry::setting('expiry_batch_enabled'), 'track_expiry' => Expiry::tracks($p), 'barcode' => config('features.barcode') ? $p->barcode : null, 'layers' => $p->stockLayers()->available()->get(['id', 'selling_price', 'cost_price', 'remaining_quantity', 'expires_at', 'batch_number'])->map(fn ($l) => ['expires_at' => Expiry::enabled() ? $l->expires_at?->toDateString() : null, 'id' => $l->id, 'selling_price' => $l->selling_price, 'cost_price' => auth()->user()->hasPermission('products.view_cost') ? $l->cost_price : null, 'quantity' => $l->remaining_quantity])->all(), 'product_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit_id' => $p->unit_id, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'expected_stock' => $p->stock, 'expected_price' => $p->price, 'expected_cost' => auth()->user()->hasPermission('products.view_cost') ? $p->cost : null];
     }
 
     public function create()

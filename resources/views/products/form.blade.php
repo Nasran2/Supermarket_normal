@@ -22,7 +22,10 @@
     <div class="customer-section-heading"><span class="customer-section-icon"><x-icon name="package"/></span><div><h2>Product information</h2><p>Make this item easy to find at checkout.</p></div></div>
     <div class="product-fields">
         <label class="field full"><span>Product name <b class="required">*</b></span><input name="name" value="{{ old('name',$record->name) }}" placeholder="e.g. Ceylon Tea 200g" maxlength="255" required autofocus></label>
-        <label class="field full"><span>Barcode / SKU <small>optional, auto-generated if blank</small></span><input name="sku" value="{{ old('sku',$record->sku) }}" placeholder="Scan barcode or enter SKU" maxlength="255"></label>
+        <label class="field full"><span>SKU <small>optional, auto-generated if blank</small></span><input name="sku" value="{{ old('sku',$record->sku) }}" placeholder="Enter SKU" maxlength="255"></label>
+        @if(config('features.barcode'))@can('barcode.edit_product_barcode')
+        <div class="field full"><label for="product-barcode">Barcode <small>optional unless required in settings</small></label><div class="input-with-action"><input id="product-barcode" name="barcode" value="{{ old('barcode',$record->barcode) }}" placeholder="Scan or enter barcode" maxlength="80">@can('barcode.generate')<button type="button" class="btn secondary" data-generate-product-barcode data-url="{{ route('barcode.generate') }}">Generate</button>@endcan</div><small>Enter the barcode printed on the product or generate one for your own label.</small><select name="barcode_type" id="product-barcode-type" aria-label="Barcode format">@foreach(\App\Services\BarcodeService::TYPES as $type)<option @selected(old('barcode_type',$record->barcode_type??app(\App\Services\BarcodeService::class)->setting('barcode_default_type','CODE128'))===$type)>{{ $type }}</option>@endforeach</select><small data-barcode-feedback role="status"></small>@error('barcode')<small class="text-danger">{{ $message }}</small>@enderror</div>
+        @endcan @endif
         <div class="field full"><label for="categories-select">Categories</label><div class="product-reference-control">
             <select name="categories[]" id="categories-select" multiple placeholder="Search and select categories...">
                 @foreach($options['categories'] as $id => $name)
@@ -87,6 +90,7 @@
 @endsection
 @push('scripts')
 @vite('resources/js/product-units.js')
+@if(config('features.barcode'))@vite('resources/js/barcode-product.js')@endif
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {

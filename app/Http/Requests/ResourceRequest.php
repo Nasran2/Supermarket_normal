@@ -3,11 +3,13 @@
 namespace App\Http\Requests;
 
 use App\Models\Product;
+use App\Services\BarcodeService;
 use App\Support\Expiry;
 use App\Support\Resources;
 use App\Support\SalesVisibility;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ResourceRequest extends FormRequest
 {
@@ -77,6 +79,9 @@ class ResourceRequest extends FormRequest
             'products' => ['sku', 'barcode'],'units' => ['name', 'short_name'],'payment-methods' => ['name', 'code'],'users' => ['email', 'username'],'roles','categories','expense-categories','unit-presets' => ['name'],default => []
         };
         foreach ($unique as $key) {
+            if ($resource === 'products' && $key === 'barcode') {
+                continue;
+            }
             $r[$key][] = Rule::unique($model->getTable(), $key)->ignore($id);
         }
         if ($resource === 'units') {
@@ -127,6 +132,12 @@ class ResourceRequest extends FormRequest
             }
         }
         if ($resource === 'products') {
+            if (config('features.barcode') && $this->user()->hasPermission('barcode.edit_product_barcode')) {
+                $r['barcode'] = ['nullable', 'string', 'max:80'];
+                $r['barcode_type'] = ['sometimes', Rule::in(BarcodeService::TYPES)];
+            } else {
+                unset($r['barcode']);
+            }
             if (Expiry::enabled()) {
                 $r['track_expiry'] = ['sometimes', 'boolean'];
                 $r['opening_layers.*.expires_at'] = ['nullable', 'date_format:Y-m-d'];
@@ -166,6 +177,26 @@ class ResourceRequest extends FormRequest
                 $this->merge([$key => $this->boolean($key)]);
             }
         }
+    }
+
+    public function after(): array
+    {
+        return [function ($validator) {
+            if ($this->route('resource') === 'products' && config('features.barcode') && $this->user()->hasPermission('barcode.edit_product_barcode') && $this->filled('barcode')) {
+                try {
+                    $service = app(BarcodeService::class);
+                    $type = $this->input('barcode_type') ?? ($this->route('id') ? Product::find($this->route('id'))?->barcode_type : null) ?? $service->setting('barcode_default_type', 'CODE128');
+                    $service->validate($this->input('barcode'), $type);
+                    $service->unique($this->input('barcode'), $this->route('id'));
+                } catch (ValidationException $e) {
+                    foreach ($e->errors() as $key => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add($key, $message);
+                        }
+                    }
+                }
+            }
+        }];
     }
 
     public function attributes(): array

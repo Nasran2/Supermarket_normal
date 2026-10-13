@@ -14,13 +14,13 @@ class Demo
 
     public static function protectedPage(Request $request): bool
     {
-        return $request->routeIs('settings.*', 'profile*', 'units.default', 'hr.setup*', 'hr.staff.create', 'hr.staff.edit', 'hr.staff.store', 'hr.staff.update', 'hr.staff.employment')
+        return $request->routeIs('settings.*', 'barcode.settings*', 'barcode.presets.*', 'profile*', 'units.default', 'hr.setup*', 'hr.staff.create', 'hr.staff.edit', 'hr.staff.store', 'hr.staff.update', 'hr.staff.employment')
             || ($request->routeIs('manage.*') && in_array($request->route('resource'), ['users', 'roles', 'payment-methods', 'payment-rules', 'units', 'unit-presets'], true));
     }
 
     public static function readOnlyForm(Request $request): bool
     {
-        return self::protectedPage($request) && $request->routeIs('settings.edit', 'profile', 'manage.create', 'manage.edit', 'hr.setup', 'hr.staff.create', 'hr.staff.edit');
+        return self::protectedPage($request) && $request->routeIs('settings.edit', 'barcode.settings', 'barcode.presets.edit', 'barcode.presets.create', 'profile', 'manage.create', 'manage.edit', 'hr.setup', 'hr.staff.create', 'hr.staff.edit');
     }
 
     public static function watermarkPdf(Dompdf $pdf): void

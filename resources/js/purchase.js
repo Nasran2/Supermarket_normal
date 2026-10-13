@@ -222,7 +222,7 @@ if (prodSearch) {
     prodSearch.addEventListener('input', (e) => {
         const val = e.target.value.toLowerCase();
         prodDrop.querySelectorAll('.product-option').forEach(opt => {
-            opt.style.display = `${opt.dataset.name} ${opt.dataset.sku} ${opt.dataset.barcode}`.toLowerCase().includes(val) ? 'block' : 'none';
+            opt.style.display = `${opt.dataset.name} ${opt.dataset.sku} ${opt.dataset.barcode || ''}`.toLowerCase().includes(val) ? 'block' : 'none';
         });
     });
     document.querySelectorAll('.product-option').forEach(opt => {

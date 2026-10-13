@@ -95,6 +95,9 @@ final class AuditPresentation
     {
         $result = [];
         foreach ($values as $key => $value) {
+            if (! config('features.barcode') && ($key === 'barcode' || str_starts_with((string) $key, 'barcode_'))) {
+                continue;
+            }
             if (! Expiry::enabled() && (in_array($key, ['track_expiry', 'expires_at', 'batch_number', 'expiry_source']) || str_starts_with((string) $key, 'expiry_'))) {
                 continue;
             }

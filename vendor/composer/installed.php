@@ -3,7 +3,7 @@
         'name' => 'twinsofte/supermarket-pos',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '5e3cf64a1260ebd80d5987309a4d0d5d2d1f6fa5',
+        'reference' => 'de6366825c2196315145db5f2be838d71c4f5a29',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -718,6 +718,15 @@
             'aliases' => array(),
             'dev_requirement' => true,
         ),
+        'picqer/php-barcode-generator' => array(
+            'pretty_version' => 'v3.3.0',
+            'version' => '3.3.0.0',
+            'reference' => '6beada2a30623832ff41b8c7d307c169736b8552',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../picqer/php-barcode-generator',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
         'psr/clock' => array(
             'pretty_version' => '1.0.0',
             'version' => '1.0.0.0',
@@ -1352,7 +1361,7 @@
         'twinsofte/supermarket-pos' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '5e3cf64a1260ebd80d5987309a4d0d5d2d1f6fa5',
+            'reference' => 'de6366825c2196315145db5f2be838d71c4f5a29',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

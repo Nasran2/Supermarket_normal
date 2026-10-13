@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BarcodeController;
+use App\Http\Controllers\BarcodePresetController;
 use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentationController;
@@ -92,6 +94,30 @@ Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(functi
     Route::post('/register/movement', [RegisterController::class, 'movement'])->name('register.movement');
     Route::post('/register/close', [RegisterController::class, 'close'])->name('register.close');
     Route::get('/register/{register}', [RegisterController::class, 'show'])->middleware('permission:register.view')->name('register.show');
+    Route::middleware('barcode-feature')->group(function () {
+        Route::get('/barcode', [BarcodeController::class, 'index'])->middleware('permission:barcode.view')->name('barcode.index');
+        Route::get('/barcodes/print', [BarcodeController::class, 'index'])->middleware('permission:barcode.view')->name('barcode.print');
+        Route::get('/barcode/products', [BarcodeController::class, 'products'])->middleware('permission:barcode.view')->name('barcode.products');
+        Route::post('/barcode/generate', [BarcodeController::class, 'generate'])->middleware('permission:barcode.generate')->name('barcode.generate');
+        Route::post('/barcode/products/{product}', [BarcodeController::class, 'assign'])->name('barcode.assign');
+        Route::post('/barcode/preview', [BarcodeController::class, 'preview'])->name('barcode.preview');
+        Route::post('/barcode/jobs', [BarcodeController::class, 'store'])->name('barcode.jobs.store');
+        Route::get('/barcode/jobs/{job}', [BarcodeController::class, 'show'])->middleware('permission:barcode.print')->name('barcode.jobs.show');
+        Route::get('/barcode/history', [BarcodeController::class, 'history'])->middleware('permission:barcode.view_history')->name('barcode.history');
+        Route::get('/barcode/calibration', [BarcodeController::class, 'calibration'])->middleware('permission:barcode.print')->name('barcode.calibration');
+        Route::get('/settings/barcode', [BarcodeController::class, 'settings'])->middleware('permission:barcode.manage_settings')->name('barcode.settings');
+        Route::put('/settings/barcode', [BarcodeController::class, 'updateSettings'])->middleware('permission:barcode.manage_settings')->name('barcode.settings.update');
+        Route::middleware('permission:barcode.manage_presets')->prefix('barcode/presets')->name('barcode.presets.')->group(function () {
+            Route::get('/', [BarcodePresetController::class, 'index'])->name('index');
+            Route::get('/create', [BarcodePresetController::class, 'edit'])->name('create');
+            Route::get('/{preset}/edit', [BarcodePresetController::class, 'edit'])->name('edit');
+            Route::post('/', [BarcodePresetController::class, 'store'])->name('store');
+            Route::put('/{preset}', [BarcodePresetController::class, 'update'])->name('update');
+            Route::post('/{preset}/duplicate', [BarcodePresetController::class, 'duplicate'])->name('duplicate');
+            Route::post('/{preset}/default', [BarcodePresetController::class, 'makeDefault'])->name('default');
+            Route::delete('/{preset}', [BarcodePresetController::class, 'destroy'])->name('destroy');
+        });
+    });
     Route::get('/settings', [SettingsController::class, 'index'])->middleware('permission:settings.view')->name('settings.index');
     Route::get('/settings/{group}', [SettingsController::class, 'edit'])->name('settings.edit');
     Route::put('/settings/{group}', [SettingsController::class, 'update'])->name('settings.update');

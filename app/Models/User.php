@@ -37,6 +37,9 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
+        if (str_starts_with($permission, 'barcode.') && ! config('features.barcode')) {
+            return false;
+        }
         if (str_starts_with($permission, 'hr.') && ! Hr::enabled()) {
             return false;
         }

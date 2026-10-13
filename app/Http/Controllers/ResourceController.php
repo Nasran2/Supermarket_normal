@@ -17,7 +17,6 @@ use App\Services\DefaultUnitService;
 use App\Services\PaymentActivityService;
 use App\Services\ResourceService;
 use App\Services\StockLayerService;
-use App\Support\Hr;
 use App\Support\Permissions;
 use App\Support\Resources;
 use App\Support\SalesVisibility;
@@ -145,7 +144,7 @@ class ResourceController extends Controller
         }
         if ($resource === 'categories') {
             $filters = request()->validate(['q' => 'nullable|string|max:150', 'active' => 'nullable|boolean']);
-            $products = $record->products()->with('unit')->when(! empty($filters['q']), fn ($q) => $q->where(fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%')->orWhere('barcode', 'like', '%'.$filters['q'].'%')))->when(isset($filters['active']), fn ($q) => $q->where('active', $filters['active']))->orderBy('name')->paginate(20)->withQueryString();
+            $products = $record->products()->with('unit')->when(! empty($filters['q']), fn ($q) => $q->where(fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', 'like', '%'.$filters['q'].'%'))))->when(isset($filters['active']), fn ($q) => $q->where('active', $filters['active']))->orderBy('name')->paginate(20)->withQueryString();
 
             return view('categories.show', compact('record', 'products'));
         }
@@ -201,7 +200,7 @@ class ResourceController extends Controller
             return view($view, compact('resource', 'def', 'record', 'options', 'units', 'presets'));
         }
         $moduleOrder = array_flip(['Dashboard', 'Point of sale', 'Sales', 'Purchases', 'Products', 'Stock adjustments', 'Daily register', 'Customers', 'Suppliers', 'Categories', 'Units', 'Multiple units', 'Expenses', 'Expense categories', 'Users', 'Roles & permissions', 'Settings']);
-        $permissions = Permission::whereIn('name', array_keys(Permissions::all()))->get()->filter(fn ($p) => Hr::enabled() || ! str_starts_with($p->name, 'hr.'))->sortBy(fn ($p) => sprintf('%02d-%s-%03d', $moduleOrder[Permissions::info($p->name)['group']] ?? 18, Permissions::info($p->name)['group'], array_search($p->name, array_keys(Permissions::all()))));
+        $permissions = Permission::whereIn('name', array_keys(Permissions::visible()))->get()->sortBy(fn ($p) => sprintf('%02d-%s-%03d', $moduleOrder[Permissions::info($p->name)['group']] ?? 18, Permissions::info($p->name)['group'], array_search($p->name, array_keys(Permissions::all()))));
 
         return view($resource === 'customers' ? 'customers.form' : 'crud.form', compact('resource', 'def', 'record', 'options', 'permissions'));
     }

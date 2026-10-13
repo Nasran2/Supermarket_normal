@@ -22,6 +22,7 @@ use App\Support\Hr;
 use App\Support\Money;
 use App\Support\Resources;
 use App\Support\SalesVisibility;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -33,6 +34,9 @@ class ResourceService
     {
         if (auth()->user()->isAdministrator()) {
             return;
+        }
+        if (! config('features.barcode')) {
+            $ids = array_diff($ids, Permission::where('name', 'like', 'barcode.%')->pluck('id')->all());
         }
         $allowed = auth()->user()->role->permissions->pluck('id')->all();
         if (array_diff($ids, $allowed)) {
@@ -147,6 +151,29 @@ class ResourceService
                     }
                 }
                 if ($resource === 'products') {
+                    if (! config('features.barcode')) {
+                        unset($values['barcode'], $values['barcode_type']);
+                    } else {
+                        $barcodes = app(BarcodeService::class);
+                        if (! auth()->user()->hasPermission('barcode.edit_product_barcode')) {
+                            unset($values['barcode'], $values['barcode_type']);
+                        }
+                        if (! $id && empty($values['barcode']) && $barcodes->setting('barcode_generate_on_create', false) && auth()->user()->hasPermission('barcode.generate')) {
+                            $values['barcode_type'] = $barcodes->setting('barcode_default_type', 'CODE128');
+                            $values['barcode'] = $barcodes->generate($values['barcode_type']);
+                        }
+                        if (array_key_exists('barcode', $values)) {
+                            $values['barcode'] = $values['barcode'] === '' ? null : $values['barcode'];
+                            $values['barcode_type'] ??= $id ? $record->barcode_type : $barcodes->setting('barcode_default_type', 'CODE128');
+                            if ($values['barcode'] !== null) {
+                                $barcodes->validate($values['barcode'], $values['barcode_type']);
+                                $barcodes->unique($values['barcode'], $id);
+                            }
+                        }
+                        if ($barcodes->setting('barcode_required', false) && empty(array_key_exists('barcode', $values) ? $values['barcode'] : ($id ? $record->barcode : null))) {
+                            throw ValidationException::withMessages(['barcode' => 'Barcode is required by Barcode Settings.']);
+                        }
+                    }
                     if (Expiry::enabled()) {
                         $values['track_expiry'] = (bool) ($data['track_expiry'] ?? ($id ? $record->track_expiry : Expiry::setting('expiry_default_tracking')));
                         if ($values['track_expiry'] && ! ($data['track_stock'] ?? $record->track_stock)) {
@@ -264,6 +291,15 @@ class ResourceService
                         $permissionIds = array_unique(array_merge($permissionIds, $record->permissions->whereIn('id', $hiddenIds)->pluck('id')->all()));
                     }
                 }
+                if ($resource === 'roles' && ! config('features.barcode')) {
+                    $hidden = Permission::where('name', 'like', 'barcode.%')->pluck('id')->all();
+                    if (array_intersect($data['permissions'] ?? [], $hidden)) {
+                        throw ValidationException::withMessages(['permissions' => 'Barcode is disabled. Enable the feature before changing barcode permissions.']);
+                    }
+                    if ($id) {
+                        $permissionIds = array_unique(array_merge($permissionIds, $record->permissions->whereIn('id', $hidden)->pluck('id')->all()));
+                    }
+                }
                 $categoryIds = $values['categories'] ?? [];
                 if ($resource === 'roles') {
                     if (strcasecmp(trim($values['name']), 'Administrator') === 0) {
@@ -326,6 +362,9 @@ class ResourceService
         } catch (\Throwable $e) {
             if ($path) {
                 Storage::disk('public')->delete($path);
+            }
+            if ($resource === 'products' && $e instanceof UniqueConstraintViolationException && ! empty($data['barcode'])) {
+                app(BarcodeService::class)->unique($data['barcode'], $id);
             }
             throw $e;
         }

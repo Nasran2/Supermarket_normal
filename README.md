@@ -184,3 +184,8 @@ An overdue demo also resets on its next web request if the scheduler was missed;
 Expiry tracking is off by default (`EXPIRE=false`). Set `EXPIRE=true`, run `php artisan migrate --force`, `php artisan optimize:clear`, and `npm run build`, then enable **Track expiry** for each relevant product. Batch dates extend the existing stock layers; quantities are not duplicated. Disabling the feature hides its controls and keeps all recorded dates. See [Expiry tracking](docs/EXPIRY_TRACKING.md) for staff instructions, permissions, FEFO, returns and write-offs.
 
 Implementation files, verification results and local/hosting deployment details are recorded in [Expiry implementation report](docs/EXPIRY_IMPLEMENTATION.md).
+
+
+### Optional Barcode Labels
+
+Set `BARCODE=true` and run `php artisan migrate` followed by `php artisan optimize:clear` to enable barcode generation, scanning, labels and presets. `BARCODE=false` hides the module and preserves stored data. See [Barcode System](docs/BARCODE_SYSTEM.md) for setup/printing/permissions and [Development Report](docs/BARCODE_DEVELOPMENT_REPORT.md) for implementation and QA results.

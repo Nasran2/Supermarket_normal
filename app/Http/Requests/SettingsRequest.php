@@ -37,6 +37,13 @@ class SettingsRequest extends FormRequest
             $r['default_payment_method'] = ['required', 'integer', Rule::exists('payment_methods', 'id')->where('active', true)];
         }
 
+        if (! config('features.barcode')) {
+            unset($r['barcode_enabled']);
+            if (isset($r['search_mode'])) {
+                $r['search_mode'] = ['required', 'in:all,name,sku'];
+            }
+        }
+
         return $r;
     }
 

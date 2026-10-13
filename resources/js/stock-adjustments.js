@@ -67,7 +67,7 @@ if (form) {
     if(button){input.setAttribute('aria-activedescendant',button.id);button.scrollIntoView({block:'nearest'});}
   }
   function renderResults() {
-    $('adjustment-search-count').textContent=results.length?`${results.length}${results.length===60?'+':''} matches · click one to add`:'No matching products. Try a name, SKU or barcode.';
+    $('adjustment-search-count').textContent=results.length?`${results.length}${results.length===60?'+':''} matches · click one to add`:'No matching products. Try a product name or SKU.';
     dropdown.innerHTML=results.length?results.map(p=>`<button type="button" role="option" id="adjustment-option-${p.product_id}" data-add-product="${p.product_id}"><span><strong>${escape(p.name)}</strong><small>${escape(p.sku)} · ${escape(p.expected_stock)} ${escape(p.unit)} in stock</small></span><span class="badge ${rows.has(Number(p.product_id))?'green':'slate'}">${rows.has(Number(p.product_id))?'Added':'Add'}</span></button>`).join(''):'<p class="muted">No matching products.</p>';
     dropdown.hidden=false;input.setAttribute('aria-expanded','true');active=0;highlight();
   }

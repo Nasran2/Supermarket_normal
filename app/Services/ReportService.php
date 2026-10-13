@@ -362,7 +362,7 @@ class ReportService
                 'Closing balance' => (string) $closing,
             ];
         } elseif ($kind === 'audit') {
-            $query = SalesVisibility::apply(AuditLog::with('user')->where('action', 'not like', 'hr.%'), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
+            $query = SalesVisibility::apply(AuditLog::with('user')->where('action', 'not like', 'hr.%')->when(! config('features.barcode'), fn ($q) => $q->where('action', 'not like', 'barcode.%')->where('action', '!=', 'settings.barcode')), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
             if (SalesVisibility::mode() !== 'ALL') {
                 $subjects = [Sale::class => Sale::visibleTo()->select('id')];
                 foreach ([SaleReturn::class, SaleCollection::class, SaleRevision::class] as $subject) {

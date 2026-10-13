@@ -107,6 +107,9 @@ class Permissions
                 'expiry.view' => ['reports.stock'], 'expiry.manage_settings' => ['settings.stock'], 'expiry.writeoff' => ['sales_returns.writeoff'], 'expiry.view_cost' => ['products.view_cost'], 'purchase.expiry_edit' => ['purchases.manage_prices'], default => []
             });
         }
+        foreach (['view' => 'View labels', 'print' => 'Print labels', 'print_bulk' => 'Print multiple products', 'manage_presets' => 'Manage label presets', 'manage_settings' => 'Manage barcode settings', 'generate' => 'Generate barcodes', 'edit_product_barcode' => 'Edit product barcodes', 'view_history' => 'View print history'] as $action => $label) {
+            $add('barcode.'.$action, 'Barcode labels', $label, $label.'.');
+        }
         foreach (Hr::permissions() as $name => [$group, $label]) {
             $add($name, $group, $label, $label.'.', []);
         }
@@ -116,7 +119,7 @@ class Permissions
 
     public static function visible(): array
     {
-        return array_filter(self::all(), fn ($info, $name) => (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
+        return array_filter(self::all(), fn ($info, $name) => (config('features.barcode') || ! str_starts_with($name, 'barcode.')) && (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
     }
 
     public static function info(string $name): array

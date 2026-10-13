@@ -46,21 +46,24 @@ class PosController extends Controller
         if (array_key_exists('ids', $data)) {
             return $this->productPayload($products->whereIn('id', $data['ids'] ?? [])->get());
         }
-        $scanning = ($data['scan'] ?? false) && $settings->get('barcode_enabled', true);
-        $autoScanning = ($data['auto_scan'] ?? false) && $settings->get('barcode_enabled', true);
+        $scanning = config('features.barcode') && ($data['scan'] ?? false) && $settings->get('barcode_enabled', true);
+        $autoScanning = config('features.barcode') && ($data['auto_scan'] ?? false) && $settings->get('barcode_enabled', true);
         $mode = $scanning ? 'all' : $settings->get('search_mode', 'all');
+        if (! config('features.barcode') && $mode === 'barcode') {
+            $mode = 'all';
+        }
         $exactMode = $autoScanning ? 'all' : $mode;
         $exact = null;
         if ($q !== '' && $exactMode !== 'name') {
             $exactQuery = (clone $products)->where(function ($query) use ($exactMode, $q) {
-                foreach ($exactMode === 'all' ? ['barcode', 'sku'] : [$exactMode] as $column) {
+                foreach ($exactMode === 'all' ? (config('features.barcode') ? ['barcode', 'sku'] : ['sku']) : [$exactMode] as $column) {
                     $query->orWhere($column, $q);
                 }
             });
             if (! empty($data['category_id']) && ! $scanning && ! $autoScanning) {
                 $exactQuery->whereHas('categories', fn ($q) => $q->where('categories.id', $data['category_id']));
             }
-            $exact = $exactQuery->orderByRaw('CASE WHEN barcode = ? THEN 0 ELSE 1 END', [$q])->first();
+            $exact = $exactQuery->when(config('features.barcode'), fn ($query) => $query->orderByRaw('CASE WHEN barcode = ? THEN 0 ELSE 1 END', [$q]))->first();
         }
         if ($exact) {
             $found = collect([$exact]);
@@ -68,7 +71,7 @@ class PosController extends Controller
             return $this->productPayload($page === null ? $found : new LengthAwarePaginator($page === 1 ? $found : collect(), 1, self::PRODUCTS_PER_PAGE, $page));
         }
         if ($q !== '') {
-            $cols = $mode === 'all' ? ['name', 'sku', 'barcode'] : [$mode];
+            $cols = $mode === 'all' ? (config('features.barcode') ? ['name', 'sku', 'barcode'] : ['name', 'sku']) : [$mode];
             $products->where(function ($query) use ($q, $cols) {
                 foreach ($cols as $col) {
                     if ($col === 'name' && DB::getDriverName() === 'mysql' && mb_strlen($q) >= 3) {
@@ -87,7 +90,7 @@ class PosController extends Controller
             $products->whereHas('categories', fn ($q) => $q->where('categories.id', $data['category_id']));
         }
 
-        $products->orderByRaw('CASE WHEN barcode = ? THEN 0 WHEN sku = ? THEN 1 ELSE 2 END', [$q, $q])->orderBy('name')->orderBy('id');
+        $products->when(config('features.barcode'), fn ($query) => $query->orderByRaw('CASE WHEN barcode = ? THEN 0 WHEN sku = ? THEN 1 ELSE 2 END', [$q, $q]))->orderBy('name')->orderBy('id');
         $found = $page === null ? $products->limit(self::PRODUCTS_PER_PAGE)->get() : $products->paginate(self::PRODUCTS_PER_PAGE, ['*'], 'page', $page);
         $noMatches = $found instanceof LengthAwarePaginator ? $found->total() === 0 : $found->isEmpty();
         if ($q !== '' && $noMatches && in_array($settings->get('search_mode', 'all'), ['all', 'name'])) {
@@ -107,7 +110,7 @@ class PosController extends Controller
         $transform = function ($p) {
             $groups = app(StockLayerService::class)->choices($p, request()->route('sale'));
 
-            return ['track_expiry' => Expiry::tracks($p), 'show_expiry' => Expiry::enabled() && Expiry::setting('expiry_show_pos'), 'track_stock' => $p->track_stock, 'default_discount_type' => $p->default_discount_type, 'default_discount_value' => $p->default_discount_value, 'price_options' => $groups, 'units' => array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->options($p)), 'unit_id' => $p->unit_id, 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => $p->barcode, 'price' => $p->price, 'stock' => Expiry::tracks($p) ? Money::quantity('0', (string) collect($groups)->sum('quantity')) : $p->stock, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'category' => $p->categories->pluck('name')->join(', '), 'image' => $p->image ? asset('storage/'.$p->image) : null];
+            return ['track_expiry' => Expiry::tracks($p), 'show_expiry' => Expiry::enabled() && Expiry::setting('expiry_show_pos'), 'track_stock' => $p->track_stock, 'default_discount_type' => $p->default_discount_type, 'default_discount_value' => $p->default_discount_value, 'price_options' => $groups, 'units' => array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->options($p)), 'unit_id' => $p->unit_id, 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => config('features.barcode') ? $p->barcode : null, 'price' => $p->price, 'stock' => Expiry::tracks($p) ? Money::quantity('0', (string) collect($groups)->sum('quantity')) : $p->stock, 'unit' => $p->unit->short_name, 'decimal' => $p->unit->allow_decimal, 'category' => $p->categories->pluck('name')->join(', '), 'image' => $p->image ? asset('storage/'.$p->image) : null];
         };
 
         return $products instanceof LengthAwarePaginator ? $products->through($transform) : $products->map($transform);

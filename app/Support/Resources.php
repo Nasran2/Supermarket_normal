@@ -10,7 +10,7 @@ class Resources
     {
         $contact = ['name' => ['Name', 'text'], 'phone' => ['Phone', 'text', false], 'email' => ['Email', 'email', false], 'address' => ['Address', 'textarea', false], 'active' => ['Active', 'checkbox']];
 
-        return [
+        $definitions = [
             'products' => ['title' => 'Products', 'model' => Models\Product::class, 'permission' => 'products', 'search' => ['name', 'sku', 'barcode'], 'relations' => ['categories', 'unit', 'conversions.unit', 'supplier'], 'columns' => ['name' => 'Product', 'sku' => 'SKU', 'supplier.name' => 'Supplier', 'barcode' => 'Barcode', 'categories_list' => 'Categories', 'unit.short_name' => 'Unit', 'price' => 'Price', 'stock' => 'Stock', 'active' => 'Active'], 'fields' => ['name' => ['Product name', 'text'], 'sku' => ['SKU', 'text'], 'barcode' => ['Barcode', 'text', false], 'categories' => ['Categories', 'multiselect', false, Models\Category::class], 'supplier_id' => ['Supplier', 'select', false, Models\Supplier::class], 'unit_id' => ['Unit', 'select', true, Models\Unit::class], 'cost' => ['Cost', 'money'], 'price' => ['Selling price', 'money'], 'stock' => ['Opening stock', 'quantity'], 'low_stock' => ['Low stock alert', 'quantity'], 'active' => ['Active', 'checkbox'], 'image' => ['Product image', 'file', false]]],
             'categories' => ['title' => 'Categories', 'model' => Models\Category::class, 'permission' => 'categories', 'search' => ['name'], 'columns' => ['name' => 'Name'], 'fields' => ['name' => ['Category name', 'text']]],
             'units' => ['title' => 'Units', 'model' => Models\Unit::class, 'permission' => 'units', 'search' => ['name', 'short_name'], 'columns' => ['name' => 'Name', 'short_name' => 'Short name', 'allow_decimal' => 'Decimal quantity', 'active' => 'Active'], 'fields' => ['name' => ['Unit name', 'text'], 'short_name' => ['Short name', 'text'], 'allow_decimal' => ['Allow decimal quantities', 'checkbox'], 'active' => ['Active', 'checkbox']]],
@@ -23,6 +23,12 @@ class Resources
             'users' => ['title' => 'Users', 'model' => Models\User::class, 'permission' => 'users', 'search' => ['name', 'username', 'email'], 'relations' => ['role'], 'columns' => ['name' => 'Name', 'username' => 'Username', 'email' => 'Email', 'role.name' => 'Role', 'active' => 'Active'], 'fields' => ['name' => ['Name', 'text'], 'username' => ['Username', 'text'], 'email' => ['Email', 'email'], 'role_id' => ['Role', 'select', true, Models\Role::class], 'password' => ['Password (leave blank to keep)', 'password', false], 'active' => ['Active', 'checkbox']]],
             'roles' => ['title' => 'Roles & permissions', 'model' => Models\Role::class, 'permission' => 'roles', 'search' => ['name'], 'relations' => ['permissions'], 'columns' => ['name' => 'Role', 'system' => 'System role'], 'fields' => ['name' => ['Role name', 'text'], 'sales_visibility' => ['Sales visibility', 'sales_visibility', false], 'permissions' => ['Permissions', 'permissions']]],
         ];
+        if (! config('features.barcode')) {
+            unset($definitions['products']['fields']['barcode'], $definitions['products']['columns']['barcode']);
+            $definitions['products']['search'] = ['name', 'sku'];
+        }
+
+        return $definitions;
     }
 
     public static function get(string $resource): array

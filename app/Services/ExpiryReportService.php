@@ -45,7 +45,7 @@ class ExpiryReportService
             $query->whereHas('purchaseItem.purchase', fn ($q) => $q->where('supplier_id', $filters['supplier_id']));
         }
         if (! empty($filters['q'])) {
-            $query->whereHas('product', fn ($q) => $q->where(fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%')->orWhere('barcode', $filters['q'])));
+            $query->whereHas('product', fn ($q) => $q->where(fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', $filters['q']))));
         }
         foreach (['batch' => 'batch_number', 'purchase' => 'source_reference'] as $field => $column) {
             if (! empty($filters[$field])) {

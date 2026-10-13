@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\BusinessContext;
 use App\Http\Middleware\DemoMode;
+use App\Http\Middleware\EnsureBarcodeFeatureEnabled;
 use App\Http\Middleware\PermissionMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,7 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['permission' => PermissionMiddleware::class]);
+        $middleware->alias(['permission' => PermissionMiddleware::class, 'barcode-feature' => EnsureBarcodeFeatureEnabled::class]);
         $middleware->appendToGroup('web', [DemoMode::class, BusinessContext::class]);
         // Acquire the demo lock and restore overdue data before binding records.
         $middleware->prependToPriorityList(SubstituteBindings::class, DemoMode::class);

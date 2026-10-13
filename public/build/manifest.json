@@ -1,10 +1,14 @@
 {
+  "_barcode-layout-B_o5AN8K.js": {
+    "file": "assets/barcode-layout-B_o5AN8K.js",
+    "name": "barcode-layout"
+  },
   "_pos-price-options-BXcz7Ggt.js": {
     "file": "assets/pos-price-options-BXcz7Ggt.js",
     "name": "pos-price-options"
   },
   "resources/css/app.css": {
-    "file": "assets/app-BUQgg-9r.css",
+    "file": "assets/app-DeRrQfTW.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -21,8 +25,41 @@
       "_pos-price-options-BXcz7Ggt.js"
     ]
   },
+  "resources/js/barcode-preset.js": {
+    "file": "assets/barcode-preset-DFUBBflH.js",
+    "name": "barcode-preset",
+    "src": "resources/js/barcode-preset.js",
+    "isEntry": true,
+    "imports": [
+      "_barcode-layout-B_o5AN8K.js"
+    ]
+  },
+  "resources/js/barcode-print.js": {
+    "file": "assets/barcode-print-DoKXtqWp.js",
+    "name": "barcode-print",
+    "src": "resources/js/barcode-print.js",
+    "isEntry": true,
+    "imports": [
+      "_barcode-layout-B_o5AN8K.js"
+    ]
+  },
+  "resources/js/barcode-product.js": {
+    "file": "assets/barcode-product-CsTjqj_O.js",
+    "name": "barcode-product",
+    "src": "resources/js/barcode-product.js",
+    "isEntry": true
+  },
+  "resources/js/barcode.js": {
+    "file": "assets/barcode-DGvAgvIR.js",
+    "name": "barcode",
+    "src": "resources/js/barcode.js",
+    "isEntry": true,
+    "imports": [
+      "_barcode-layout-B_o5AN8K.js"
+    ]
+  },
   "resources/js/pos.js": {
-    "file": "assets/pos-Blkr06bd.js",
+    "file": "assets/pos-CCQu6w1_.js",
     "name": "pos",
     "src": "resources/js/pos.js",
     "isEntry": true,
@@ -37,7 +74,7 @@
     "isEntry": true
   },
   "resources/js/purchase.js": {
-    "file": "assets/purchase-B4WYsA_q.js",
+    "file": "assets/purchase-fg8t6Pmy.js",
     "name": "purchase",
     "src": "resources/js/purchase.js",
     "isEntry": true
@@ -49,7 +86,7 @@
     "isEntry": true
   },
   "resources/js/stock-adjustments.js": {
-    "file": "assets/stock-adjustments-D04M1Ytd.js",
+    "file": "assets/stock-adjustments-CXA3wSn_.js",
     "name": "stock-adjustments",
     "src": "resources/js/stock-adjustments.js",
     "isEntry": true

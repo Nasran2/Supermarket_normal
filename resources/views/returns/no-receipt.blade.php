@@ -26,7 +26,7 @@
     <h2>What should the customer receive?</h2>
     <div class="return-resolution-grid">@foreach(['SAME'=>['package','Same Product'],'OTHER'=>['shopping-bag','Another Product'],'MONEY'=>['banknote','Money / Account Credit']] as $value=>[$icon,$label])<label class="return-resolution"><input type="radio" name="nr-resolution" value="{{ $value }}" @checked($value==='MONEY')><x-icon :name="$icon" :size="26"/><strong>{{ $label }}</strong></label>@endforeach</div>
     @if(!($settings['no_receipt_cash_refund']??false))<p class="notice info">Cash refunds without a receipt are disabled. You can exchange products, apply credit to a selected customer's due, or use an enabled noncash refund method.</p>@endif
-    <div id="nr-replacement-search" hidden><label class="field">Replacement product search<input type="search" id="nr-replacement-query" placeholder="Search products or scan replacement barcode..." autocomplete="off"></label><div id="nr-replacement-results" class="return-product-results"></div></div><div id="nr-replacements" class="mt-6"></div>
+    <div id="nr-replacement-search" hidden><label class="field">Replacement product search<input type="search" id="nr-replacement-query" placeholder="{{ config('features.barcode')?'Search products or scan replacement barcode...':'Search products...' }}" autocomplete="off"></label><div id="nr-replacement-results" class="return-product-results"></div></div><div id="nr-replacements" class="mt-6"></div>
     <div class="form-footer"><button class="btn secondary" type="button" data-nr-next="2">Back</button><button class="btn primary" type="button" data-nr-next="4">Review & settle<x-icon name="arrow-right"/></button></div>
 </section>
 <section data-nr-step="4" hidden><div class="return-review-grid">
