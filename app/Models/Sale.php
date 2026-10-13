@@ -79,7 +79,17 @@ class Sale extends Model
 
     public function getCollectedTotalAttribute(): string
     {
-        return Money::add(Money::sub(Money::sum($this->payments->pluck('amount_paid')), Money::sum($this->payments->pluck('change'))), Money::sum($this->collections->pluck('amount')));
+        return Money::add(Money::sub(Money::sum($this->payments->where('is_effective', true)->pluck('amount_paid')), Money::sum($this->payments->where('is_effective', true)->pluck('change'))), Money::sum($this->collections->where('is_effective', true)->pluck('amount')));
+    }
+
+    public function getChequeHoldAttribute(): string
+    {
+        return Money::add((string) $this->payments()->where('settlement_status', 'PENDING')->sum('amount_paid'), (string) $this->collections()->where('settlement_status', 'PENDING')->sum('amount'));
+    }
+
+    public function getSettledTotalAttribute(): string
+    {
+        return Money::add(Money::sum($this->payments->where('settlement_status', 'PASSED')->map(fn ($p) => Money::sub($p->amount_paid, $p->change))), Money::sum($this->collections->where('settlement_status', 'PASSED')->pluck('amount')));
     }
 
     public function getDueBalanceAttribute(): string
@@ -95,7 +105,7 @@ class Sale extends Model
 
     public function getPaymentStatusAttribute(): string
     {
-        return $this->status !== 'ACTIVE' ? 'Voided' : (Money::compare($this->due_balance, 0) > 0 ? 'Due' : 'Paid');
+        return $this->status !== 'ACTIVE' ? 'Voided' : (config('features.cheque') && Money::compare($this->cheque_hold, 0) > 0 && Money::compare($this->due_balance, 0) <= 0 ? 'Cheque Hold' : (Money::compare($this->due_balance, 0) > 0 ? 'Due' : 'Paid'));
     }
 
     public function getHasReturnableItemsAttribute(): bool
@@ -129,9 +139,13 @@ class Sale extends Model
 
     public function getPaymentNamesAttribute(): string
     {
-        $names = $this->payments->pluck('method_name');
+        $names = $this->payments->filter(fn ($p) => config('features.cheque') || ! $p->cheque_id)->pluck('method_name');
         if (Money::compare($this->return_credit_total, 0) > 0) {
             $names->push('Return credit');
+        }
+
+        if (config('features.cheque') && $this->payments->contains('method_type', 'CHEQUE')) {
+            $names = $names->unique();
         }
 
         return $names->join(' + ');
@@ -144,12 +158,12 @@ class Sale extends Model
 
     public function getPaidTotalAttribute(): string
     {
-        return Money::add(Money::sum($this->payments->pluck('amount_paid')), Money::sum($this->collections->pluck('amount_paid')));
+        return Money::add(Money::sum($this->payments->where('is_effective', true)->pluck('amount_paid')), Money::sum($this->collections->where('is_effective', true)->pluck('amount_paid')));
     }
 
     public function getChangeTotalAttribute(): string
     {
-        return Money::add(Money::sum($this->payments->pluck('change')), Money::sum($this->collections->pluck('change')));
+        return Money::add(Money::sum($this->payments->where('is_effective', true)->pluck('change')), Money::sum($this->collections->where('is_effective', true)->pluck('change')));
     }
 
     // Compatibility for callers displaying a historical single-payment sale.

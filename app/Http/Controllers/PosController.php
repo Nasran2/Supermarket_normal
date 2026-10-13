@@ -29,7 +29,7 @@ class PosController extends Controller
     public function index(RegisterService $registers)
     {
         $register = $registers->current(auth()->id());
-        $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
+        $methods = PaymentMethod::forContext('receive')->where('active', true)->orderBy('display_order')->get();
         $customers = Customer::withDueBalances()->where('active', true)->orderBy('name')->get();
         $categories = Category::orderBy('name')->get();
 

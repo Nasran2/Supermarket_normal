@@ -1,3 +1,4 @@
+import './cheques.js';
 import './expiry.js';
 import './expense-category.js';
 import './register.js';

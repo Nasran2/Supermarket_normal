@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Cheque;
 use App\Models\PaymentMethod;
 use App\Models\SaleReturn;
 use App\Support\Money;
@@ -40,7 +41,15 @@ class PaymentActivityService
             ->where(fn ($q) => $q->whereIn('p.kind', ['PURCHASE_RETURN_REFUND', 'PURCHASE_RETURN_PAYMENT', 'SUPPLIER_RETURN_REFUND', 'REVERSAL']))
             ->where(fn ($q) => $q->whereNull('p.sale_return_id')->orWhereIn('r.id', SaleReturn::visibleTo()->select('id')))
             ->selectRaw("p.id as entry_id, p.kind as kind, p.created_at as occurred_at, p.payment_method_id, p.method_name, s.id as sale_id, COALESCE(r.reference,pr.reference,sr.reference) as bill, COALESCE(c.name,'Supplier') as customer,c.id as customer_id,u.name as cashier,0 as allocated,CASE WHEN p.amount>0 THEN p.amount ELSE 0 END as received,0 as change_amount,CASE WHEN p.amount>0 THEN p.amount ELSE 0 END as collected,CASE WHEN p.amount<0 THEN -p.amount ELSE 0 END as refunded,0 as charges,0 as customer_charges,0 as business_charges,COALESCE(r.reference,pr.reference,sr.reference) as reference");
+        foreach ([$checkouts, $collections, $accounts] as $q) {
+            $q->whereNull('p.cheque_id');
+        }
         $events = $checkouts->unionAll($collections)->unionAll($refunds)->unionAll($accounts)->unionAll($returnEvents);
+
+        if (config('features.cheque')) {
+            $cleared = Cheque::visibleTo()->leftJoin('customers as c', 'c.id', '=', 'cheques.origin_customer_id')->join('users as u', 'u.id', '=', 'cheques.passed_by')->where('cheques.type', 'CUSTOMER_RECEIVED')->where('cheques.status', 'PASSED')->selectRaw("cheques.id as entry_id,'Cheque passed' as kind,cheques.passed_at as occurred_at,(SELECT id FROM payment_methods WHERE type='CHEQUE' ORDER BY id LIMIT 1) as payment_method_id,'Cheque' as method_name,cheques.sale_id as sale_id,cheques.cheque_number as bill,COALESCE(c.name,'Customer') as customer,c.id as customer_id,u.name as cashier,0 as allocated,cheques.amount as received,0 as change_amount,cheques.amount as collected,0 as refunded,0 as charges,0 as customer_charges,0 as business_charges,cheques.reference")->toBase();
+            $events->unionAll($cleared);
+        }
 
         return DB::query()->fromSub($events, 'activity')
             ->where('occurred_at', '>=', $filters['from'].' 00:00:00')

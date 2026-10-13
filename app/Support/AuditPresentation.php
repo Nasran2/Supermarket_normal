@@ -95,6 +95,9 @@ final class AuditPresentation
     {
         $result = [];
         foreach ($values as $key => $value) {
+            if (! config('features.cheque') && (str_starts_with((string) $key, 'cheque') || (is_array($value) && (($value['method_type'] ?? '') === 'CHEQUE' || ! empty($value['cheque_id']))))) {
+                continue;
+            }
             if (! config('features.barcode') && ($key === 'barcode' || str_starts_with((string) $key, 'barcode_'))) {
                 continue;
             }

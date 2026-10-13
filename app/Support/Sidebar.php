@@ -43,6 +43,9 @@ class Sidebar
         }
         $expenses['active'] = collect($expenses['children'])->contains('active', true);
         $inventory = [$products, $resource('categories', 'Categories', 'tags', 'category'), $resource('units', 'Units', 'ruler', 'unit'), $resource('unit-presets', 'Multiple units', 'boxes', 'unit preset'), $group('Suppliers', 'truck', [$link('All suppliers', 'manage.index', 'suppliers', 'suppliers.view'), $link('Add supplier', 'manage.create', 'suppliers', 'suppliers.create'), $link('Supplier Returns', 'returns.suppliers', [], 'supplier_returns.view', request()->routeIs('returns.suppliers'))]), $resource('customers', 'Customers', 'contact', 'customer'), $expenses];
+        if (config('features.cheque')) {
+            $inventory[] = $group('Cheques', 'landmark', [$link('All Cheques', 'cheques.index', [], 'cheques.view', request()->routeIs('cheques.index')), $link('Received Cheques', 'cheques.tab', 'received', 'cheques.view'), $link('Issued Cheques', 'cheques.tab', 'issued', 'cheques.view'), $link('Third-Party Cheques', 'cheques.tab', 'third-party', 'cheques.view'), $link('Due Soon', 'cheques.tab', 'due-soon', 'cheques.view'), $link('Returned Cheques', 'cheques.tab', 'returned', 'cheques.view'), $link('Cheque Report', 'cheques.report', [], 'cheques.view_reports')]);
+        }
         if (config('features.barcode')) {
             $inventory[] = $group('Barcode Labels', 'barcode', [$link('Print Labels', 'barcode.index', [], 'barcode.view', request()->routeIs('barcode.index', 'barcode.print')), $link('Presets', 'barcode.presets.index', [], 'barcode.manage_presets', request()->routeIs('barcode.presets.*')), $link('Print history', 'barcode.history', [], 'barcode.view_history', request()->routeIs('barcode.history'))]);
         }
@@ -55,6 +58,9 @@ class Sidebar
         }
         if (Expiry::enabled()) {
             $reports[] = $link('Expiry report', 'expiry.index', [], 'expiry.view', request()->routeIs('expiry.*'));
+        }
+        if (config('features.cheque')) {
+            $reports[] = $link('Cheques', 'cheques.report', [], 'cheques.view_reports', request()->routeIs('cheques.report'));
         }
         $hr = [];
         if (Hr::enabled()) {
@@ -71,6 +77,9 @@ class Sidebar
         }
         if (config('features.barcode')) {
             $settings[] = $link('Barcode', 'barcode.settings', [], 'barcode.manage_settings', request()->routeIs('barcode.settings*'));
+        }
+        if (config('features.cheque')) {
+            $settings[] = $link('Cheques', 'cheques.settings', [], 'cheques.manage_settings', request()->routeIs('cheques.settings'));
         }
         if (Expiry::enabled()) {
             $settings[] = $link('Expiry dates', 'settings.edit', 'expiry', 'expiry.manage_settings', request()->route('group') === 'expiry');

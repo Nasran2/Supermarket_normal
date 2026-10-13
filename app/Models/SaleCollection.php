@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ChequePayment;
 use Illuminate\Database\Eloquent\Model;
 
 class SaleCollection extends Model
 {
+    use ChequePayment;
+
     protected $guarded = ['id'];
 
     protected $casts = ['amount' => 'decimal:2', 'amount_paid' => 'decimal:2', 'change' => 'decimal:2', 'collected_at' => 'datetime'];

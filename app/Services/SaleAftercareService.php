@@ -12,6 +12,7 @@ use App\Support\Money;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class SaleAftercareService
@@ -89,6 +90,23 @@ class SaleAftercareService
             $paid = Money::round($data['amount_paid']);
             if (Money::compare($paid, $amount) < 0 || ($method->type !== 'CASH' && Money::compare($paid, $amount) !== 0)) {
                 $this->fail('Cash must cover the payment. Other methods must match it exactly.');
+            }
+            if ($method->type === 'CHEQUE') {
+                if (! $sale->customer_id) {
+                    app(ChequeService::class)->fail('Select a named customer to receive cheques.');
+                }
+                $entries = app(ChequeService::class)->entries($data['cheques'] ?? [], $amount);
+                $first = null;
+                foreach ($entries as $i => $entry) {
+                    $c = app(ChequeService::class)->create($entry, 'CUSTOMER_RECEIVED', $sale->customer_id, $userId, $sale->id);
+                    $p = SaleCollection::create(['sale_id' => $sale->id, 'register_id' => $register->id, 'user_id' => $userId, 'payment_method_id' => $method->id, 'token' => $i === 0 ? $data['token'] : (string) Str::uuid(), 'method_name' => $method->name, 'method_type' => 'CHEQUE', 'amount' => $c->amount, 'amount_paid' => $c->amount, 'change' => 0, 'cheque_id' => $c->id, 'settlement_status' => 'PENDING', 'reference' => $c->cheque_number, 'collected_at' => now()]);
+                    $first ??= $p;
+                }
+
+                return $first;
+            }
+            if (! empty($data['cheques'])) {
+                app(ChequeService::class)->fail('Cheque entries require the Cheque payment method.');
             }
             $collection = SaleCollection::create(['sale_id' => $sale->id, 'register_id' => $register->id, 'user_id' => $userId, 'payment_method_id' => $method->id, 'token' => $data['token'], 'method_name' => $method->name, 'method_type' => $method->type, 'amount' => $amount, 'amount_paid' => $paid, 'change' => Money::sub($paid, $amount), 'reference' => $data['reference'] ?? null, 'collected_at' => now()]);
             Audit::record('sale.collect', $collection, [], $collection->toArray());

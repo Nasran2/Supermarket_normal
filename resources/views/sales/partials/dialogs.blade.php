@@ -10,6 +10,7 @@
         <label class="field">Payment method<select name="payment_method_id" id="due-payment-method" required>@foreach($methods as $method)<option value="{{ $method->id }}" data-type="{{ $method->type }}" @selected(old('payment_method_id')==$method->id)>{{ $method->name }}</option>@endforeach</select></label>
         <div class="two-col"><label class="field">Amount to pay<input id="due-payment-amount" type="text" inputmode="decimal" name="amount" value="{{ old('_action')==='pay'?old('amount'):$sale->due_balance }}" pattern="[0-9]+(\.[0-9]{1,2})?" maxlength="15" required></label><label class="field"><span id="due-tender-label">Cash received</span><input id="due-payment-tender" type="text" inputmode="decimal" name="amount_paid" value="{{ old('_action')==='pay'?old('amount_paid'):$sale->due_balance }}" pattern="[0-9]+(\.[0-9]{1,2})?" maxlength="15" required></label></div>
         <label class="field">Reference <span class="muted">optional</span><input name="reference" value="{{ old('_action')==='pay'?old('reference'):'' }}" maxlength="255"></label>
+        @include('cheques.editor',['side'=>'receive'])
         <div class="sale-payment-preview"><div><span>Balance after payment</span><strong id="due-after">—</strong></div><div><span>Cash change</span><strong id="due-change">—</strong></div></div>
         <p class="notice error" id="due-payment-error" hidden role="alert"></p>
         <div class="sale-dialog-actions"><button class="btn secondary" type="button" data-close-sale-dialog>Cancel</button><button class="btn primary" id="save-due-payment"><x-icon name="check"/>Receive payment</button></div>
@@ -36,6 +37,7 @@
         @endif
 @endforeach
         </tbody></table></div>
+        @include('cheques.editor',['side'=>'receive'])
         <div class="sale-payment-preview"><div><span>Items return value</span><strong id="return-total">—</strong></div><div><span>Reduce outstanding due first</span><strong id="return-due-reduction">—</strong></div><div><span>Refund to customer</span><strong id="return-refund">—</strong></div></div>
         <p class="muted text-xs">Payment processing fees remain on the original invoice. Final return value is checked when saved.</p>
         <div class="two-col"><label class="field">Refund method<select name="payment_method_id" id="return-payment-method"><option value="">Choose refund method</option>@foreach($methods as $method)<option value="{{ $method->id }}" @selected(old('_action')==='return'&&old('payment_method_id')==$method->id)>{{ $method->name }}</option>@endforeach</select></label><label class="field">Reason<input name="reason" required minlength="3" maxlength="1000" placeholder="e.g. Customer returned unopened items" value="{{ old('_action')==='return'?old('reason'):'' }}"></label></div>

@@ -19,6 +19,7 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <env name="CHEQUE" value="false" force="true"/>
         <env name="EXPIRE" value="false" force="true"/>
         <env name="DEMO" value="false" force="true"/>
         <env name="APP_URL" value="http://localhost"/>

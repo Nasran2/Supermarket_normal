@@ -19,7 +19,7 @@
                     <thead><tr><th>Invoice</th><th>Date</th><th>Payment</th><th>Amount collected</th><th>Due</th><th>Status</th></tr></thead>
                     <tbody>
                         @forelse($sales as $sale)
-                        <tr><td>@can('sales.view')<a class="text-link" href="{{ route('sales.show',$sale) }}">{{ $sale->invoice }}</a>@else{{ $sale->invoice }}@endcan </td><td>{{ $sale->sold_at->format('d/m/Y H:i') }}</td><td>{{ $sale->payment_names ?: 'On account (unpaid)' }}</td><td>{{ $currency }} {{ \App\Support\Money::display(\App\Support\Money::sub($sale->collected_total,$sale->refunded_total)) }}</td><td>{{ $currency }} {{ \App\Support\Money::display($sale->due_balance) }}</td><td><span class="badge {{ $sale->status==='ACTIVE'?(\App\Support\Money::compare($sale->due_balance,0)>0?'amber':'green'):'slate' }}">{{ $sale->payment_status }}</span></td></tr>
+                        <tr><td>@can('sales.view')<a class="text-link" href="{{ route('sales.show',$sale) }}">{{ $sale->invoice }}</a>@else{{ $sale->invoice }}@endcan </td><td>{{ $sale->sold_at->format('d/m/Y H:i') }}</td><td>{{ $sale->payment_names ?: 'On account (unpaid)' }}</td><td>{{ $currency }} {{ \App\Support\Money::display(\App\Support\Money::sub(config('features.cheque')?$sale->settled_total:$sale->collected_total,$sale->refunded_total)) }}</td><td>{{ $currency }} {{ \App\Support\Money::display($sale->due_balance) }}</td><td><span class="badge {{ $sale->status==='ACTIVE'?(\App\Support\Money::compare($sale->due_balance,0)>0?'amber':'green'):'slate' }}">{{ $sale->payment_status }}</span></td></tr>
                         @empty
                         <tr><td colspan="6"><div class="empty-state"><x-icon name="receipt-text" :size="34"/><h3>No purchases yet</h3><p>Sales linked to this customer will appear here.</p></div></td></tr>
                         @endforelse
@@ -42,7 +42,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($record->customerPayments()->with(['paymentMethod', 'allocations.sale'])->latest('payment_date')->take(10)->get() as $payment)
+                        @forelse($record->customerPayments()->featureVisible()->with(['paymentMethod', 'allocations.sale'])->latest('payment_date')->take(10)->get() as $payment)
                         <tr>
                             <td>{{ \Carbon\Carbon::parse($payment->payment_date)->format('d/m/Y') }}</td>
                             <td>{{ $payment->paymentMethod->name ?? 'Unknown' }}</td>
@@ -86,8 +86,8 @@
                 </label>
                 <label class="field">Payment Method
                     <select name="payment_method_id" required>
-                        @foreach(\App\Models\PaymentMethod::where('active',true)->orderBy('display_order')->get() as $method)
-                            <option value="{{ $method->id }}">{{ $method->name }}</option>
+                        @foreach(\App\Models\PaymentMethod::forContext('receive')->where('active',true)->orderBy('display_order')->get() as $method)
+                            <option value="{{ $method->id }}" data-type="{{ $method->type }}">{{ $method->name }}</option>
                         @endforeach
                     </select>
                 </label>
@@ -97,6 +97,7 @@
                 <input type="number" step="0.01" name="amount" min="0.01" max="{{ $record->due_balance }}" required id="payment-amount">
             </label>
 
+            @include('cheques.editor',['side'=>'receive'])
             <label class="field">Notes (Optional)
                 <input type="text" name="notes">
             </label>
@@ -175,4 +176,6 @@
         history.replaceState(null, null, ' ');
     }
 </script>@endcan
+@include('cheques.account',['side'=>'customer'])
+@can('cheques.view_customer')<p class="muted mb-6">Total receivable exposure: {{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display(\App\Support\Money::add($record->due_balance,$record->cheque_hold)) }} · Due + Cheque Hold.</p>@endcan
 @endsection

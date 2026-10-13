@@ -180,6 +180,9 @@ class ResourceController extends Controller
         foreach ($def['fields'] as $key => $f) {
             if ($f[1] === 'select' || $f[1] === 'multiselect') {
                 $query = $f[3]::query();
+                if ($resource === 'expenses' && $f[3] === PaymentMethod::class) {
+                    $query->where('type', '!=', 'CHEQUE');
+                }
                 if ($resource === 'users' && $key === 'role_id' && ! auth()->user()->isAdministrator()) {
                     $query->where(fn ($q) => $q->where('name', '!=', 'Administrator')->orWhere('system', false));
                 }

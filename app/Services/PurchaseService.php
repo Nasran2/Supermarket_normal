@@ -41,6 +41,7 @@ class PurchaseService
             }
             if ($purchase) {
                 $purchase = Purchase::whereKey($purchase->id)->lockForUpdate()->firstOrFail();
+                app(ChequeService::class)->assertDocumentSafe($purchase, true);
                 if ($purchase->returns()->exists() || PurchaseReturn::where('replacement_purchase_id', $purchase->id)->orWhere('purchase_id', $purchase->id)->exists()) {
                     throw ValidationException::withMessages(['items' => 'Purchases linked to returns cannot be edited.']);
                 }
@@ -140,7 +141,7 @@ class PurchaseService
                     throw ValidationException::withMessages(['amount_paid' => 'For a partial payment, enter an amount greater than zero and less than the purchase total.']);
                 }
                 if (Money::compare($amount, 0) > 0) {
-                    app(PurchasePaymentService::class)->record($purchase, ['token' => (string) Str::uuid(), 'allow_change' => $mode === 'AUTO', 'amount' => $amount, 'payment_method_id' => $data['payment_method_id'], 'reference' => $data['payment_reference'] ?? null, 'take_from_register' => $data['take_from_register'] ?? true], $userId);
+                    app(PurchasePaymentService::class)->record($purchase, ['token' => (string) Str::uuid(), 'allow_change' => $mode === 'AUTO', 'amount' => $amount, 'payment_method_id' => $data['payment_method_id'], 'reference' => $data['payment_reference'] ?? null, 'take_from_register' => $data['take_from_register'] ?? true, 'cheques' => $data['cheques'] ?? []], $userId);
                 }
             }
             Audit::record('purchase.save', $purchase, $before, $purchase->load('items')->toArray());
@@ -180,6 +181,7 @@ class PurchaseService
     {
         DB::transaction(function () use ($purchase, $userId, $reason) {
             $p = Purchase::whereKey($purchase->id)->lockForUpdate()->firstOrFail();
+            app(ChequeService::class)->assertDocumentSafe($p);
             if ($p->returns()->exists() || PurchaseReturn::where('replacement_purchase_id', $p->id)->orWhere('purchase_id', $p->id)->exists()) {
                 throw ValidationException::withMessages(['reason' => 'Cancel the linked return instead of voiding this purchase.']);
             }

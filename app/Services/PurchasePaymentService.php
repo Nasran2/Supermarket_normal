@@ -83,6 +83,23 @@ class PurchasePaymentService
             if ($register !== null && $method->type !== 'CASH') {
                 $this->fail('The payment method changed while this payment was being recorded. Refresh and select it again.');
             }
+            if ($method->type === 'CHEQUE') {
+                if ($refund) {
+                    app(ChequeService::class)->fail('Cheque refunds are not supported. Resolve pending cheques and choose a cleared refund method.');
+                }
+                if (Money::compare($given, $amount) !== 0) {
+                    app(ChequeService::class)->fail('Cheque total exceeds the amount being paid.');
+                }
+                $entries = app(ChequeService::class)->entries($data['cheques'] ?? [], $amount, true);
+
+                return app(ChequeService::class)->supplierEntries($purchase, $entries, $userId, $data['token']);
+            }
+            if (! empty($data['cheques'])) {
+                app(ChequeService::class)->fail('Cheque entries require the Cheque payment method.');
+            }
+            if ($refund) {
+                app(ChequeService::class)->assertDocumentSafe($purchase);
+            }
             $movement = null;
             if ($register) {
                 $movement = RegisterMovement::create(['register_id' => $register->id, 'user_id' => $userId, 'type' => $refund ? 'IN' : 'OUT', 'amount' => $amount, 'description' => ($refund ? 'Supplier refund · ' : 'Supplier payment · ').Str::limit($purchase->reference, 180, '').' · purchase #'.$purchase->id]);

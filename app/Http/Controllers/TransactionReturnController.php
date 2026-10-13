@@ -113,7 +113,7 @@ class TransactionReturnController extends Controller
             app(NoReceiptSalesReturnService::class)->guard($request->user());
             $categories = Category::orderBy('name')->get();
             $suppliers = Supplier::where('active', true)->orderBy('name')->get();
-            $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
+            $methods = PaymentMethod::where('type', '!=', 'CHEQUE')->where('active', true)->orderBy('display_order')->get();
 
             return view('returns.no-receipt', compact('draft', 'categories', 'suppliers', 'methods'));
         }
@@ -146,7 +146,7 @@ class TransactionReturnController extends Controller
                 }
             }
         }
-        $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
+        $methods = PaymentMethod::where('type', '!=', 'CHEQUE')->where('active', true)->orderBy('display_order')->get();
         $suppliers = Supplier::where('active', true)->orderBy('name')->get();
         $customers = Customer::withDueBalances()->where('active', true)->orderBy('name')->get();
 
@@ -260,7 +260,7 @@ class TransactionReturnController extends Controller
         }
         $q['payment_charge'] = '0.00';
         if ($kind === 'sales' && Money::compare($q['must_pay'], 0) > 0 && ! ($data['add_to_due'] ?? false) && ! empty($data['payment_method_id'])) {
-            $method = PaymentMethod::whereKey($data['payment_method_id'])->where('active', true)->firstOrFail();
+            $method = PaymentMethod::where('type', '!=', 'CHEQUE')->whereKey($data['payment_method_id'])->where('active', true)->firstOrFail();
             $q['payment_charge'] = app(PaymentChargeService::class)->calculateCharge($method, $q['must_pay'], false, $q['replacement_value'])['customer_payable'];
             $q['payment_charge'] = Money::sub($q['payment_charge'], $q['must_pay']);
         }
@@ -344,7 +344,7 @@ class TransactionReturnController extends Controller
         abort_unless($request->user()->hasPermission('supplier_returns.view'), 403);
         $request->validate(['supplier_id' => 'nullable|integer', 'status' => 'nullable|in:PENDING,SENT,SETTLED,CANCELLED']);
         $rows = SupplierReturn::whereHas('saleReturn', fn ($q) => $q->visibleTo())->with('supplier', 'saleReturn.sale', 'items.layer.product', 'items.returnItem.product')->when($request->supplier_id, fn ($q, $id) => $q->where('supplier_id', $id))->when($request->status, fn ($q, $status) => $q->where('status', $status))->latest('id')->paginate(20)->withQueryString();
-        $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
+        $methods = PaymentMethod::where('type', '!=', 'CHEQUE')->where('active', true)->orderBy('display_order')->get();
 
         return view('returns.suppliers', compact('rows', 'methods'));
     }

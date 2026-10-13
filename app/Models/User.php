@@ -37,6 +37,12 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
+        if (str_starts_with($permission, 'cheques.') && ! config('features.cheque')) {
+            return false;
+        }
+        if ((str_starts_with($permission, 'expiry.') || $permission === 'purchase.expiry_edit') && ! config('features.expiry')) {
+            return false;
+        }
         if (str_starts_with($permission, 'barcode.') && ! config('features.barcode')) {
             return false;
         }

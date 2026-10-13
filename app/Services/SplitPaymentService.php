@@ -25,6 +25,10 @@ class SplitPaymentService
             if (! $method) {
                 throw ValidationException::withMessages(['payments.'.$i.'.payment_method_id' => 'Select an active payment method.']);
             }
+            if ($method->type === 'CHEQUE') {
+                abort_unless(config('features.cheque'), 404);
+                abort_unless(auth()->user()?->hasPermission('cheques.receive'), 403);
+            }
             $amount = Money::round((string) $part['amount']);
             // Each payment entry is independent, even when the method is repeated.
             // Thresholds refer to the whole discounted bill; fees apply to this entry's share.
@@ -69,6 +73,11 @@ class SplitPaymentService
             }
             if ($payment['method_type'] !== 'CASH' && Money::compare($paid, $payment['customer_payable']) !== 0) {
                 throw ValidationException::withMessages([$paidField => $payment['method_name'].' received must match its amount to collect.']);
+            }
+            if ($payment['method_type'] === 'CHEQUE') {
+                $payment['cheques'] = app(ChequeService::class)->entries($part['cheques'] ?? [], $payment['customer_payable']);
+            } elseif (! empty($part['cheques'])) {
+                throw ValidationException::withMessages(['cheques' => 'Cheque entries require the Cheque payment method.']);
             }
             $payments[] = $payment + ['amount_paid' => $paid, 'change' => $payment['method_type'] === 'CASH' && Money::compare($paid, $payment['customer_payable']) > 0 ? Money::sub($paid, $payment['customer_payable']) : '0.00', 'reference' => $part['reference'] ?? null];
         }

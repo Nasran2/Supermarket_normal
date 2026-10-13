@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\Cheques;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -33,7 +34,7 @@ class CheckoutRequest extends FormRequest
             'discount' => ['nullable', 'numeric', 'min:0', 'max:999999999', 'decimal:0,2'],
             'payment_method_id' => ['required_without:payments', Rule::prohibitedIf($this->has('payments')), 'integer', $activeMethod],
             'payments' => ['sometimes', 'required', 'array', 'list', 'min:1', 'max:10'],
-            'payments.*' => ['array:payment_method_id,amount,amount_paid,reference'],
+            'payments.*' => ['array:payment_method_id,amount,amount_paid,reference,cheques'],
             'payments.*.payment_method_id' => ['required', 'integer', $activeMethod],
             'payments.*.amount' => ['required', 'numeric', 'min:0', 'max:999999999999', 'decimal:0,2'],
             'payments.*.reference' => ['nullable', 'string', 'max:255'],
@@ -46,6 +47,6 @@ class CheckoutRequest extends FormRequest
                 'checkout_token' => ['required', 'uuid'], 'quote_hash' => ['required', 'string', 'size:64']];
         }
 
-        return $r;
+        return $r + Cheques::rules('payments.*.cheques') + Cheques::rules();
     }
 }

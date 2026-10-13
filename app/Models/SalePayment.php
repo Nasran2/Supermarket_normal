@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ChequePayment;
 use Illuminate\Database\Eloquent\Model;
 
 class SalePayment extends Model
 {
-    protected $fillable = ['sale_id', 'payment_method_id', 'payment_charge_rule_id', 'method_name', 'method_type', 'rule_name', 'charge_type', 'charge_value', 'charge_bearer', 'sale_amount', 'processing_charge', 'customer_payable', 'amount_paid', 'change', 'reference'];
+    use ChequePayment;
+
+    protected $fillable = ['cheque_id', 'settlement_status', 'sale_id', 'payment_method_id', 'payment_charge_rule_id', 'method_name', 'method_type', 'rule_name', 'charge_type', 'charge_value', 'charge_bearer', 'sale_amount', 'processing_charge', 'customer_payable', 'amount_paid', 'change', 'reference'];
 
     protected $casts = ['sale_amount' => 'decimal:2', 'processing_charge' => 'decimal:2', 'customer_payable' => 'decimal:2', 'amount_paid' => 'decimal:2', 'change' => 'decimal:2', 'charge_value' => 'decimal:4'];
 

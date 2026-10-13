@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Cheques;
 use Illuminate\Database\Eloquent\Model;
 
 class PaymentMethod extends Model
@@ -17,6 +18,29 @@ class PaymentMethod extends Model
         'charge_value' => 0,
         'has_charge' => false,
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('cheque-feature', function ($q) {
+            if (! config('features.cheque')) {
+                $q->where($q->getModel()->qualifyColumn('type'), '!=', 'CHEQUE');
+            }
+        });
+    }
+
+    public function scopeForContext($q, string $context)
+    {
+        $source = ['receive' => 'customer', 'issue' => 'own', 'transfer' => 'third_party'][$context] ?? null;
+
+        return $source && auth()->user()?->hasPermission('cheques.'.$context) && Cheques::setting('cheque_allow_'.$source) ? $q : $q->where('type', '!=', 'CHEQUE');
+    }
+
+    public function scopeForSupplier($q)
+    {
+        $allowed = (auth()->user()?->hasPermission('cheques.issue') && Cheques::setting('cheque_allow_own')) || (auth()->user()?->hasPermission('cheques.transfer') && Cheques::setting('cheque_allow_third_party'));
+
+        return $allowed ? $q : $q->where('type', '!=', 'CHEQUE');
+    }
 
     public function rules()
     {

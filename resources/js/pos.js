@@ -299,6 +299,7 @@ const payload = () => ({
     payment_method_id: p.id,
     amount: p.amount,
     reference: p.reference || null,
+    ...(methods.get(p.id)?.type === 'CHEQUE' ? { cheques: p.cheques || [] } : {}),
   })),
 });
 function showError(text) {
@@ -452,15 +453,23 @@ function add(p) {
   if (!syncQuantities()) return false;
   const groups = sellingPriceOptions(p);
   if (!groups.length) {
-    message.textContent = p.track_expiry ? `${p.name} has no sellable expiry stock. Check expired or undated batches.` : `${p.name} is out of stock.`;
+    message.textContent = p.track_expiry
+      ? `${p.name} has no sellable expiry stock. Check expired or undated batches.`
+      : `${p.name} is out of stock.`;
     return false;
   }
   if (groups.length === 1) {
     return addPrice(p, groups[0]);
   }
   message.textContent = '';
-  $('price-choice-title').textContent = p.track_expiry ? 'Choose price & expiry batch' : 'Choose selling price';
-  $('price-choice-hint').textContent = p.track_expiry ? (groups.some(group => group.fefo) ? 'Choose the selling price. The system uses the earliest valid expiry dates first, at this same price.' : 'Choose the price and expiry date printed on the product. Each option shows the stock available for that date.') : 'Choose a selling price to add to your cart. Each price shows the total available quantity.';
+  $('price-choice-title').textContent = p.track_expiry
+    ? 'Choose price & expiry batch'
+    : 'Choose selling price';
+  $('price-choice-hint').textContent = p.track_expiry
+    ? groups.some((group) => group.fefo)
+      ? 'Choose the selling price. The system uses the earliest valid expiry dates first, at this same price.'
+      : 'Choose the price and expiry date printed on the product. Each option shows the stock available for that date.'
+    : 'Choose a selling price to add to your cart. Each price shows the total available quantity.';
   choosingProduct = p;
   choosingPrices = groups;
   $('price-choice-product').textContent = p.name;
@@ -475,7 +484,11 @@ function add(p) {
   return true;
 }
 function addPrice(p, group) {
-  if (group.expired && !window.confirm('This batch is expired. Confirm the manager-approved sale of expired stock?')) return false;
+  if (
+    group.expired &&
+    !window.confirm('This batch is expired. Confirm the manager-approved sale of expired stock?')
+  )
+    return false;
   const unit = group.units.find((option) => option.id === p.unit_id);
   const key = stockChoiceKey({
     id: p.id,
@@ -939,7 +952,9 @@ if (customerDialog) {
     if (document.querySelector('dialog[open]')) return;
     form.reset();
     saveButton.textContent = pendingCompletion
-      ? 'Save customer & complete sale'
+      ? pendingCompletion === 'cheque'
+        ? 'Save & return to payment'
+        : 'Save customer & complete sale'
       : 'Save & select customer';
     name.setCustomValidity('');
     customerError.hidden = true;
@@ -1149,6 +1164,7 @@ function renderPayments() {
   $('payment-lines').innerHTML = payments
     .map((p, index) => {
       const m = methods.get(p.id);
+      if (m.type === 'CHEQUE' && !p.cheques?.length) p.cheques = [{}];
       const label = split ? `${m.name} · Payment ${index + 1}` : m.name;
       const tenderLabel =
         (editMode ? 'Revised ' : '') +
@@ -1159,7 +1175,33 @@ function renderPayments() {
           : editMode
             ? 'amount collected'
             : 'Amount collected');
-      return `<section class="payment-part" data-payment-key="${p.key}"><div class="payment-part-heading"><h3>${escape(label)}</h3>${split ? `<button class="icon-button" type="button" data-remove-payment="${p.key}" aria-label="Remove ${escape(label)}"><i data-lucide="x"></i></button>` : '<span class="badge green">Selected</span>'}</div><div class="payment-part-fields"><label class="field compact" ${split ? '' : 'hidden'}>Sale amount<input class="payment-money-input" type="text" inputmode="decimal" maxlength="15" data-field="amount" value="${escape(p.amount)}" aria-label="${escape(label)} sale amount" autocomplete="off"></label><label class="field compact">${tenderLabel}<input class="payment-money-input" type="text" inputmode="decimal" maxlength="15" data-field="paid" value="${escape(p.paid)}" aria-label="${escape(split ? `${label} ${tenderLabel}` : tenderLabel)}" autocomplete="off" ${m.type === 'CASH' ? '' : 'readonly'}></label></div><div class="part-collection"><span>${editMode ? 'Revised payable' : 'Collect'} <strong data-part-payable>—</strong></span><span class="part-fee" data-part-fee></span></div><details class="part-reference" ${p.reference ? 'open' : ''}><summary>Add reference (optional)</summary><label class="field compact"><span class="sr-only">${escape(label)} reference</span><input type="text" maxlength="255" data-field="reference" value="${escape(p.reference)}" aria-label="${escape(label)} reference"></label></details></section>`;
+      return `<section class="payment-part" data-payment-key="${p.key}"><div class="payment-part-heading"><h3>${escape(label)}</h3>${split ? `<button class="icon-button" type="button" data-remove-payment="${p.key}" aria-label="Remove ${escape(label)}"><i data-lucide="x"></i></button>` : '<span class="badge green">Selected</span>'}</div><div class="payment-part-fields"><label class="field compact" ${split ? '' : 'hidden'}>Sale amount<input class="payment-money-input" type="text" inputmode="decimal" maxlength="15" data-field="amount" value="${escape(p.amount)}" aria-label="${escape(label)} sale amount" autocomplete="off"></label><label class="field compact">${tenderLabel}<input class="payment-money-input" type="text" inputmode="decimal" maxlength="15" data-field="paid" value="${escape(p.paid)}" aria-label="${escape(split ? `${label} ${tenderLabel}` : tenderLabel)}" autocomplete="off" ${m.type === 'CASH' ? '' : 'readonly'}></label></div><div class="part-collection"><span>${editMode ? 'Revised payable' : 'Collect'} <strong data-part-payable>—</strong></span><span class="part-fee" data-part-fee></span></div><details class="part-reference" ${p.reference ? 'open' : ''}><summary>Add reference (optional)</summary><label class="field compact"><span class="sr-only">${escape(label)} reference</span><input type="text" maxlength="255" data-field="reference" value="${escape(p.reference)}" aria-label="${escape(label)} reference"></label></details>${
+        m.type === 'CHEQUE'
+          ? `<div class="cheque-pos-entries">${p.cheques
+              .map(
+                (c, i) =>
+                  `<fieldset class="cheque-entry" data-cheque-index="${i}"><legend>Cheque ${i + 1}</legend><div class="form-grid">${[
+                    ['amount', 'Amount', 'number'],
+                    ['cheque_date', 'Cheque date', 'date'],
+                    ['cheque_number', 'Cheque number', 'text'],
+                    ['bank_name', 'Bank', 'text'],
+                    ['branch', 'Branch', 'text'],
+                    ['drawer_name', 'Account holder / drawer', 'text'],
+                    ['account_number', 'Account number', 'text'],
+                  ]
+                    .map(
+                      ([key, title, type]) =>
+                        `<label class="field compact">${title}<input data-cheque-pos-field="${key}" type="${type}" ${type === 'number' ? 'min="0.01" step="0.01"' : ''} maxlength="${key === 'cheque_number' || key === 'account_number' ? 80 : 150}" value="${escape(c[key] || '')}" ${['amount', 'cheque_date', 'cheque_number', 'bank_name'].includes(key) ? 'required' : ''}></label>`,
+                    )
+                    .join(
+                      '',
+                    )}</div>${p.cheques.length > 1 ? '<button type="button" class="text-link text-danger" data-remove-pos-cheque>Remove cheque</button>' : ''}</fieldset>`,
+              )
+              .join(
+                '',
+              )}<button type="button" class="btn secondary small" data-add-pos-cheque ${pos.dataset.chequeMultiple === '0' ? 'hidden' : ''}>+ Add another cheque</button><p class="muted" data-pos-cheque-total></p></div>`
+          : ''
+      }</section>`;
     })
     .join('');
   window.refreshIcons?.();
@@ -1208,6 +1250,29 @@ function updateBalance() {
     }
     const paid = scaled(p.paid, 2),
       required = scaled(q.customer_payable, 2);
+    if (q.method_type === 'CHEQUE') {
+      const entries = p.cheques || [];
+      const total = entries.reduce((sum, c) => sum + scaled(c.amount || '0', 2), 0n);
+      const message = document.querySelector(
+        `[data-payment-key="${p.key}"] [data-pos-cheque-total]`,
+      );
+      if (message)
+        message.textContent = `Cheque total: ${asAmount(total)} · Remaining: ${asAmount(required - total)}`;
+      if (
+        !entries.length ||
+        total !== required ||
+        entries.some(
+          (c) =>
+            !/^\d+(?:\.\d{1,2})?$/.test(c.amount || '') ||
+            scaled(c.amount, 2) <= 0n ||
+            !/^\d{4}-\d{2}-\d{2}$/.test(c.cheque_date || '') ||
+            !(c.cheque_number || '').trim() ||
+            !(c.bank_name || '').trim() ||
+            (pos.dataset.chequeBranchRequired === '1' && !(c.branch || '').trim()),
+        )
+      )
+        ready = creditReady = false;
+    }
     received += paid;
     if (paid < required) due += required - paid;
     if (q.method_type === 'CASH' && paid > required) change += paid - required;
@@ -1241,6 +1306,7 @@ function updateBalance() {
 }
 async function getQuote() {
   clearTimeout(quoteTimer);
+  if (!dialog.open) return;
   const current = ++quoteNumber;
   quote = null;
   error.hidden = true;
@@ -1250,6 +1316,11 @@ async function getQuote() {
   if (editMode) $('edit-payment-adjustments').textContent = 'Calculating payment adjustment…';
   if (!payments.length) {
     $('payment-payable').textContent = 'Choose a method';
+    return;
+  }
+  if (!$('customer').value && payments.some((p) => methods.get(p.id)?.type === 'CHEQUE')) {
+    $('payment-payable').textContent = 'Select a customer';
+    openCheckoutCustomer('cheque');
     return;
   }
   if (payments.some((p) => !/^\d+(?:\.\d{1,2})?$/.test(p.amount))) {
@@ -1309,6 +1380,17 @@ function amountInput(input) {
   else if (input.dataset.field === 'paid') updateBalance();
 }
 $('payment-lines').addEventListener('input', (e) => {
+  const chequeInput = e.target.closest('[data-cheque-pos-field]');
+  if (chequeInput) {
+    const part = payments.find(
+      (p) => p.key === Number(chequeInput.closest('[data-payment-key]').dataset.paymentKey),
+    );
+    const i = Number(chequeInput.closest('[data-cheque-index]').dataset.chequeIndex);
+    part.cheques[i][chequeInput.dataset.chequePosField] = chequeInput.value;
+    updateBalance();
+    if (!quote) scheduleQuote();
+    return;
+  }
   const input = e.target.closest('[data-field]');
   if (input) amountInput(input);
 });
@@ -1325,6 +1407,22 @@ $('payment-lines').addEventListener('keydown', (e) => {
   }
 });
 $('payment-lines').addEventListener('click', (e) => {
+  const chequeButton = e.target.closest('[data-add-pos-cheque],[data-remove-pos-cheque]');
+  if (chequeButton && !pending) {
+    const part = payments.find(
+      (p) => p.key === Number(chequeButton.closest('[data-payment-key]').dataset.paymentKey),
+    );
+    if (chequeButton.hasAttribute('data-add-pos-cheque')) {
+      if (part.cheques.length < 30) part.cheques.push({});
+    } else
+      part.cheques.splice(
+        Number(chequeButton.closest('[data-cheque-index]').dataset.chequeIndex),
+        1,
+      );
+    renderPayments();
+    updateBalance();
+    return;
+  }
   const button = e.target.closest('[data-remove-payment]');
   if (!button || pending) return;
   payments = payments.filter((p) => p.key !== Number(button.dataset.removePayment));
@@ -1476,27 +1574,37 @@ document.addEventListener('keydown', (e) => {
   }
 });
 const checkoutCustomerDialog = $('checkout-customer-dialog');
+function openCheckoutCustomer(mode) {
+  if (!checkoutCustomerDialog || checkoutCustomerDialog.open) return;
+  pendingCompletion = mode;
+  const select = $('checkout-customer-select');
+  select.replaceChildren(new Option('Select a customer', ''));
+  [...$('customer').options]
+    .filter((option) => option.value)
+    .forEach((option) => select.add(new Option(option.text, option.value)));
+  select.setCustomValidity('');
+  $('checkout-walk-in').hidden = mode !== 'paid';
+  $('checkout-customer-title').textContent =
+    mode === 'cheque' ? 'Customer required for cheques' : 'Select a customer';
+  $('checkout-customer-help').textContent =
+    mode === 'cheque'
+      ? 'Select an existing customer or add a new customer to receive these cheques. Your payment details will be kept.'
+      : mode === 'due'
+        ? 'A named customer is required to track this unpaid balance. Select one or add a new customer.'
+        : 'Select or add a customer for this sale, or continue as a walk-in customer.';
+  $('use-checkout-customer').textContent =
+    mode === 'cheque' ? 'Use customer & return to payment' : 'Use customer & complete';
+  document.querySelector('.checkout-customer-balance').hidden = mode !== 'due';
+  $('checkout-customer-due').textContent = $('payment-balance').textContent;
+  dialog.close();
+  checkoutCustomerDialog.showModal();
+  select.focus();
+}
 function requestCompletion(mode) {
   const button = mode === 'due' ? $('confirm-due') : $('confirm-payment');
   if (!quote || pending || button?.disabled) return;
   if (!editMode && mode === 'due' && !$('customer').value) {
-    pendingCompletion = mode;
-    const select = $('checkout-customer-select');
-    select.replaceChildren(new Option('Select a customer', ''));
-    [...$('customer').options]
-      .filter((option) => option.value)
-      .forEach((option) => select.add(new Option(option.text, option.value)));
-    select.setCustomValidity('');
-    $('checkout-walk-in').hidden = mode === 'due';
-    $('checkout-customer-help').textContent =
-      mode === 'due'
-        ? 'A named customer is required to track this unpaid balance. Select one or add a new customer.'
-        : 'Select or add a customer for this sale, or continue as a walk-in customer.';
-    document.querySelector('.checkout-customer-balance').hidden = mode !== 'due';
-    $('checkout-customer-due').textContent = $('payment-balance').textContent;
-    dialog.close();
-    checkoutCustomerDialog.showModal();
-    select.focus();
+    openCheckoutCustomer(mode);
     return;
   }
   completeCheckout(mode);
@@ -1507,7 +1615,7 @@ async function resumeCustomerCheckout() {
   dialog.showModal();
   await getQuote();
   focusPaymentAmount();
-  if (mode) requestCompletion(mode);
+  if (mode && mode !== 'cheque') requestCompletion(mode);
 }
 if (checkoutCustomerDialog) {
   const backToPayment = () => {
@@ -1536,7 +1644,7 @@ if (checkoutCustomerDialog) {
   $('checkout-customer-select').addEventListener('change', (event) =>
     event.target.setCustomValidity(''),
   );
-  $('checkout-add-customer').addEventListener('click', () => {
+  $('checkout-add-customer')?.addEventListener('click', () => {
     checkoutCustomerDialog.close();
     $('add-customer').click();
   });
@@ -1547,8 +1655,8 @@ if (checkoutCustomerDialog) {
     dialog.showModal();
     completeCheckout('paid');
   });
-  $('confirm-due').addEventListener('click', () => requestCompletion('due'));
-  $('leave-unpaid').addEventListener('click', () => {
+  $('confirm-due')?.addEventListener('click', () => requestCompletion('due'));
+  $('leave-unpaid')?.addEventListener('click', () => {
     if (pending) return;
     const method =
       [...methods.values()].find((method) => method.type === 'CASH') ||

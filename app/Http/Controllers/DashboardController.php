@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cheque;
 use App\Models\Expense;
 use App\Models\Product;
 use App\Models\Sale;
@@ -11,6 +12,7 @@ use App\Services\ExpiryReportService;
 use App\Services\ProfitLossService;
 use App\Services\RegisterService;
 use App\Services\ReportService;
+use App\Support\Cheques;
 use App\Support\Expiry;
 use Illuminate\Http\Request;
 
@@ -65,6 +67,8 @@ class DashboardController extends Controller
             $expiredBatches = app(ExpiryReportService::class)->query(['tab' => 'expired'])->count();
         }
 
-        return view('dashboard', compact('expiryRows', 'expiredBatches', 'period', 'from', 'to', 'summary', 'transactions', 'payments', 'days', 'overview', 'lowStock', 'recentSales', 'recentExpenses', 'topProducts', 'register'));
+        $chequeAlerts = config('features.cheque') && $request->user()->hasPermission('cheques.dashboard') && Cheques::setting('cheque_dashboard') ? Cheque::visibleTo()->with('customer', 'supplier')->dueSoon()->limit(6)->get() : collect();
+
+        return view('dashboard', compact('chequeAlerts', 'expiryRows', 'expiredBatches', 'period', 'from', 'to', 'summary', 'transactions', 'payments', 'days', 'overview', 'lowStock', 'recentSales', 'recentExpenses', 'topProducts', 'register'));
     }
 }

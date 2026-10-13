@@ -402,7 +402,7 @@ class HrService
                     $this->fail('staff_id', 'Exited staff cannot receive new advances.');
                 }
             }
-            $method = PaymentMethod::whereKey($data['payment_method_id'])->where('active', true)->firstOrFail();
+            $method = PaymentMethod::where('type', '!=', 'CHEQUE')->whereKey($data['payment_method_id'])->where('active', true)->firstOrFail();
             $register = $method->type === 'CASH' ? app(RegisterService::class)->current(auth()->id(), true) : null;
             if ($method->type === 'CASH' && ! $register) {
                 $this->fail('payment_method_id', 'Open your register before making a cash payment.');

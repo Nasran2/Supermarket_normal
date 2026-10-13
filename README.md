@@ -189,3 +189,9 @@ Implementation files, verification results and local/hosting deployment details 
 ### Optional Barcode Labels
 
 Set `BARCODE=true` and run `php artisan migrate` followed by `php artisan optimize:clear` to enable barcode generation, scanning, labels and presets. `BARCODE=false` hides the module and preserves stored data. See [Barcode System](docs/BARCODE_SYSTEM.md) for setup/printing/permissions and [Development Report](docs/BARCODE_DEVELOPMENT_REPORT.md) for implementation and QA results.
+
+## Optional cheque management
+
+Set `CHEQUE=true`, run `php artisan migrate --force` and `php artisan optimize:clear` to enable customer, own and third-party cheques. POS/customer collections and purchase/supplier payments accept multiple instruments. Due moves to Cheque Hold until manual clearance; returned cheques restore Due. Third-party transfers use one physical cheque and update both accounts atomically without business cash/bank movements. Cash drawer totals and revenue/COGS are unaffected by cheque status.
+
+`CHEQUE=false` hides every cheque entry point, settings, reports, dashboard/account cards and role permissions, and blocks direct cheque URLs while retaining all history and permission assignments. See [cheque workflows, permissions and verification](docs/CHEQUE_MANAGEMENT.md).

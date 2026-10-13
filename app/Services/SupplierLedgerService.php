@@ -31,7 +31,19 @@ class SupplierLedgerService
             }
             foreach ($purchase->payments as $payment) {
                 $refund = $payment->kind === 'REFUND';
-                $add($payment->paid_at, $refund ? 'Refund' : ($payment->kind === 'OPENING' ? 'Opening payment' : 'Payment'), $payment->method_name.($payment->reference ? ' · '.$payment->reference : '').($payment->notes ? ' · '.$payment->notes : ''), $refund ? $payment->amount : '0.00', $refund ? '0.00' : $payment->amount, $payment->amount, '2-'.$payment->id);
+                $add($payment->paid_at, $refund ? 'Refund' : ($payment->kind === 'OPENING' ? 'Opening payment' : 'Payment'), ($payment->cheque_id && ! config('features.cheque') ? 'Account payment' : $payment->method_name).($payment->reference && (! $payment->cheque_id || config('features.cheque')) ? ' · '.$payment->reference : '').($payment->notes ? ' · '.$payment->notes : ''), $refund ? $payment->amount : '0.00', $refund ? '0.00' : $payment->amount, $payment->amount, '2-'.$payment->id);
+            }
+            foreach ($purchase->payments->whereNotNull('cheque_id') as $payment) {
+                $description = config('features.cheque') ? 'Cheque #'.$payment->cheque->cheque_number : 'Account payment';
+                if (in_array($payment->settlement_status, ['RETURNED', 'CANCELLED'])) {
+                    $add($payment->updated_at, config('features.cheque') ? 'CHEQUE '.$payment->settlement_status : 'Payment reversal', $description, $payment->amount, '0.00', $payment->amount, '2r-'.$payment->id);
+                }
+                if (config('features.cheque')) {
+                    $add($payment->paid_at, 'CHEQUE HOLD', $description.' · awaiting clearance', '0.00', '0.00', $payment->amount, '2h-'.$payment->id);
+                    if ($payment->settlement_status === 'PASSED') {
+                        $add($payment->cheque->passed_at, 'CHEQUE PASSED', $description.' · settled', '0.00', '0.00', $payment->amount, '2p-'.$payment->id);
+                    }
+                }
             }
             if ($purchase->status !== 'ACTIVE' && $purchase->status !== 'RETURN_CANCELLED') {
                 $void = ($audits[$purchase->id] ?? collect())->firstWhere('action', 'purchase.void');

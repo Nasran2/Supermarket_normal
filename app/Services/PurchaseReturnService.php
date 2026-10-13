@@ -157,6 +157,7 @@ class PurchaseReturnService
 
         return DB::transaction(function () use ($original, $data, $user) {
             $p = Purchase::whereKey($original->id)->lockForUpdate()->firstOrFail();
+            app(ChequeService::class)->assertDocumentSafe($p);
             Supplier::whereKey($p->supplier_id)->lockForUpdate()->firstOrFail();
             $existing = PurchaseReturn::where('token', $data['token'])->first();
             if ($existing) {

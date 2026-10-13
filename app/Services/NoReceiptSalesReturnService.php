@@ -371,7 +371,7 @@ class NoReceiptSalesReturnService
 
         return DB::transaction(function () use ($data, $user) {
             $ids = SaleItem::whereIn('id', array_filter(array_column($data['items'], 'sale_item_id')))->pluck('sale_id')->unique()->sort();
-            Sale::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+            Sale::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->each(fn ($s) => app(ChequeService::class)->assertDocumentSafe($s));
             if (! empty($data['customer_id'])) {
                 Customer::whereKey($data['customer_id'])->lockForUpdate()->firstOrFail();
             }

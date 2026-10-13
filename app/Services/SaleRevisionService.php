@@ -20,6 +20,7 @@ class SaleRevisionService
 
     public function assertEditable(Sale $sale, int $userId): void
     {
+        app(ChequeService::class)->assertDocumentSafe($sale, true);
         $register = $sale->register;
         $user = User::find($userId);
 
@@ -78,6 +79,9 @@ class SaleRevisionService
                 throw ValidationException::withMessages(['payment' => 'Prices, stock or payment rules changed. Review payment again before saving.']);
             }
             $payments = $this->payments->settle($data, $quote);
+            if (collect($payments)->contains(fn ($p) => $p['method_type'] === 'CHEQUE')) {
+                throw ValidationException::withMessages(['payments' => 'Use Pay due to receive a cheque for an existing invoice.']);
+            }
             // Preserve reversed expenses and full payment snapshots in revision history.
             Expense::where('sale_id', $sale->id)->where('type', 'AUTOMATIC')->update(['status' => 'REVERSED', 'sale_payment_id' => null]);
             $sale->items()->delete();

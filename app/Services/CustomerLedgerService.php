@@ -17,14 +17,31 @@ class CustomerLedgerService
         $add = function ($date, $type, $description, $debit, $credit) use ($entries) {
             $entries->push(['date' => Carbon::parse($date), 'type' => $type, 'description' => $description, 'debit' => $debit, 'credit' => $credit]);
         };
+        $chequeEntry = function ($payment, $amount) use ($add) {
+            if (! $payment->cheque_id) {
+                return;
+            }
+            $label = config('features.cheque') ? 'Cheque #'.$payment->cheque->cheque_number : 'Account payment';
+            if (in_array($payment->settlement_status, ['RETURNED', 'CANCELLED'])) {
+                $add($payment->updated_at, config('features.cheque') ? 'CHEQUE '.$payment->settlement_status : 'Payment reversal', $label, $amount, '0.00');
+            }
+            if (config('features.cheque')) {
+                $add($payment->created_at, 'CHEQUE HOLD', $label.' · '.Money::display($amount).' awaiting clearance', '0.00', '0.00');
+                if ($payment->settlement_status === 'PASSED') {
+                    $add($payment->cheque->passed_at, 'CHEQUE PASSED', $label.' · '.Money::display($amount).' settled', '0.00', '0.00');
+                }
+            }
+        };
         $add($customer->created_at, 'Opening Balance', 'Old balance brought forward', $customer->opening_due, '0.00');
         foreach ($customer->sales()->visibleTo()->whereIn('status', ['ACTIVE', 'RETURN_CANCELLED'])->with('payments', 'collections')->get() as $sale) {
             $add($sale->sold_at, 'Invoice', 'Invoice '.$sale->invoice, $sale->customer_payable, '0.00');
             foreach ($sale->payments as $p) {
-                $add($sale->sold_at, 'POS Payment', $sale->invoice.' · '.$p->method_name, '0.00', Money::sub($p->amount_paid, $p->change));
+                $add($sale->sold_at, $p->cheque_id && config('features.cheque') ? 'CHEQUE RECEIVED' : 'POS Payment', $sale->invoice.' · '.($p->cheque_id && ! config('features.cheque') ? 'Account payment' : $p->method_name), '0.00', Money::sub($p->amount_paid, $p->change));
+                $chequeEntry($p, Money::sub($p->amount_paid, $p->change));
             }
             foreach ($sale->collections as $p) {
-                $add($p->collected_at, 'Due Collection', $sale->invoice.' · '.$p->method_name, '0.00', $p->amount);
+                $add($p->collected_at, $p->cheque_id && config('features.cheque') ? 'CHEQUE RECEIVED' : 'Due Collection', $sale->invoice.' · '.($p->cheque_id && ! config('features.cheque') ? 'Account payment' : $p->method_name), '0.00', $p->amount);
+                $chequeEntry($p, $p->amount);
             }
             if ($sale->status === 'RETURN_CANCELLED') {
                 $cash = Money::sum($sale->payments->map(fn ($p) => Money::sub($p->amount_paid, $p->change)));
@@ -34,7 +51,8 @@ class CustomerLedgerService
         foreach (SalesVisibility::apply($customer->customerPayments()->getQuery(), 'customer_payments.user_id')->with('allocations')->get() as $p) {
             $opening = Money::sum($p->allocations->where('type', 'OPENING_BALANCE')->pluck('amount'));
             if (Money::compare($opening, 0) > 0) {
-                $add($p->payment_date, 'Payment', 'Opening due payment #'.$p->id, '0.00', $opening);
+                $add($p->payment_date, $p->cheque_id && config('features.cheque') ? 'CHEQUE RECEIVED' : 'Payment', 'Opening due payment #'.$p->id, '0.00', $opening);
+                $chequeEntry($p, $opening);
             }
         }
         foreach (SaleReturn::whereHas('sale', fn ($q) => $q->visibleTo()->where('customer_id', $customer->id))->get() as $r) {

@@ -110,6 +110,9 @@ class Permissions
         foreach (['view' => 'View labels', 'print' => 'Print labels', 'print_bulk' => 'Print multiple products', 'manage_presets' => 'Manage label presets', 'manage_settings' => 'Manage barcode settings', 'generate' => 'Generate barcodes', 'edit_product_barcode' => 'Edit product barcodes', 'view_history' => 'View print history'] as $action => $label) {
             $add('barcode.'.$action, 'Barcode labels', $label, $label.'.');
         }
+        foreach (['view' => 'View cheque management', 'create' => 'Create cheque records', 'receive' => 'Receive customer cheques', 'issue' => 'Issue own cheques', 'transfer' => 'Transfer customer cheques', 'reverse_transfer' => 'Reverse a pending transfer', 'pass' => 'Mark cheques passed', 'return' => 'Mark cheques returned', 'cancel' => 'Cancel pending cheques', 'view_customer' => 'View customer cheque balances/history', 'view_supplier' => 'View supplier cheque balances/history', 'manage_settings' => 'Manage cheque settings and bank accounts', 'view_reports' => 'View cheque reports', 'export' => 'Export cheque PDF/CSV reports', 'dashboard' => 'View dashboard cheque alerts', 'override_action_date' => 'Override cheque action date'] as $action => $label) {
+            $add('cheques.'.$action, 'Cheques', $label, $label.'.');
+        }
         foreach (Hr::permissions() as $name => [$group, $label]) {
             $add($name, $group, $label, $label.'.', []);
         }
@@ -119,7 +122,7 @@ class Permissions
 
     public static function visible(): array
     {
-        return array_filter(self::all(), fn ($info, $name) => (config('features.barcode') || ! str_starts_with($name, 'barcode.')) && (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
+        return array_filter(self::all(), fn ($info, $name) => (config('features.cheque') || ! str_starts_with($name, 'cheques.')) && (config('features.barcode') || ! str_starts_with($name, 'barcode.')) && (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
     }
 
     public static function info(string $name): array

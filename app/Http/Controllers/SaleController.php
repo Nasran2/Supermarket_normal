@@ -55,7 +55,7 @@ class SaleController extends Controller
     {
         $sale->load(['items.returns', 'user', 'customer', 'register', 'payments.expense', 'voider', 'returns.items.item', 'returns.user', 'collections.user']);
         $customers = Customer::withDueBalances()->where('active', true)->orderBy('name')->get();
-        $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
+        $methods = PaymentMethod::forContext('receive')->where('active', true)->orderBy('display_order')->get();
         $returnable = app(SaleAftercareService::class)->returnableLines($sale);
 
         return view('sales.show', compact('sale', 'customers', 'methods', 'returnable'));
@@ -66,7 +66,7 @@ class SaleController extends Controller
         $service->assertEditable($sale, auth()->id());
         $sale->load('items.product.unit', 'items.product.conversions.unit', 'items.allocations.layer', 'customer', 'payments');
         $register = $sale->register;
-        $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
+        $methods = PaymentMethod::forContext('receive')->where('active', true)->orderBy('display_order')->get();
         $customers = Customer::withDueBalances()->where('active', true)->orWhere('id', $sale->customer_id)->orderBy('name')->get();
         $categories = Category::orderBy('name')->get();
         $editingSale = $sale;
@@ -140,6 +140,9 @@ class SaleController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('sales.view') || ($sale->user_id === auth()->id() && auth()->user()->hasPermission('sales.create')), 403);
         $sale->load(['items.allocations', 'user', 'customer', 'payments', 'returns', 'collections']);
+        if (config('features.cheque')) {
+            $sale->load('payments.cheque');
+        }
 
         return view('sales.receipt', compact('sale'));
     }

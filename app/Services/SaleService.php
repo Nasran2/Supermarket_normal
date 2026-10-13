@@ -157,6 +157,11 @@ class SaleService
                 app(StockLayerService::class)->consume($p, $item, $line['allocations'], 'SALE', $invoice, $user->id);
             }
             foreach ($payments as $part) {
+                if ($part['method_type'] === 'CHEQUE') {
+                    app(ChequeService::class)->receiveForSale($sale, $part['cheques'], $user->id);
+
+                    continue;
+                }
                 $payment = $sale->payments()->create([
                     'payment_method_id' => $part['payment_method_id'], 'payment_charge_rule_id' => $part['rule_id'],
                     'method_name' => $part['method_name'], 'method_type' => $part['method_type'], 'rule_name' => $part['rule_name'],
@@ -203,6 +208,7 @@ class SaleService
                 throw ValidationException::withMessages(['reason' => 'This register is closed. Completed register records cannot be changed (unless administrator).']);
             }
             $sale = Sale::whereKey($sale->id)->lockForUpdate()->firstOrFail();
+            app(ChequeService::class)->assertDocumentSafe($sale);
             if ($sale->status !== 'ACTIVE') {
                 throw ValidationException::withMessages(['reason' => 'This sale has already been voided.']);
             }

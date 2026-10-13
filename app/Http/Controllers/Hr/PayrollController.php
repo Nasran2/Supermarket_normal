@@ -41,7 +41,7 @@ class PayrollController extends Controller
     public function show(Payroll $payroll)
     {
         $payroll->load('staff', 'payments.user');
-        $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
+        $methods = PaymentMethod::where('type', '!=', 'CHEQUE')->where('active', true)->orderBy('display_order')->get();
 
         return view('hr.payroll-show', compact('payroll', 'methods'));
     }
@@ -73,7 +73,7 @@ class PayrollController extends Controller
         $filters = $request->validate(['from' => 'nullable|date_format:Y-m-d', 'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])], 'kind' => 'nullable|in:SALARY,ADVANCE']);
         $rows = StaffPayment::with('staff', 'payroll', 'user')->when($filters['from'] ?? null, fn ($q, $v) => $q->whereDate('date', '>=', $v))->when($filters['to'] ?? null, fn ($q, $v) => $q->whereDate('date', '<=', $v))->when($filters['kind'] ?? null, fn ($q, $v) => $q->where('kind', $v))->latest('date')->latest('id')->paginate(20)->withQueryString();
         $staff = Staff::where('status', '!=', 'EXITED')->orderBy('name')->get();
-        $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
+        $methods = PaymentMethod::where('type', '!=', 'CHEQUE')->where('active', true)->orderBy('display_order')->get();
 
         return view('hr.payments', compact('rows', 'staff', 'methods', 'filters'));
     }

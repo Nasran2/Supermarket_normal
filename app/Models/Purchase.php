@@ -32,25 +32,35 @@ class Purchase extends Model
 
     public function scopeWithPaymentTotals($query)
     {
-        return $query->withSum(['payments as paid_total' => fn ($q) => $q->whereIn('kind', ['PAYMENT', 'OPENING'])], 'amount')
-            ->withSum(['payments as refunded_total' => fn ($q) => $q->where('kind', 'REFUND')], 'amount');
+        return $query->withSum(['payments as paid_total' => fn ($q) => $q->effective()->whereIn('kind', ['PAYMENT', 'OPENING'])], 'amount')
+            ->withSum(['payments as refunded_total' => fn ($q) => $q->effective()->where('kind', 'REFUND')], 'amount');
     }
 
     public function getPaidAmountAttribute(): string
     {
         if ($this->relationLoaded('payments')) {
-            return Money::sub(Money::sum($this->payments->whereIn('kind', ['PAYMENT', 'OPENING'])->pluck('amount')), Money::sum($this->payments->where('kind', 'REFUND')->pluck('amount')));
+            return Money::sub(Money::sum($this->payments->where('is_effective', true)->whereIn('kind', ['PAYMENT', 'OPENING'])->pluck('amount')), Money::sum($this->payments->where('is_effective', true)->where('kind', 'REFUND')->pluck('amount')));
         }
         if (array_key_exists('paid_total', $this->getAttributes())) {
             return Money::sub((string) ($this->paid_total ?? 0), (string) ($this->refunded_total ?? 0));
         }
 
-        return Money::round((string) ($this->payments()->selectRaw("SUM(CASE WHEN kind = 'REFUND' THEN -amount ELSE amount END) as net_paid")->value('net_paid') ?? 0));
+        return Money::round((string) ($this->payments()->effective()->selectRaw("SUM(CASE WHEN kind = 'REFUND' THEN -amount ELSE amount END) as net_paid")->value('net_paid') ?? 0));
+    }
+
+    public function getSettledAmountAttribute(): string
+    {
+        return Money::round((string) ($this->payments()->settled()->selectRaw("SUM(CASE WHEN kind='REFUND' THEN -amount ELSE amount END) as amount")->value('amount') ?? 0));
     }
 
     public function getDueAmountAttribute(): ?string
     {
         return $this->payment_tracking ? ($this->status === 'ACTIVE' ? Money::sub(Money::sub(Money::sub($this->total, $this->paid_amount), (string) $this->returns()->sum('due_reduction')), (string) ReturnAccountAllocation::where('purchase_id', $this->id)->where('status', 'ACTIVE')->sum('amount')) : '0.00') : null;
+    }
+
+    public function getChequeHoldAttribute(): string
+    {
+        return Money::round((string) $this->payments()->where('settlement_status', 'PENDING')->sum('amount'));
     }
 
     public function getPaymentStatusAttribute(): string
@@ -62,7 +72,7 @@ class Purchase extends Model
             return 'Unrecorded';
         }
         if (Money::compare($this->due_amount, 0) <= 0) {
-            return 'Paid';
+            return config('features.cheque') && Money::compare($this->cheque_hold, 0) > 0 ? 'Cheque Hold' : 'Paid';
         }
 
         return Money::compare($this->paid_amount, 0) > 0 ? 'Partial' : 'Unpaid';

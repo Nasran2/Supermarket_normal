@@ -24,9 +24,9 @@ class RegisterService
     {
         return $query->withSum(['payments as cash_collections' => fn ($q) => $q->where('method_type', 'CASH')], 'amount_paid')
             ->withSum(['payments as cash_change' => fn ($q) => $q->where('method_type', 'CASH')], 'change')
-            ->withSum('payments as total_collections', 'amount_paid')->withSum('payments as total_change', 'change')
+            ->withSum(['payments as total_collections' => fn ($q) => $q->where('method_type', '!=', 'CHEQUE')], 'amount_paid')->withSum('payments as total_change', 'change')
             ->withSum(['collections as due_cash' => fn ($q) => $q->where('method_type', 'CASH')], 'amount')
-            ->withSum('collections as due_collections', 'amount')
+            ->withSum(['collections as due_collections' => fn ($q) => $q->where('method_type', '!=', 'CHEQUE')], 'amount')
             ->withSum(['returns as cash_refunds' => fn ($q) => $q->where('method_type', 'CASH')], 'refund_amount')
             ->withSum('returns as total_refunds', 'refund_amount')->withSum('returns as returned_amount', 'amount')
             ->withCount(['sales as transactions_count' => fn ($q) => $q->where('status', 'ACTIVE')])
@@ -52,6 +52,9 @@ class RegisterService
             'due_collections' => Money::round((string) ($register->due_collections ?? 0)), 'refunds' => Money::round((string) ($register->total_refunds ?? 0)), 'returns' => Money::round((string) ($register->returned_amount ?? 0))];
         $customerReversals = ReturnSettlement::where('register_id', $register->id)->whereNotNull('sale_return_id')->where('kind', 'REVERSAL');
         $summary['collections'] = Money::add($summary['collections'], (string) (clone $customerReversals)->sum('amount'));
+        if (config('features.cheque')) {
+            $summary['cheque_pending'] = Money::add((string) $register->payments()->where('settlement_status', 'PENDING')->sum('amount_paid'), (string) $register->collections()->where('settlement_status', 'PENDING')->sum('amount'));
+        }
         if (! $detailed) {
             return $summary;
         }

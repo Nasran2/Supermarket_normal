@@ -8,7 +8,7 @@
     "name": "pos-price-options"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DeRrQfTW.css",
+    "file": "assets/app-Dx9OiVjG.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -17,7 +17,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-B4z1uQYq.js",
+    "file": "assets/app-DBgdSm3j.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -59,7 +59,7 @@
     ]
   },
   "resources/js/pos.js": {
-    "file": "assets/pos-CCQu6w1_.js",
+    "file": "assets/pos-B-YheGAP.js",
     "name": "pos",
     "src": "resources/js/pos.js",
     "isEntry": true,

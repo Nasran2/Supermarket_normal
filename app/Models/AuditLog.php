@@ -10,6 +10,15 @@ class AuditLog extends Model
 
     protected $casts = ['before' => 'array', 'after' => 'array'];
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope('cheque-feature', function ($q) {
+            if (! config('features.cheque')) {
+                $q->where('action', 'not like', 'cheque.%');
+            }
+        });
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

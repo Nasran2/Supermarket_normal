@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ChequePayment;
 use Illuminate\Database\Eloquent\Model;
 
 class CustomerPayment extends Model
 {
+    use ChequePayment;
+
     protected $guarded = ['id'];
 
     protected $casts = [

@@ -20,6 +20,7 @@ use App\Support\Audit;
 use App\Support\Expiry;
 use App\Support\Hr;
 use App\Support\Money;
+use App\Support\Permissions;
 use App\Support\Resources;
 use App\Support\SalesVisibility;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -38,6 +39,7 @@ class ResourceService
         if (! config('features.barcode')) {
             $ids = array_diff($ids, Permission::where('name', 'like', 'barcode.%')->pluck('id')->all());
         }
+        $ids = array_intersect($ids, Permission::whereIn('name', array_keys(Permissions::visible()))->pluck('id')->all());
         $allowed = auth()->user()->role->permissions->pluck('id')->all();
         if (array_diff($ids, $allowed)) {
             throw ValidationException::withMessages(['permissions' => 'You cannot grant permissions beyond your own access.']);
@@ -234,6 +236,13 @@ class ResourceService
                     if ($target->system && $target->name === 'Administrator' && ! auth()->user()->isAdministrator()) {
                         throw ValidationException::withMessages(['role_id' => 'Only an administrator can assign Administrator access.']);
                     }
+                    if (! auth()->user()->isAdministrator() && (! $id || $record->role_id != $target->id)) {
+                        $hiddenNames = array_diff(array_keys(Permissions::all()), array_keys(Permissions::visible()));
+                        $hiddenTarget = $target->permissions->whereIn('name', $hiddenNames)->pluck('id')->all();
+                        if (array_diff($hiddenTarget, auth()->user()->role->permissions->pluck('id')->all())) {
+                            throw ValidationException::withMessages(['role_id' => 'You cannot assign a role with stored feature permissions beyond your own access.']);
+                        }
+                    }
                     $this->guardPermissions($target->permissions->pluck('id')->all());
                     $this->guardSalesVisibility($target);
                     if ($id === auth()->id() && (! $data['active'] || $data['role_id'] != auth()->user()->role_id)) {
@@ -244,6 +253,19 @@ class ResourceService
                     }
                     if (empty($values['password'])) {
                         unset($values['password']);
+                    }
+                }
+                if ($resource === 'payment-methods') {
+                    if ($id && $record->type === 'CHEQUE' && (($values['type'] ?? $record->type) !== 'CHEQUE' || ($values['code'] ?? $record->code) !== $record->code)) {
+                        throw ValidationException::withMessages(['type' => 'The cheque payment type/code is protected. Disable the method or the CHEQUE feature instead.']);
+                    }
+                    if (($values['type'] ?? '') === 'CHEQUE') {
+                        abort_unless(config('features.cheque'), 404);
+                        if (PaymentMethod::where('type', 'CHEQUE')->when($id, fn ($q) => $q->where('id', '!=', $id))->exists()) {
+                            throw ValidationException::withMessages(['type' => 'Use the existing Cheque payment method.']);
+                        }
+                        $values['has_charge'] = false;
+                        $values['charge_value'] = 0;
                     }
                 }
                 if ($resource === 'payment-rules') {
@@ -266,7 +288,7 @@ class ResourceService
                             throw ValidationException::withMessages(['expense' => 'This expense belongs to a closed register.']);
                         }
                     }
-                    $method = PaymentMethod::whereKey($values['payment_method_id'])->where('active', true)->lockForUpdate()->first();
+                    $method = PaymentMethod::where('type', '!=', 'CHEQUE')->whereKey($values['payment_method_id'])->where('active', true)->lockForUpdate()->first();
                     if (! $method) {
                         throw ValidationException::withMessages(['payment_method_id' => 'Select an active payment method.']);
                     }
@@ -282,9 +304,18 @@ class ResourceService
                     }
                 }
                 $permissionIds = $values['permissions'] ?? [];
+                if ($resource === 'roles') {
+                    $hidden = Permission::whereNotIn('name', array_keys(Permissions::visible()))->pluck('id')->all();
+                    if (array_intersect($data['permissions'] ?? [], $hidden)) {
+                        throw ValidationException::withMessages(['permissions' => 'These feature permissions are disabled. Enable the module before changing them.']);
+                    }
+                    if ($id) {
+                        $permissionIds = array_unique(array_merge($permissionIds, $record->permissions->whereIn('id', $hidden)->pluck('id')->all()));
+                    }
+                }
                 if ($resource === 'roles' && ! Hr::enabled()) {
                     $hiddenIds = Permission::where('name', 'like', 'hr.%')->pluck('id')->all();
-                    if (array_intersect($permissionIds, $hiddenIds)) {
+                    if (array_intersect($data['permissions'] ?? [], $hiddenIds)) {
                         throw ValidationException::withMessages(['permissions' => 'HR is disabled. Enable the module before changing HR permissions.']);
                     }
                     if ($id) {

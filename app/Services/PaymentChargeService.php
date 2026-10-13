@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
-use App\Models\PaymentChargeRule;
 use App\Models\PaymentMethod;
 use App\Models\SalePayment;
 use App\Support\Money;
@@ -15,7 +14,7 @@ class PaymentChargeService
     {
         $amountToEvaluate = $ruleAmount ?? $amount;
 
-        if (!$method->has_charge || Money::compare($amountToEvaluate, $method->charge_minimum_amount ?? 0) < 0) {
+        if ($method->type === 'CHEQUE' || ! $method->has_charge || Money::compare($amountToEvaluate, $method->charge_minimum_amount ?? 0) < 0) {
             return ['rule_id' => null, 'rule_name' => null, 'charge_type' => null, 'charge_value' => '0.0000', 'charge_bearer' => $method->charge_bearer, 'processing_charge' => '0.00', 'customer_payable' => $amount, 'business_expense' => '0.00'];
         }
 

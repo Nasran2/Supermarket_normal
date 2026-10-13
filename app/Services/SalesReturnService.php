@@ -237,6 +237,7 @@ class SalesReturnService
 
         return DB::transaction(function () use ($original, $data, $user) {
             $sale = Sale::whereKey($original->id)->lockForUpdate()->firstOrFail();
+            app(ChequeService::class)->assertDocumentSafe($sale);
             if ($sale->customer_id) {
                 Customer::whereKey($sale->customer_id)->lockForUpdate()->firstOrFail();
             }

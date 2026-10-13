@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BarcodeController;
 use App\Http\Controllers\BarcodePresetController;
+use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentationController;
@@ -94,6 +95,25 @@ Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(functi
     Route::post('/register/movement', [RegisterController::class, 'movement'])->name('register.movement');
     Route::post('/register/close', [RegisterController::class, 'close'])->name('register.close');
     Route::get('/register/{register}', [RegisterController::class, 'show'])->middleware('permission:register.view')->name('register.show');
+    Route::middleware('cheque-feature')->group(function () {
+        Route::get('/cheques', [ChequeController::class, 'index'])->middleware('permission:cheques.view')->name('cheques.index');
+        Route::get('/cheques/create', [ChequeController::class, 'create'])->middleware('permission:cheques.create')->name('cheques.create');
+        Route::post('/cheques', [ChequeController::class, 'store'])->name('cheques.store');
+        Route::get('/cheques/available', [ChequeController::class, 'available'])->middleware('permission:cheques.transfer')->name('cheques.available');
+        Route::get('/reports/cheques', [ChequeController::class, 'index'])->middleware('permission:cheques.view_reports')->name('cheques.report');
+        Route::get('/reports/cheques/{format}', [ChequeController::class, 'export'])->whereIn('format', ['pdf', 'csv'])->middleware(['permission:cheques.view_reports', 'permission:cheques.export'])->name('cheques.export');
+        Route::get('/cheques/{tab}', [ChequeController::class, 'index'])->whereIn('tab', ['received', 'issued', 'third-party', 'due-soon', 'returned'])->middleware('permission:cheques.view')->name('cheques.tab');
+        Route::get('/settings/cheques', [ChequeController::class, 'settings'])->middleware('permission:cheques.manage_settings')->name('cheques.settings');
+        Route::put('/settings/cheques', [ChequeController::class, 'updateSettings'])->middleware('permission:cheques.manage_settings')->name('cheques.settings.update');
+        Route::post('/settings/cheques/banks', [ChequeController::class, 'bank'])->middleware('permission:cheques.manage_settings')->name('cheques.banks.store');
+        Route::put('/settings/cheques/banks/{account}', [ChequeController::class, 'bankActive'])->middleware('permission:cheques.manage_settings')->name('cheques.banks.update');
+        Route::get('/cheques/{cheque}', [ChequeController::class, 'show'])->whereNumber('cheque')->middleware('permission:cheques.view')->name('cheques.show');
+        Route::post('/cheques/{cheque}/transfer', [ChequeController::class, 'transfer'])->middleware('permission:cheques.transfer')->name('cheques.transfer');
+        Route::post('/cheques/{cheque}/reverse-transfer', [ChequeController::class, 'reverseTransfer'])->middleware('permission:cheques.reverse_transfer')->name('cheques.reverse-transfer');
+        Route::post('/cheques/{cheque}/image', [ChequeController::class, 'image'])->middleware('permission:cheques.create')->name('cheques.image');
+        Route::get('/cheques/{cheque}/image', [ChequeController::class, 'download'])->middleware('permission:cheques.view')->name('cheques.image.download');
+        Route::post('/cheques/{cheque}/{action}', [ChequeController::class, 'action'])->whereIn('action', ['pass', 'return', 'cancel'])->name('cheques.action');
+    });
     Route::middleware('barcode-feature')->group(function () {
         Route::get('/barcode', [BarcodeController::class, 'index'])->middleware('permission:barcode.view')->name('barcode.index');
         Route::get('/barcodes/print', [BarcodeController::class, 'index'])->middleware('permission:barcode.view')->name('barcode.print');

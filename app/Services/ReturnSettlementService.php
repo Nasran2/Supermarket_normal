@@ -60,7 +60,7 @@ class ReturnSettlementService
         if (Money::compare($amount, 0) === 0) {
             return null;
         }
-        $method = PaymentMethod::whereKey($methodId)->where('active', true)->lockForUpdate()->first();
+        $method = PaymentMethod::where('type', '!=', 'CHEQUE')->whereKey($methodId)->where('active', true)->lockForUpdate()->first();
         if (! $method) {
             self::fail('Choose an active payment method.');
         }

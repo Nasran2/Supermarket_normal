@@ -33,7 +33,7 @@ class PurchaseController extends Controller
             $query->where('supplier_id', $request->input('supplier_id'));
         }
         $tracked = (clone $query)->where('status', 'ACTIVE')->where('payment_tracking', true);
-        $paid = PurchasePayment::whereIn('purchase_id', (clone $tracked)->select('id')->reorder())->selectRaw("SUM(CASE WHEN kind = 'REFUND' THEN -amount ELSE amount END) as net_paid")->value('net_paid') ?? '0';
+        $paid = PurchasePayment::settled()->whereIn('purchase_id', (clone $tracked)->select('id')->reorder())->selectRaw("SUM(CASE WHEN kind = 'REFUND' THEN -amount ELSE amount END) as net_paid")->value('net_paid') ?? '0';
         $stats = ['total' => (string) (clone $query)->where('status', 'ACTIVE')->sum('total'), 'paid' => Money::round((string) $paid), 'due' => Money::sum((clone $tracked)->get()->map(fn ($p) => $p->due_amount)), 'unrecorded' => (clone $query)->where('status', 'ACTIVE')->where('payment_tracking', false)->count()];
         $suppliers = Supplier::orderBy('name')->get(['id', 'name']);
         $purchases = $query->latest('purchase_date')->paginate(20)->withQueryString();
@@ -59,7 +59,7 @@ class PurchaseController extends Controller
         $suppliers = Supplier::where('active', true)->orderBy('name')->get();
         $products = Product::with(['unit', 'conversions.unit', 'stockLayers' => fn ($query) => $query->available()])->where('active', true)->orderBy('name')->get();
 
-        $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
+        $methods = PaymentMethod::forSupplier()->where('active', true)->orderBy('display_order')->get();
 
         $nextReference = app(DocumentNumberService::class)->preview('PURCHASE', today());
         $purchase->load('charges');
@@ -84,7 +84,7 @@ class PurchaseController extends Controller
     public function show(Purchase $purchase)
     {
         $purchase->load(['items', 'supplier', 'user', 'payments.user', 'charges']);
-        $methods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
+        $methods = PaymentMethod::forSupplier()->where('active', true)->orderBy('display_order')->get();
 
         return view('purchases.show', compact('purchase', 'methods'));
     }
