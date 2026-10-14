@@ -25,6 +25,16 @@ class ChequePolicy
         return $this->allowed($user, $cheque, 'view');
     }
 
+    public function edit(User $user, Cheque $cheque): bool
+    {
+        return $this->allowed($user, $cheque, 'edit');
+    }
+
+    public function resolveReturn(User $user, Cheque $cheque): bool
+    {
+        return $this->allowed($user, $cheque, 'resolve_return');
+    }
+
     public function pass(User $user, Cheque $cheque): bool
     {
         return $this->allowed($user, $cheque, 'pass');

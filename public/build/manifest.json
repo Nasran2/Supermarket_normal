@@ -7,12 +7,16 @@
     "file": "assets/pos-price-options-BXcz7Ggt.js",
     "name": "pos-price-options"
   },
+  "_purchase-totals-Bp1k2QOT.js": {
+    "file": "assets/purchase-totals-Bp1k2QOT.js",
+    "name": "purchase-totals"
+  },
   "_units-BWArtpcn.js": {
     "file": "assets/units-BWArtpcn.js",
     "name": "units"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DOQGf3yh.css",
+    "file": "assets/app-CjCJTIE1.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -21,11 +25,12 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-CGk2d1A6.js",
+    "file": "assets/app-Dfuv0AU_.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
+      "_purchase-totals-Bp1k2QOT.js",
       "_units-BWArtpcn.js",
       "_pos-price-options-BXcz7Ggt.js"
     ]
@@ -84,12 +89,13 @@
     ]
   },
   "resources/js/purchase.js": {
-    "file": "assets/purchase-nMxlQtvI.js",
+    "file": "assets/purchase-DTaVyzsz.js",
     "name": "purchase",
     "src": "resources/js/purchase.js",
     "isEntry": true,
     "imports": [
-      "_units-BWArtpcn.js"
+      "_units-BWArtpcn.js",
+      "_purchase-totals-Bp1k2QOT.js"
     ]
   },
   "resources/js/sales.js": {

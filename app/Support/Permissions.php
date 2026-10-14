@@ -113,6 +113,8 @@ class Permissions
         foreach (['view' => 'View cheque management', 'create' => 'Create cheque records', 'receive' => 'Receive customer cheques', 'issue' => 'Issue own cheques', 'transfer' => 'Transfer customer cheques', 'reverse_transfer' => 'Reverse a pending transfer', 'pass' => 'Mark cheques passed', 'return' => 'Mark cheques returned', 'cancel' => 'Cancel pending cheques', 'view_customer' => 'View customer cheque balances/history', 'view_supplier' => 'View supplier cheque balances/history', 'manage_settings' => 'Manage cheque settings and bank accounts', 'view_reports' => 'View cheque reports', 'export' => 'Export cheque PDF/CSV reports', 'dashboard' => 'View dashboard cheque alerts', 'override_action_date' => 'Override cheque action date'] as $action => $label) {
             $add('cheques.'.$action, 'Cheques', $label, $label.'.');
         }
+        $add('cheques.edit', 'Cheques', 'Edit cheque details', 'Correct pending cheque information with an audit trail.', ['cheques.create']);
+        $add('cheques.resolve_return', 'Cheques', 'Resolve returned cheques', 'Record replacement cheques or cleared payments against a returned cheque.', ['cheques.return']);
         foreach (Hr::permissions() as $name => [$group, $label]) {
             $add($name, $group, $label, $label.'.', []);
         }

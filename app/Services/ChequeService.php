@@ -114,6 +114,69 @@ class ChequeService
         return $c;
     }
 
+    public const EDIT_FIELDS = ['cheque_number', 'cheque_date', 'bank_name', 'branch', 'drawer_name', 'account_number', 'bank_account_id', 'reference', 'notes'];
+
+    public function instrumentKey(array $entry): string
+    {
+        if (! empty($entry['bank_account_id'])) {
+            $account = BankAccount::findOrFail($entry['bank_account_id']);
+            $entry['bank_name'] = $account->bank_name;
+            $entry['account_number'] = $account->account_number;
+        }
+
+        return hash('sha256', mb_strtolower(trim($entry['bank_name'])).'|'.trim($entry['account_number'] ?? '').'|'.trim($entry['cheque_number']));
+    }
+
+    public function editVersion(Cheque $cheque): string
+    {
+        return hash('sha256', json_encode($cheque->only([...self::EDIT_FIELDS, 'status', 'amount', 'type', 'origin_customer_id', 'destination_supplier_id', 'sale_id', 'purchase_id'])));
+    }
+
+    public function edit(Cheque $original, array $data, int $userId): Cheque
+    {
+        $user = $this->authorize($userId, 'edit');
+
+        return DB::transaction(function () use ($original, $data, $userId, $user) {
+            $c = Cheque::visibleTo()->whereKey($original->id)->lockForUpdate()->firstOrFail();
+            Gate::forUser($user)->authorize('edit', $c);
+            if (! in_array($c->status, ['PENDING', 'TRANSFERRED'])) {
+                $this->fail('Only pending cheques can be edited. Settled cheque history is retained.');
+            }
+            if (! hash_equals($this->editVersion($c), $data['version'])) {
+                $this->fail('This cheque changed while you were editing. Reload it before saving.');
+            }
+            $values = array_intersect_key($data, array_flip(self::EDIT_FIELDS));
+            foreach (['cheque_number', 'bank_name', 'account_number'] as $field) {
+                if (isset($values[$field])) {
+                    $values[$field] = trim($values[$field]);
+                }
+            }
+            if (empty($values['cheque_number']) || empty($values['bank_name'])) {
+                $this->fail('Enter a cheque number and bank name.');
+            }
+            if (! empty($values['bank_account_id'])) {
+                if ($c->type !== 'OWN_CHEQUE') {
+                    $this->fail('Business bank accounts can only be linked to own cheques.');
+                }
+                $account = BankAccount::whereKey($values['bank_account_id'])->where('active', true)->lockForUpdate()->firstOrFail();
+                $values = array_replace($values, ['bank_name' => $account->bank_name, 'account_number' => $account->account_number, 'drawer_name' => $account->account_name, 'branch' => $account->branch ?? ($values['branch'] ?? null)]);
+            }
+            $values['instrument_key'] = $this->instrumentKey($values);
+            if (Cheque::where('instrument_key', $values['instrument_key'])->where('id', '!=', $c->id)->exists()) {
+                $this->fail('A cheque with this bank, account and cheque number already exists.');
+            }
+            $before = $c->only(self::EDIT_FIELDS);
+            try {
+                $c->update($values);
+            } catch (UniqueConstraintViolationException $e) {
+                $this->fail('This cheque has already been recorded.');
+            }
+            $this->event($c, 'EDITED', $userId, $values['notes'] ?? null, ['before' => $before, 'after' => $c->only(self::EDIT_FIELDS)]);
+
+            return $c->fresh();
+        }, 3);
+    }
+
     public function receiveForSale($sale, array $entries, int $userId): void
     {
         $this->authorize($userId, 'receive');
@@ -177,9 +240,6 @@ class ChequeService
             if ($action === 'cancel' && $c->status === 'TRANSFERRED') {
                 $this->fail('Reverse the transfer first, or mark a bounced transferred cheque Returned to restore both accounts.');
             }
-            if ($action === 'return' && empty(trim($data['reason'] ?? ''))) {
-                $this->fail('Enter a return reason.');
-            }
             $status = ['pass' => 'PASSED', 'return' => 'RETURNED', 'cancel' => 'CANCELLED'][$action] ?? null;
             abort_unless($status, 422);
             if ($c->origin_customer_id) {
@@ -198,7 +258,7 @@ class ChequeService
                 $model::where('cheque_id', $c->id)->where('settlement_status', 'PENDING')->update(['settlement_status' => $status]);
             }
             $prefix = ['pass' => 'passed', 'return' => 'returned', 'cancel' => 'cancelled'][$action];
-            $c->update(['status' => $status, $prefix.'_by' => $userId, $prefix.'_at' => now(), 'return_reason' => $action === 'return' ? $data['reason'] : $c->return_reason]);
+            $c->update(['status' => $status, $prefix.'_by' => $userId, $prefix.'_at' => now(), 'return_reason' => $action === 'return' ? ($data['reason'] ?? null) : $c->return_reason]);
             $this->event($c, $status, $userId, $data['notes'] ?? null, ['reason' => $data['reason'] ?? null]);
 
             return $c->fresh();

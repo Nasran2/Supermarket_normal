@@ -107,6 +107,10 @@ Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(functi
         Route::put('/settings/cheques', [ChequeController::class, 'updateSettings'])->middleware('permission:cheques.manage_settings')->name('cheques.settings.update');
         Route::post('/settings/cheques/banks', [ChequeController::class, 'bank'])->middleware('permission:cheques.manage_settings')->name('cheques.banks.store');
         Route::put('/settings/cheques/banks/{account}', [ChequeController::class, 'bankActive'])->middleware('permission:cheques.manage_settings')->name('cheques.banks.update');
+        Route::get('/cheques/{cheque}/edit', [ChequeController::class, 'edit'])->whereNumber('cheque')->middleware('permission:cheques.edit')->name('cheques.edit');
+        Route::put('/cheques/{cheque}', [ChequeController::class, 'update'])->whereNumber('cheque')->middleware('permission:cheques.edit')->name('cheques.update');
+        Route::post('/cheques/{cheque}/return', [ChequeController::class, 'returnCheque'])->whereNumber('cheque')->name('cheques.return');
+        Route::post('/cheques/{cheque}/resolve-return', [ChequeController::class, 'resolveReturn'])->whereNumber('cheque')->name('cheques.resolve-return');
         Route::get('/cheques/{cheque}', [ChequeController::class, 'show'])->whereNumber('cheque')->middleware('permission:cheques.view')->name('cheques.show');
         Route::post('/cheques/{cheque}/transfer', [ChequeController::class, 'transfer'])->middleware('permission:cheques.transfer')->name('cheques.transfer');
         Route::post('/cheques/{cheque}/reverse-transfer', [ChequeController::class, 'reverseTransfer'])->middleware('permission:cheques.reverse_transfer')->name('cheques.reverse-transfer');

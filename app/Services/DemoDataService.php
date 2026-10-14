@@ -23,7 +23,7 @@ class DemoDataService
         'return_stock_allocations', 'return_account_allocations', 'return_settlements',
         'expiry_writeoffs', 'expenses', 'stock_movements', 'stock_adjustments', 'stock_adjustment_items',
         'product_stock_layers', 'sale_stock_allocations', 'stock_layer_movements',
-        'cheques', 'cheque_events', 'barcode_print_jobs', 'document_sequences', 'audit_logs', 'hr_staff', 'hr_employment_events',
+        'cheques', 'cheque_events', 'cheque_resolutions', 'cheque_resolution_items', 'barcode_print_jobs', 'document_sequences', 'audit_logs', 'hr_staff', 'hr_employment_events',
         'hr_attendances', 'hr_leaves', 'hr_payrolls', 'hr_payments',
     ];
 

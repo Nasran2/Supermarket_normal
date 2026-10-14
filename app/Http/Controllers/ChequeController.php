@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ChequeEditRequest;
+use App\Http\Requests\ChequeRecoveryRequest;
 use App\Http\Requests\ChequeRequest;
 use App\Models\BankAccount;
 use App\Models\Cheque;
@@ -10,6 +12,7 @@ use App\Models\PaymentMethod;
 use App\Models\Purchase;
 use App\Models\Setting;
 use App\Models\Supplier;
+use App\Services\ChequeRecoveryService;
 use App\Services\ChequeService;
 use App\Services\CustomerPaymentService;
 use App\Services\PdfReportService;
@@ -32,7 +35,7 @@ class ChequeController extends Controller
 
     private function query(array $f)
     {
-        $q = Cheque::visibleTo()->with('customer', 'supplier', 'sale', 'purchase');
+        $q = Cheque::visibleTo()->with('customer', 'supplier', 'sale', 'purchase', 'resolutions');
         foreach (['type', 'status', 'customer_id' => 'origin_customer_id', 'supplier_id' => 'destination_supplier_id', 'bank' => 'bank_name'] as $input => $column) {
             if (is_int($input)) {
                 $input = $column;
@@ -83,11 +86,45 @@ class ChequeController extends Controller
 
     public function show(Cheque $cheque)
     {
-        $cheque = Cheque::visibleTo()->with('customer', 'supplier', 'sale', 'purchase', 'bankAccount', 'events.user')->findOrFail($cheque->id);
+        $cheque = Cheque::visibleTo()->with('customer', 'supplier', 'sale', 'purchase', 'bankAccount', 'events.user', 'resolutions.replacements', 'resolutions.user', 'resolutions.paymentMethod', 'replacementSources.cheque')->findOrFail($cheque->id);
 
         Gate::authorize('view', $cheque);
 
         return view('cheques.show', compact('cheque'));
+    }
+
+    public function edit(Cheque $cheque, ChequeService $service)
+    {
+        $cheque = Cheque::visibleTo()->findOrFail($cheque->id);
+        Gate::authorize('edit', $cheque);
+        abort_unless(in_array($cheque->status, ['PENDING', 'TRANSFERRED']), 409, 'Only pending cheques can be edited.');
+
+        return view('cheques.edit', ['cheque' => $cheque, 'version' => $service->editVersion($cheque), 'accounts' => BankAccount::where('active', true)->orderBy('bank_name')->get()]);
+    }
+
+    public function update(ChequeEditRequest $request, Cheque $cheque, ChequeService $service)
+    {
+        $service->edit($cheque, $request->validated(), $request->user()->id);
+
+        return redirect()->route('cheques.show', $cheque)->with('success', 'Cheque details saved.');
+    }
+
+    public function returnCheque(ChequeRecoveryRequest $request, Cheque $cheque, ChequeRecoveryService $service)
+    {
+        $resolution = $service->record($cheque, $request->validated(), $request->user()->id);
+
+        return back()->with('success', match ($resolution->resolution) {
+            'REPLACE' => 'Cheque returned. Replacement cheques recorded; any remaining balance stays due.',
+            'PAYMENT' => 'Cheque returned. Payment recorded; any remaining balance stays due.',
+            default => 'Cheque returned. Its balance is now due.',
+        });
+    }
+
+    public function resolveReturn(ChequeRecoveryRequest $request, Cheque $cheque, ChequeRecoveryService $service)
+    {
+        $service->record($cheque, $request->validated(), $request->user()->id, false);
+
+        return back()->with('success', 'Returned cheque resolution saved. Any remaining balance stays due.');
     }
 
     public function create()

@@ -1,3 +1,4 @@
+import { moneyCents, displayCents } from './purchase-totals.js';
 const editors = document.querySelectorAll('[data-cheque-editor]');
 for (const editor of editors) {
   const form = editor.closest('form');
@@ -83,7 +84,11 @@ for (const editor of editors) {
   }
   function renderState() {
     const selected = method?.selectedOptions[0];
-    editor.hidden = !editor.dataset.always && selected?.dataset.type !== 'CHEQUE';
+    if (editor.dataset.resolutionEditor === '1') {
+      editor.dataset.side =
+        form.querySelector('[name=recovery_side]').value === 'SUPPLIER' ? 'supplier' : 'receive';
+      editor.hidden = form.querySelector('[name=resolution]:checked')?.value !== 'REPLACE';
+    } else editor.hidden = !editor.dataset.always && selected?.dataset.type !== 'CHEQUE';
     if (kind) {
       const supplier = kind.value === 'OWN_CHEQUE';
       editor.dataset.side = supplier ? 'supplier' : 'receive';
@@ -134,6 +139,9 @@ for (const editor of editors) {
   });
   method?.addEventListener('change', renderState);
   kind?.addEventListener('change', renderState);
+  form
+    .querySelectorAll('[name=resolution], [name=recovery_side]')
+    .forEach((input) => input.addEventListener('change', renderState));
   const initial = JSON.parse(editor.querySelector('[data-cheque-initial]').textContent);
   if (initial.length) {
     for (const entry of initial) {
@@ -148,4 +156,98 @@ for (const editor of editors) {
     }
     renderState();
   } else add();
+}
+
+for (const form of document.querySelectorAll('[data-cheque-recovery]')) {
+  const amount = form.querySelector('[name=amount]');
+  const method = form.querySelector('[name=payment_method_id]');
+  const editor = form.querySelector('[data-cheque-editor]');
+  const render = () => {
+    const side = form.querySelector('[name=recovery_side]').value;
+    const limit = moneyCents(
+      side === 'SUPPLIER' ? form.dataset.supplierLimit : form.dataset.customerLimit,
+    );
+    const accountAllowed =
+      (side === 'SUPPLIER' ? form.dataset.supplierAllowed : form.dataset.customerAllowed) === '1';
+    const sourceAllowed =
+      side === 'SUPPLIER'
+        ? editor.dataset.own === '1' || editor.dataset.transfer === '1'
+        : form.dataset.customerReplace === '1';
+    for (const radio of form.querySelectorAll('[name=resolution]')) {
+      radio.disabled =
+        radio.value !== 'DUE' &&
+        (!accountAllowed || limit <= 0n || (radio.value === 'REPLACE' && !sourceAllowed));
+      radio.closest('label').hidden = radio.disabled;
+    }
+    let selected = form.querySelector('[name=resolution]:checked');
+    if (!selected || selected.disabled) {
+      selected = form.querySelector('[name=resolution]:not(:disabled)');
+      if (selected) {
+        selected.checked = true;
+        selected.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    const choice = selected?.value || 'DUE';
+    const payment = form.querySelector('[data-recovery-payment]');
+    payment.hidden = choice !== 'PAYMENT';
+    payment.querySelectorAll('input, select').forEach((input) => {
+      input.disabled = choice !== 'PAYMENT';
+    });
+    method.required = choice === 'PAYMENT';
+    const register = form.querySelector('[data-recovery-register]');
+    register.hidden =
+      choice !== 'PAYMENT' ||
+      side !== 'SUPPLIER' ||
+      method.selectedOptions[0]?.dataset.type !== 'CASH';
+    register.querySelector('input').disabled = register.hidden;
+    amount.closest('[data-recovery-amount]').hidden = choice === 'DUE';
+    amount.disabled = choice === 'DUE';
+    amount.readOnly = choice === 'REPLACE';
+    amount.required = choice !== 'DUE';
+    amount.max = displayCents(limit).replaceAll(',', '');
+    if (choice === 'PAYMENT' && moneyCents(amount.value) === 0n) amount.value = amount.max;
+    form.querySelector('[data-recovery-amount-label]').textContent =
+      choice === 'REPLACE'
+        ? 'Total replacement cheques'
+        : side === 'CUSTOMER'
+          ? 'Amount received'
+          : 'Amount paid';
+    const current = choice === 'DUE' ? 0n : moneyCents(amount.value);
+    const remaining = limit - current;
+    amount.setCustomValidity(
+      current > limit ? 'The total exceeds the amount remaining against this returned cheque.' : '',
+    );
+    form.querySelector('[data-recovery-balance]').textContent =
+      remaining < 0n
+        ? 'The total is above the remaining return amount.'
+        : `${form.dataset.currency} ${displayCents(remaining)} remains to be handled against this return.`;
+    form.querySelector('[data-recovery-submit]').disabled =
+      !selected || (choice !== 'DUE' && (current <= 0n || current > limit));
+  };
+  form.addEventListener('input', render);
+  form.addEventListener('change', render);
+  form.addEventListener('submit', () => {
+    const button = form.querySelector('[data-recovery-submit]');
+    button.disabled = true;
+    button.textContent = 'Saving…';
+  });
+  render();
+}
+document.addEventListener('click', (event) => {
+  event.target.closest('[data-close-cheque-dialog]')?.closest('dialog')?.close();
+});
+document.querySelectorAll('[data-reopen-cheque]').forEach((dialog) => dialog.showModal());
+for (const form of document.querySelectorAll('[data-cheque-edit]')) {
+  form.querySelector('[data-edit-bank-account]')?.addEventListener('change', (event) => {
+    const option = event.target.selectedOptions[0];
+    for (const [field, property] of [
+      ['bank_name', 'bank'],
+      ['account_number', 'number'],
+      ['drawer_name', 'holder'],
+      ['branch', 'branch'],
+    ]) {
+      if (option.dataset[property] !== undefined)
+        form.querySelector(`[name=${field}]`).value = option.dataset[property];
+    }
+  });
 }

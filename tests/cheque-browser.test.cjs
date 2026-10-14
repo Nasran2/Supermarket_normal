@@ -40,7 +40,7 @@ fs.mkdirSync(artifacts, { recursive: true });
     if (kind === 'return') await dialog.locator('[name=reason]').fill('Insufficient funds');
     await dialog
       .getByRole('button', {
-        name: kind === 'pass' ? 'Confirm Passed' : 'Confirm Returned',
+        name: kind === 'pass' ? 'Confirm Passed' : 'Confirm return',
         exact: true,
       })
       .click();

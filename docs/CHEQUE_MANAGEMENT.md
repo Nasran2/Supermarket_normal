@@ -80,7 +80,23 @@ An authorized **Reverse transfer** action requires a reason and confirmation tha
 
 The default alert/action window is three calendar days before each cheque date, measured in the business timezone. For an 18 October cheque, ordinary Pass/Return actions start on 15 October. Settings can change the window from 0–90 days. Both button visibility and backend action checks enforce it. `cheques.override_action_date` permits an explicit early action; grant it sparingly. Administrator has it automatically.
 
-The dashboard shows a compact Cheques Due Soon section with overdue instruments first, then today and future dates inside the configured window. Long-dated cheques do not appear. Instruments never pass automatically. Passing, returning and cancelling require confirmation. Return/cancel requires a reason. Terminal settlements cannot run twice or be edited through normal cheque forms.
+The dashboard shows a red Cheques Due Soon alert immediately below Collections, with overdue instruments first, then today and future dates inside the configured window. Long-dated cheques do not appear. Instruments never pass automatically. Passing, returning and cancelling require confirmation. Return reasons are optional; cancellation and transfer-reversal reasons remain required. Terminal settlements cannot run twice or be edited through normal cheque forms.
+
+## Edit and resolve returns
+
+**Edit** is available on pending and transferred cheques. Correct the number, cheque date, bank, branch, drawer, account number, reference and notes. Each save creates an audited timeline event. Duplicate bank/account/number combinations and stale edits are rejected. Amounts, parties and document links remain tied to the original payment: return or cancel and record a replacement when those need to change.
+
+**Mark Returned** opens a popup with an optional reason and three choices:
+
+- **Leave balance due** reverses the original cheque hold and restores its balance to Due.
+- **Get / issue replacement cheque(s)** records one or several new instruments, with independent dates and amounts. Their combined value cannot exceed the remaining returned amount. Partial replacement leaves the difference due, and replacements remain on Hold until passed.
+- **Record cash / bank / card payment** pays all or part of the restored balance through an active payment method. Supplier cash can optionally be taken from the current register, using the existing purchase-payment controls.
+
+Returned cheques offer **Resolve return** for later replacements or payments. The original instrument stays Returned, and its detail page links each replacement and lists every resolution. A replacement's detail page links back to the original. For a third-party return, both accounts become due; choose the customer or supplier side for each resolution, then handle the other side separately.
+
+Recoveries apply only to the original opening-balance/invoice/purchase allocations. They cannot shift money to unrelated debt if the original balance has already been paid. Invalid submissions roll back the return and all new payments together. Repeated submissions with the same token and details do not create duplicate payments.
+
+The additive `2026_10_14_010000_add_cheque_return_resolutions.php` migration creates resolution history and replacement links, extends existing demo baselines with the new empty tables, and installs the new permissions. Run `php artisan migrate --force` on other installations, then rebuild assets with `npm run build`.
 
 ## Management, ledgers and reports
 
@@ -104,6 +120,8 @@ The role editor includes independent cheque permissions:
 
 - `cheques.view`: management lists, details and authorized attachments.
 - `cheques.create`: standalone record form and pending attachments.
+- `cheques.edit`: correct pending/transferred cheque metadata.
+- `cheques.resolve_return`: record replacement instruments or payments for a returned cheque; the existing source and customer/supplier payment permissions also apply.
 - `cheques.receive`, `cheques.issue`, `cheques.transfer`: permitted cheque sources.
 - `cheques.reverse_transfer`: retrieve/reverse a pending supplier endorsement.
 - `cheques.pass`, `cheques.return`, `cheques.cancel`: lifecycle actions.
@@ -113,7 +131,7 @@ The role editor includes independent cheque permissions:
 - `cheques.dashboard`: dashboard alerts.
 - `cheques.override_action_date`: explicit early clearance/return override.
 
-Administrator has all permissions. Existing roles are not silently expanded by the permission installation migration. Assign the necessary permissions alongside existing POS, sales, purchase, customer and supplier permissions. Customer-origin cheque records follow existing sales visibility scope. Hiding a button is complemented by backend authorization.
+Administrator has all permissions. When the new edit and resolve permissions are first installed, roles already holding `cheques.create` inherit metadata editing, and roles holding `cheques.return` inherit resolution access; existing payment and cheque-source permissions still apply. Assign or remove these independently in the role editor. Customer-origin cheque records follow existing sales visibility scope. Hiding a button is complemented by backend authorization.
 
 ## Troubleshooting
 
@@ -133,6 +151,7 @@ Administrator has all permissions. Existing roles are not silently expanded by t
 Verified on 14 October 2026:
 
 - 24 cheque feature tests passed (251 assertions), covering lifecycle accounting, transfers and reversals, source restrictions, immutable payment history, permissions and disabled-feature behavior.
+- Cheque editing/return recovery adds 11 feature tests covering optional reasons, split/partial replacements, cash/bank recovery, allocation limits, atomic rollback, duplicate submissions, stale edits, source permissions and third-party accounts. The focused cheque/account/purchase/demo/unit regression run passes 84 tests (1,263 assertions).
 - Cheque, barcode and HR compatibility suites passed together: 67 tests, 699 assertions.
 - 26 JavaScript tests passed; production assets built successfully, Blade views compiled and changed PHP files passed formatting checks.
 - Disposable-database browser checks passed for multiple customer/own cheques, POS checkout, pass/return, linked supplier transfers, settings, reports, responsive layouts and `CHEQUE=false` hiding. POS checkout also rejects incomplete cheque details and mismatched totals before submission.

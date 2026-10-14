@@ -52,6 +52,24 @@ class Cheque extends Model
         return $this->hasMany(ChequeEvent::class)->orderBy('id');
     }
 
+    public function resolutions()
+    {
+        return $this->hasMany(ChequeResolution::class)->orderBy('id');
+    }
+
+    public function replacementSources()
+    {
+        return $this->belongsToMany(ChequeResolution::class, 'cheque_resolution_items', 'replacement_cheque_id', 'cheque_resolution_id');
+    }
+
+    public function recoveryRemaining(string $side): string
+    {
+        $recorded = Money::sum($this->resolutions->where('side', $side)->pluck('amount'));
+        $remaining = Money::sub($this->amount, $recorded);
+
+        return Money::compare($remaining, 0) > 0 ? $remaining : '0.00';
+    }
+
     public function customerPayments()
     {
         return $this->hasMany(CustomerPayment::class);

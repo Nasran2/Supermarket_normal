@@ -60,6 +60,7 @@ import {
   Menu,
   UsersRound,
   UserPlus,
+  Calendar,
   CalendarCheck,
   CalendarDays,
   BriefcaseBusiness,
@@ -67,6 +68,8 @@ import {
   Maximize,
   MousePointer2,
   Calculator,
+  Barcode,
+  ScanBarcode,
 } from 'lucide';
 const icons = {
   Receipt: ReceiptText,
@@ -127,6 +130,7 @@ const icons = {
   Menu,
   UsersRound,
   UserPlus,
+  Calendar,
   CalendarCheck,
   CalendarDays,
   BriefcaseBusiness,
@@ -134,6 +138,8 @@ const icons = {
   Maximize,
   MousePointer2,
   Calculator,
+  Barcode,
+  ScanBarcode,
 };
 window.refreshIcons = () => createIcons({ icons });
 window.refreshIcons();
