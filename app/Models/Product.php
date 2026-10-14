@@ -23,6 +23,16 @@ class Product extends Model
         return $attributes;
     }
 
+    protected function getArrayableRelations()
+    {
+        $relations = parent::getArrayableRelations();
+        if (! \App\Support\Units::enabled()) {
+            unset($relations['unit'], $relations['conversions']);
+        }
+
+        return $relations;
+    }
+
     public static function sellableStockSql(): string
     {
         if (! Expiry::enabled()) {

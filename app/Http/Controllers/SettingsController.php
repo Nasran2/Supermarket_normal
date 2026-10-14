@@ -34,6 +34,9 @@ class SettingsController extends Controller
                 $fields['show_sku'][0] = 'Show SKU';
             }
         }
+        if (! \App\Support\Units::enabled()) {
+            unset($fields['show_unit']);
+        }
         $values = $service->all();
         if (! config('features.barcode') && ($values['search_mode'] ?? '') === 'barcode') {
             $values['search_mode'] = 'all';

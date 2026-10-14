@@ -151,6 +151,10 @@ class SalesReturnService
                     $replacement['product_id'] = $original->product_id;
                     $replacement['unit_id'] = $original->unit_id;
                     $replacement['quantity'] = $r['quantity'];
+                    if (! \App\Support\Units::enabled() && ! $same) {
+                        $replacement['unit_id'] = $original->product->unit_id;
+                        $replacement['quantity'] = $r['base_quantity'];
+                    }
                     if ($same) {
                         $replacement['unit_price'] = (string) BigDecimal::of($r['amount'])->dividedBy($r['quantity'], 2, RoundingMode::CEILING);
                     }

@@ -1,3 +1,4 @@
+import { unitsEnabled } from './units.js';
 const editor = document.getElementById('unit-editor');
 document.querySelectorAll('[data-product-reference-dialog]').forEach((dialog) => {
   const form = dialog.querySelector('form');
@@ -133,6 +134,7 @@ function add(data = {}) {
   refresh();
   window.refreshIcons?.();
 }
+if (rows && primary) {
 document.getElementById('add-conversion').addEventListener('click', () => add());
 rows.addEventListener('input', refresh);
 primary.addEventListener('change', () => {
@@ -161,6 +163,7 @@ document.getElementById('unit-preset')?.addEventListener('change', (event) => {
 });
 JSON.parse(document.getElementById('conversion-initial').textContent).forEach(add);
 refresh();
+}
 let previewUrl;
 document.getElementById('product-image-input')?.addEventListener('change', (event) => {
   const file = event.target.files[0];
@@ -217,7 +220,7 @@ if (discountType) {
       : 'Fixed discount amount';
     document.getElementById('product-discount-help').textContent = percent
       ? 'The percentage is taken off the entire product line.'
-      : 'This amount is taken off once from the entire product line, even when the customer buys several units.';
+      : `This amount is taken off once from the entire product line, even when the customer buys several ${unitsEnabled() ? 'units' : 'items'}.`;
   };
   discountType.addEventListener('change', refreshDiscount);
   refreshDiscount();

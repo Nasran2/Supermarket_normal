@@ -1,3 +1,4 @@
+import { unitsEnabled, unitLabel } from './units.js';
 import { sellingPriceOptions } from './pos-price-options.js';
 const config = document.getElementById('no-receipt-config');
 if (config) {
@@ -321,7 +322,7 @@ if (config) {
       const updateCredit = () =>
         (lineCredit.textContent = `Line return credit: ${money(Number(r.price || 0) * Number(r.quantity || 0))}`);
       const unit = r.product.units.find((u) => u.id === r.unit_id) || {
-        decimal: true,
+        decimal: r.match?.decimal ?? r.product.units[0]?.decimal ?? false,
         short_name: r.match?.unit,
       };
       const qty = input(r.quantity, 'number', (v) => {
@@ -351,7 +352,7 @@ if (config) {
         renderRows();
       });
       unitSelect.disabled = !!r.match;
-      field(grid, 'Unit', unitSelect);
+      if (unitsEnabled()) field(grid, 'Unit', unitSelect);
       const price = input(r.price, 'number', (v) => {
         r.price = v;
         updateCredit();
@@ -438,7 +439,7 @@ if (config) {
         card.append(
           el(
             'p',
-            `Cost basis: Estimated · ${sourceLabel(unit.suggestion?.cost_basis_source || c.costMethod)}${c.viewCost && unit.suggestion?.cost_basis != null ? ' · ' + money(unit.suggestion.cost_basis) + ' per primary unit' : ''}`,
+            `Cost basis: Estimated · ${sourceLabel(unit.suggestion?.cost_basis_source || c.costMethod)}${c.viewCost && unit.suggestion?.cost_basis != null ? ' · ' + money(unit.suggestion.cost_basis) + (unitsEnabled() ? ' per primary unit' : '') : ''}`,
             'muted',
           ),
         );
@@ -446,7 +447,7 @@ if (config) {
           const cost = input(r.cost_basis, 'number', (v) => (r.cost_basis = v));
           cost.min = '0';
           cost.step = '0.01';
-          field(grid, 'Estimated cost per primary unit (manager)', cost);
+          field(grid, unitsEnabled() ? 'Estimated cost per primary unit (manager)' : 'Estimated cost (manager)', cost);
         }
       }
       if (r.action === 'SUPPLIER') {
@@ -508,7 +509,7 @@ if (config) {
               el('strong', `${m.invoice} · ${m.date}`),
               el(
                 'small',
-                `${m.quantity} ${m.unit} bought · ${m.remaining} available to return · original net ${money(m.net_price)} each`,
+                `${m.quantity} ${unitLabel(m.unit)} bought · ${m.remaining} available to return · original net ${money(m.net_price)} each`,
                 'cell-note',
               ),
             );
@@ -657,7 +658,7 @@ if (config) {
         },
       );
       unit.disabled = mode() === 'SAME';
-      field(card, 'Unit', unit);
+      if (unitsEnabled()) field(card, 'Unit', unit);
       field(
         card,
         'Available selling price',
@@ -774,7 +775,7 @@ if (config) {
         ...q.lines.map((l) =>
           el(
             'p',
-            `${l.name} × ${l.quantity} ${l.unit} · ${money(l.amount)} · ${l.original_invoice || 'No original sale identified'} · ${l.stock_action}`,
+            `${l.name} × ${l.quantity} ${unitLabel(l.unit)} · ${money(l.amount)} · ${l.original_invoice || 'No original sale identified'} · ${l.stock_action}`,
           ),
         ),
       );

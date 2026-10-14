@@ -162,9 +162,9 @@ Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(functi
     });
     Route::get('/stock/{product}/adjust', [StockController::class, 'edit'])->middleware('permission:stock-adjustments.create')->name('stock.edit');
     Route::put('/stock/{product}/adjust', [StockController::class, 'update'])->name('stock.update');
-    Route::post('/units/{unit}/default', [StockPriceController::class, 'defaultUnit'])->middleware('permission:units.set_default')->name('units.default');
+    Route::post('/units/{unit}/default', [StockPriceController::class, 'defaultUnit'])->middleware(['unit-feature', 'permission:units.set_default'])->name('units.default');
     Route::put('/stock-prices/{layer}', [StockPriceController::class, 'reprice'])->middleware('permission:products.manage_prices')->name('stock-prices.update');
-    Route::prefix('manage/{resource}')->name('manage.')->group(function () {
+    Route::middleware('unit-resources')->prefix('manage/{resource}')->name('manage.')->group(function () {
         Route::get('/', [ResourceController::class, 'index'])->name('index');
         Route::get('/create', [ResourceController::class, 'create'])->name('create');
         Route::post('/', [ResourceController::class, 'store'])->name('store');

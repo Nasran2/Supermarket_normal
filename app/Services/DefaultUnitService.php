@@ -14,6 +14,33 @@ class DefaultUnitService
         return Unit::where('default_slot', 1)->where('active', true)->first();
     }
 
+    /** Resolve by the unique default slot; repair legacy installations without changing products. */
+    public function resolve(): Unit
+    {
+        if ($unit = $this->current()) {
+            return $unit;
+        }
+
+        try {
+            return DB::transaction(function () {
+                $units = Unit::orderBy('id')->lockForUpdate()->get();
+                if ($default = $units->firstWhere('default_slot', 1)) {
+                    $default->update(['active' => true]);
+
+                    return $default;
+                }
+                $piece = $units->firstWhere('short_name', 'pcs') ?? $units->firstWhere('name', 'Piece');
+                $piece ??= Unit::create(['name' => 'Piece', 'short_name' => 'pcs', 'allow_decimal' => false, 'active' => true]);
+                $piece->update(['active' => true, 'default_slot' => 1]);
+
+                return $piece;
+            }, 3);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            // Concurrent first-use requests can race on an empty units table.
+            return $this->current() ?? throw $e;
+        }
+    }
+
     public function set(int $id): void
     {
         DB::transaction(function () use ($id) {

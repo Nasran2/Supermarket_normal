@@ -152,7 +152,7 @@ class ProductUnitsTest extends TestCase
     {
         $rows = [['unit_id' => $this->dozen->id, 'base_quantity' => '12', 'converted_quantity' => '1']];
         $this->post(route('manage.store', 'unit-presets'), ['name' => 'Pieces & dozen', 'unit_id' => $this->pieces->id, 'conversions' => $rows])->assertRedirect()->assertSessionHasNoErrors();
-        $preset = UnitPreset::firstOrFail();
+        $preset = UnitPreset::where('name', 'Pieces & dozen')->firstOrFail();
         $this->assertCount(1, $preset->conversions);
         $p = $this->product();
         $this->put(route('manage.update', ['unit-presets', $preset->id]), ['name' => 'Pieces & dozen', 'unit_id' => $this->pieces->id, 'conversions' => [['unit_id' => $this->dozen->id, 'base_quantity' => '24', 'converted_quantity' => '1']]])->assertRedirect()->assertSessionHasNoErrors();

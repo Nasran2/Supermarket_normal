@@ -1,3 +1,4 @@
+import { quantityText } from './units.js';
 const dialog = document.getElementById('expiry-writeoff-confirm');
 if (dialog) {
   let selectedForm = null;
@@ -9,7 +10,7 @@ if (dialog) {
       selectedForm = form;
       const quantity = Number(form.elements.quantity.value);
       document.getElementById('expiry-writeoff-review').textContent =
-        `Remove ${quantity} ${form.dataset.unit} of ${form.dataset.product} (expiry ${form.dataset.expiry})?`;
+        `Remove ${quantityText(quantity, form.dataset.unit)} of ${form.dataset.product} (expiry ${form.dataset.expiry})?`;
       const cost = document.getElementById('expiry-writeoff-cost');
       cost.textContent = form.dataset.cost
         ? `Expense at inventory cost: ${form.dataset.currency} ${(quantity * Number(form.dataset.cost) / Number(form.dataset.stock)).toFixed(2)}`

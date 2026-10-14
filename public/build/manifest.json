@@ -7,8 +7,12 @@
     "file": "assets/pos-price-options-BXcz7Ggt.js",
     "name": "pos-price-options"
   },
+  "_units-BWArtpcn.js": {
+    "file": "assets/units-BWArtpcn.js",
+    "name": "units"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-Dx9OiVjG.css",
+    "file": "assets/app-CtSDx6jy.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -17,11 +21,12 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DBgdSm3j.js",
+    "file": "assets/app-CGk2d1A6.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
+      "_units-BWArtpcn.js",
       "_pos-price-options-BXcz7Ggt.js"
     ]
   },
@@ -50,34 +55,42 @@
     "isEntry": true
   },
   "resources/js/barcode.js": {
-    "file": "assets/barcode-DGvAgvIR.js",
+    "file": "assets/barcode-BYWMNUO4.js",
     "name": "barcode",
     "src": "resources/js/barcode.js",
     "isEntry": true,
     "imports": [
+      "_units-BWArtpcn.js",
       "_barcode-layout-B_o5AN8K.js"
     ]
   },
   "resources/js/pos.js": {
-    "file": "assets/pos-B-YheGAP.js",
+    "file": "assets/pos-njLpZQMI.js",
     "name": "pos",
     "src": "resources/js/pos.js",
     "isEntry": true,
     "imports": [
+      "_units-BWArtpcn.js",
       "_pos-price-options-BXcz7Ggt.js"
     ]
   },
   "resources/js/product-units.js": {
-    "file": "assets/product-units-B86SHXrY.js",
+    "file": "assets/product-units-CfWpxFQq.js",
     "name": "product-units",
     "src": "resources/js/product-units.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_units-BWArtpcn.js"
+    ]
   },
   "resources/js/purchase.js": {
-    "file": "assets/purchase-fg8t6Pmy.js",
+    "file": "assets/purchase-nMxlQtvI.js",
     "name": "purchase",
     "src": "resources/js/purchase.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_units-BWArtpcn.js"
+    ]
   },
   "resources/js/sales.js": {
     "file": "assets/sales-CPJKppA4.js",
@@ -86,9 +99,12 @@
     "isEntry": true
   },
   "resources/js/stock-adjustments.js": {
-    "file": "assets/stock-adjustments-CXA3wSn_.js",
+    "file": "assets/stock-adjustments-D8753fUn.js",
     "name": "stock-adjustments",
     "src": "resources/js/stock-adjustments.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_units-BWArtpcn.js"
+    ]
   }
 }

@@ -12,13 +12,13 @@
             <div class="documentation-steps-heading"><h2><x-documentation-text text="Follow these steps"/></h2><span><x-documentation-text text=":count simple steps" :replace="['count'=>count($guide['steps'])]"/></span></div>
             <ol class="documentation-steps">
                 @foreach($guide['steps'] as $step)
-                <li class="documentation-step {{ $loop->first?'current':'' }}" id="step-{{ $loop->iteration }}" data-written-step="{{ $loop->index }}"><span class="documentation-step-number">{{ $loop->iteration }}</span><div><h3><x-documentation-text :text="$step['title']"/></h3><p><x-documentation-text :text="$step['text']"/></p><button type="button" class="documentation-watch-step" data-watch-step="{{ $loop->index }}" disabled><x-icon name="eye" :size="16"/><x-documentation-text text="Show this step"/><span class="sr-only">: {{ $step['title'] }}</span></button></div></li>
+                <li class="documentation-step {{ $loop->first?'current':'' }}" id="step-{{ $loop->iteration }}" data-written-step="{{ $loop->index }}"><span class="documentation-step-number">{{ $loop->iteration }}</span><div><h3><x-documentation-text :text="$step['title']"/></h3><p><x-documentation-text :text="$step['text']"/></p>@if($guide['screens_enabled'])<button type="button" class="documentation-watch-step" data-watch-step="{{ $loop->index }}" disabled><x-icon name="eye" :size="16"/><x-documentation-text text="Show this step"/><span class="sr-only">: {{ $step['title'] }}</span></button>@endif</div></li>
                 @endforeach
             </ol>
             @if($guide['tip'])<aside class="documentation-tip"><span><x-icon name="circle-check" :size="21"/></span><div><h3><x-documentation-text text="Good to know"/></h3><p><x-documentation-text :text="$guide['tip']"/></p></div></aside>@endif
             <div class="documentation-finish"><x-icon name="circle-check" :size="27"/><div><h3><x-documentation-text text="Ready to try it?"/></h3><p><x-documentation-text text="Follow the steps at your own pace. If something looks different, ask your manager."/></p></div>@if($screenUrl)<a class="btn primary" href="{{ $screenUrl }}"><x-documentation-text text="Open this screen"/><x-icon name="arrow-right" :size="17"/></a>@endif</div>
         </div>
-        <aside class="documentation-player" aria-label="Animated example">
+        @if($guide['screens_enabled'])<aside class="documentation-player" aria-label="Animated example">
             <div class="documentation-player-heading"><span class="documentation-live-dot"></span><strong><x-documentation-text text="Watch the real screens"/></strong><span><x-documentation-text text="DEMO"/></span></div>
             <p class="documentation-player-intro"><x-documentation-text text="Real screens with sample details. Follow the highlighted area. This example does not change your store."/></p>
             <div class="documentation-screen-tools"><button type="button" data-demo-expand disabled><x-icon name="maximize" :size="16"/><x-documentation-text text="View larger"/></button><button type="button" data-demo-overview aria-pressed="false" disabled><x-documentation-text text="Show full screen"/></button></div>
@@ -50,9 +50,9 @@
             <button class="documentation-replay" type="button" data-demo-replay disabled><x-documentation-text text="Replay from the beginning"/></button>
             <p class="documentation-player-hint"><x-documentation-text text="Use “Show this step” to replay a step. Pause or choose Show full screen whenever you need."/></p>
             <noscript><p class="documentation-player-hint"><x-documentation-text text="Animated examples need JavaScript. You can still read every step on this page."/></p></noscript>
-        </aside>
+        </aside>@endif
     </div>
-    <dialog class="documentation-expanded" id="documentation-expanded" aria-label="Larger walkthrough"><div class="documentation-expanded-heading"><strong><x-documentation-text :text="$guide['title']"/> · <x-documentation-text text="Example"/></strong><button type="button" class="icon-button" data-demo-collapse aria-label="Close larger walkthrough"><x-icon name="x" :size="22"/></button></div><div data-demo-expanded-host></div></dialog>
+    @if($guide['screens_enabled'])<dialog class="documentation-expanded" id="documentation-expanded" aria-label="Larger walkthrough"><div class="documentation-expanded-heading"><strong><x-documentation-text :text="$guide['title']"/> · <x-documentation-text text="Example"/></strong><button type="button" class="icon-button" data-demo-collapse aria-label="Close larger walkthrough"><x-icon name="x" :size="22"/></button></div><div data-demo-expanded-host></div></dialog>@endif
     @if(count($related))<section class="documentation-related"><h2><x-documentation-text text="You might also need"/></h2><div>@foreach(array_slice($related,0,3,true) as $key=>$other)<a href="{{ route('documentation.show',$key) }}"><x-icon :name="$other['icon']" :size="20"/><strong><x-documentation-text :text="$other['title']"/></strong><x-icon name="arrow-right" :size="17"/></a>@endforeach</div></section>@endif
 </article>
 @endsection

@@ -133,7 +133,7 @@ class TransactionReturnController extends Controller
             if ($kind === 'sales') {
                 foreach (app(SaleAftercareService::class)->returnableLines($original) as $line) {
                     $item = $line['item'];
-                    $lines[] = ['id' => $item->id, 'product_id' => $item->product_id, 'unit_id' => $item->unit_id, 'name' => $item->name, 'unit' => $item->unit, 'sold' => $item->quantity, 'returned' => $line['returned'], 'remaining' => $line['remaining'], 'decimal' => ($item->unitRecord ?? $item->product->unit)->allow_decimal, 'base_quantity' => $item->base_quantity ?? $item->quantity, 'restock_prices' => $item->allocations()->orderByDesc('id')->with('layer')->get()->map(fn ($a) => ['expires_at' => Expiry::enabled() ? ($a->expires_at ?? $a->layer->expires_at?->toDateString()) : null, 'expiry_label' => Expiry::enabled() ? $a->layer->expires_at?->format('d M Y') : null, 'stock_price' => $a->layer->selling_price, 'remaining' => Money::quantity($a->quantity, '-'.$a->returned_quantity), 'units' => array_map(fn ($u) => array_diff_key($u, ['cost' => true]), app(ProductUnitService::class)->options($item->product, $a->layer->selling_price))])->values()->all(), 'price' => $item->price, 'net' => $line['net'], 'stock_action' => app(SettingsService::class)->get('return_default_stock_action', 'RESTOCK'), 'unknown_supplier' => $item->allocations()->whereHas('layer', fn ($q) => $q->whereNull('purchase_item_id'))->exists() || ! $item->allocations()->exists()];
+                    $lines[] = ['id' => $item->id, 'product_id' => $item->product_id, 'unit_id' => $item->unit_id, 'name' => $item->name, 'unit' => \App\Support\Units::label($item->unit), 'sold' => $item->quantity, 'returned' => $line['returned'], 'remaining' => $line['remaining'], 'decimal' => ($item->unitRecord ?? $item->product->unit)->allow_decimal, 'base_quantity' => $item->base_quantity ?? $item->quantity, 'restock_prices' => $item->allocations()->orderByDesc('id')->with('layer')->get()->map(fn ($a) => ['expires_at' => Expiry::enabled() ? ($a->expires_at ?? $a->layer->expires_at?->toDateString()) : null, 'expiry_label' => Expiry::enabled() ? $a->layer->expires_at?->format('d M Y') : null, 'stock_price' => $a->layer->selling_price, 'remaining' => Money::quantity($a->quantity, '-'.$a->returned_quantity), 'units' => array_map(fn ($u) => array_diff_key($u, ['cost' => true]), app(ProductUnitService::class)->publicOptions($item->product, $a->layer->selling_price))])->values()->all(), 'price' => $item->price, 'net' => $line['net'], 'stock_action' => app(SettingsService::class)->get('return_default_stock_action', 'RESTOCK'), 'unknown_supplier' => $item->allocations()->whereHas('layer', fn ($q) => $q->whereNull('purchase_item_id'))->exists() || ! $item->allocations()->exists()];
                 }
             } else {
                 foreach ($original->items()->with('product.unit', 'stockLayers')->get() as $item) {
@@ -142,7 +142,7 @@ class TransactionReturnController extends Controller
                     $physical = Money::quantity('0', (string) $item->stockLayers->where('status', 'ACTIVE')->sum('remaining_quantity'));
                     $primary = $item->base_quantity ?? $item->quantity;
                     $available = $item->track_stock ? app(StockReturnService::class)->portion($item->quantity, $physical, $primary, 3) : $remaining;
-                    $lines[] = ['id' => $item->id, 'product_id' => $item->product_id, 'unit_id' => $item->unit_id, 'name' => $item->name, 'unit' => $item->unit, 'sold' => $item->quantity, 'returned' => (string) $prior, 'remaining' => ReturnSettlementService::minimum($remaining, $available), 'physical' => $physical, 'decimal' => (Unit::find($item->unit_id) ?? $item->product->unit)->allow_decimal, 'price' => $item->cost, 'net' => $item->total];
+                    $lines[] = ['id' => $item->id, 'product_id' => $item->product_id, 'unit_id' => $item->unit_id, 'name' => $item->name, 'unit' => \App\Support\Units::label($item->unit), 'sold' => $item->quantity, 'returned' => (string) $prior, 'remaining' => ReturnSettlementService::minimum($remaining, $available), 'physical' => $physical, 'decimal' => (Unit::find($item->unit_id) ?? $item->product->unit)->allow_decimal, 'price' => $item->cost, 'net' => $item->total];
                 }
             }
         }
@@ -193,7 +193,7 @@ class TransactionReturnController extends Controller
         $service->guard($request->user());
         $data = $request->validate(['customer_id' => 'required|integer|exists:customers,id', 'product_id' => 'required|integer|exists:products,id']);
 
-        return response()->json($service->matches(Product::findOrFail($data['product_id']), Customer::where('active', true)->findOrFail($data['customer_id']), $request->user()));
+        return response()->json(\App\Support\Units::payload($service->matches(Product::findOrFail($data['product_id']), Customer::where('active', true)->findOrFail($data['customer_id']), $request->user())));
     }
 
     public function noReceiptProducts(Request $request, string $kind)
@@ -213,7 +213,7 @@ class TransactionReturnController extends Controller
         }
 
         return $q->orderBy('name')->limit(40)->get()->map(function ($p) use ($request, $service) {
-            $units = app(ProductUnitService::class)->options($p);
+            $units = app(ProductUnitService::class)->publicOptions($p);
             foreach ($units as &$unit) {
                 $unit['suggestion'] = $service->suggestions($p, $unit['id']);
                 if (! $request->user()->hasPermission('returns.view_cost')) {
@@ -241,7 +241,7 @@ class TransactionReturnController extends Controller
             $q->whereHas('categories', fn ($q) => $q->where('categories.id', $request->category_id));
         }
 
-        return $q->orderBy('name')->limit(60)->get()->map(fn ($p) => ['batch_enabled' => Expiry::enabled() && Expiry::setting('expiry_batch_enabled'), 'track_expiry' => Expiry::tracks($p), 'id' => $p->id, 'sku' => $p->sku, 'barcode' => config('features.barcode') ? $p->barcode : null, 'name' => $p->name, 'unit_id' => $p->unit_id, 'unit' => $p->unit->short_name, 'price' => $p->price, 'cost' => $kind === 'purchase' && auth()->user()->hasPermission('returns.view_cost') ? $p->cost : null, 'units' => array_map(fn ($u) => array_diff_key($u, ['cost' => true]), app(ProductUnitService::class)->options($p)), 'price_options' => app(StockLayerService::class)->choices($p)]);
+        return $q->orderBy('name')->limit(60)->get()->map(fn ($p) => ['batch_enabled' => Expiry::enabled() && Expiry::setting('expiry_batch_enabled'), 'track_expiry' => Expiry::tracks($p), 'id' => $p->id, 'sku' => $p->sku, 'barcode' => config('features.barcode') ? $p->barcode : null, 'name' => $p->name, 'unit_id' => $p->unit_id, 'unit' => \App\Support\Units::label($p->unit), 'price' => $p->price, 'cost' => $kind === 'purchase' && auth()->user()->hasPermission('returns.view_cost') ? $p->cost : null, 'units' => array_map(fn ($u) => array_diff_key($u, ['cost' => true]), app(ProductUnitService::class)->publicOptions($p)), 'price_options' => app(StockLayerService::class)->choices($p)]);
     }
 
     public function quote(TransactionReturnRequest $request, string $kind)
@@ -265,7 +265,7 @@ class TransactionReturnController extends Controller
             $q['payment_charge'] = Money::sub($q['payment_charge'], $q['must_pay']);
         }
 
-        return response()->json($q);
+        return response()->json(\App\Support\Units::payload($q));
     }
 
     public function store(TransactionReturnRequest $request, string $kind)

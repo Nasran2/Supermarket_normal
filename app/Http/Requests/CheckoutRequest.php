@@ -23,7 +23,7 @@ class CheckoutRequest extends FormRequest
             'items.*.expires_at' => ['nullable', 'date_format:Y-m-d'],
             'items.*.expired_confirmed' => ['sometimes', 'boolean'],
             'items.*.stock_layer_id' => ['nullable', 'integer', 'min:1', 'exists:product_stock_layers,id'],
-            'items.*.unit_id' => ['nullable', 'integer', 'exists:units,id'],
+            'items.*.unit_id' => [config('features.unit') ? 'nullable' : 'exclude', 'integer', 'exists:units,id'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0', 'max:999999999', 'decimal:0,2'],
             'items.*.use_default_discount' => ['sometimes', 'boolean'],
             'items.*.discount_type' => ['nullable', 'in:AMOUNT,PERCENT'],

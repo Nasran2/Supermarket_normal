@@ -22,7 +22,7 @@ class StockBatchRequest extends FormRequest
             'items.*.expires_at' => [Expiry::enabled() ? 'nullable' : 'exclude', 'date_format:Y-m-d'],
             'items.*.batch_number' => [Expiry::enabled() ? 'nullable' : 'exclude', 'string', 'max:100'],
             'items.*.stock_layer_id' => ['nullable', 'integer', 'exists:product_stock_layers,id'],
-            'items.*.unit_id' => ['required', 'integer', 'exists:units,id'],
+            'items.*.unit_id' => [config('features.unit') ? 'required' : 'exclude', 'integer', 'exists:units,id'],
             'items.*.mode' => ['required', 'in:ADD,REMOVE,SET'],
             'items.*.quantity' => ['required', 'numeric', 'min:0', 'max:999999999999', 'decimal:0,3'],
             'items.*.expected_stock' => ['required', 'numeric', 'min:-999999999999', 'max:999999999999', 'decimal:0,3'],

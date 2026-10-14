@@ -17,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['permission' => PermissionMiddleware::class, 'barcode-feature' => EnsureBarcodeFeatureEnabled::class, 'cheque-feature' => EnsureChequeFeatureEnabled::class]);
+        $middleware->alias(['permission' => PermissionMiddleware::class, 'barcode-feature' => EnsureBarcodeFeatureEnabled::class, 'cheque-feature' => EnsureChequeFeatureEnabled::class, 'unit-feature' => \App\Http\Middleware\EnsureUnitFeatureEnabled::class, 'unit-resources' => \App\Http\Middleware\GuardUnitResources::class]);
         $middleware->appendToGroup('web', [DemoMode::class, BusinessContext::class]);
         // Acquire the demo lock and restore overdue data before binding records.
         $middleware->prependToPriorityList(SubstituteBindings::class, DemoMode::class);

@@ -1,3 +1,4 @@
+import { unitsEnabled, unitLabel } from './units.js';
 import { sellingPriceOptions } from './pos-price-options.js';
 const configElement = document.getElementById('return-config');
 if (configElement) {
@@ -43,7 +44,7 @@ if (configElement) {
     replacements.forEach((r, i) => {
       const card = textElement('article', '', 'return-replacement-card'); card.append(textElement('strong', r.name));
       const qtyLabel = textElement('label', 'Quantity', 'field'), qty = document.createElement('input'); qty.type = 'number'; qty.min = '0.001'; qty.step = '0.001'; qty.value = r.quantity; qty.disabled = resolution() === 'SAME'; qty.addEventListener('input', () => { r.quantity = qty.value; }); qtyLabel.append(qty); card.append(qtyLabel);
-      const unitLabel = textElement('label', 'Unit', 'field'), unit = document.createElement('select'); (r.units || []).forEach((u) => { const o = textElement('option', u.short_name); o.value = u.id; o.selected = u.id === r.unit_id; unit.append(o); }); unit.disabled = resolution() === 'SAME'; unit.addEventListener('change', () => { r.unit_id = Number(unit.value); }); unitLabel.append(unit); card.append(unitLabel);
+      const unitLabel = textElement('label', 'Unit', 'field'), unit = document.createElement('select'); (r.units || []).forEach((u) => { const o = textElement('option', u.short_name); o.value = u.id; o.selected = u.id === r.unit_id; unit.append(o); }); unit.disabled = resolution() === 'SAME'; unit.addEventListener('change', () => { r.unit_id = Number(unit.value); }); unitLabel.append(unit); if (unitsEnabled()) card.append(unitLabel);
       if (c.kind === 'sales') {
         const label = textElement('label', 'Available selling price', 'field'), select = document.createElement('select');
         r.options.forEach((o, index) => { const e = textElement('option', `${currency(o.stock_price)}${o.expiry_label ? ` · Exp ${o.expiry_label}` : ''} · ${o.quantity} available`); e.value = String(index); e.selected = o.stock_price === r.stock_price && (o.expires_at ?? null) === (r.expires_at ?? null); select.append(e); });
@@ -84,7 +85,7 @@ if (configElement) {
       const data = await request(c.quoteUrl, payload());
       if (sequence !== quoteSequence) return;
       latestQuote = data;
-      $('return-review-items').replaceChildren(...data.lines.map((l) => textElement('p', `${l.name} × ${l.quantity} ${l.unit}${l.stock_action ? ` · ${({ RESTOCK: 'Restock', WRITEOFF: 'Write off', SUPPLIER: 'Return to supplier' })[l.stock_action]}` : ''} · ${currency(l.amount)}`)));
+      $('return-review-items').replaceChildren(...data.lines.map((l) => textElement('p', `${l.name} × ${l.quantity} ${unitLabel(l.unit)}${l.stock_action ? ` · ${({ RESTOCK: 'Restock', WRITEOFF: 'Write off', SUPPLIER: 'Return to supplier' })[l.stock_action]}` : ''} · ${currency(l.amount)}`)));
       const totals = $('return-review-totals'); totals.replaceChildren();
       [['Returned items', data.amount], ['Refundable original fees', data.fee_refund || 0], ['Original bill due reduced', data.due_reduction], ['Available credit', data.available_credit], ['Replacement products', data.replacement_value], ['Other account due available', data.customer_due_available ?? data.supplier_due_available ?? 0], ['Other account due reduced', data.apply_due], ['Refund / money received', data.refund_amount], ['Payment charge', data.payment_charge || 0]].forEach(([name, amount]) => { const row = document.createElement('div'); row.append(textElement('span', name), textElement('strong', currency(amount))); totals.append(row); });
       const paying = Number(data.must_pay) > 0, owed = Number(data.owed) > 0;

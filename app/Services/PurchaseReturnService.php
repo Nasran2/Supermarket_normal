@@ -92,7 +92,7 @@ class PurchaseReturnService
                     $input['cost'] = $input['cost'] ?? $original->cost;
                 }
                 $product = Product::with(['unit', 'conversions.unit'])->whereKey($input['product_id'])->where('active', true)->firstOrFail();
-                $selected = app(ProductUnitService::class)->resolve($product, $input['unit_id'] ?? null, (string) $input['quantity']);
+                $selected = app(ProductUnitService::class)->resolve($product, $input['unit_id'] ?? null, (string) $input['quantity'], historical: $resolution === 'SAME');
                 $cost = Money::round((string) ($input['cost'] ?? $product->cost));
                 $price = Money::round((string) ($input['selling_price'] ?? $selected['price']));
                 if (Money::compare($cost, 0) < 0 || Money::compare($price, 0) < 0) {
@@ -191,7 +191,7 @@ class PurchaseReturnService
                 Expense::create(['expense_category_id' => $cat->id, 'user_id' => $user->id, 'type' => 'RETURN_WRITEOFF', 'expense_date' => today(), 'reference' => $r->reference, 'description' => 'Non-refundable landed cost · '.$p->reference, 'amount' => $unrecovered]);
             }
             if ($q['replacements']) {
-                $replacement = app(PurchaseService::class)->save(['supplier_id' => $p->supplier_id, 'purchase_date' => today()->toDateString(), 'auto_reference' => true, 'payment_mode' => 'UNPAID', 'items' => array_map(fn ($line) => array_diff_key($line, ['total' => true]), $q['replacements'])], $user->id);
+                $replacement = app(PurchaseService::class)->save(['supplier_id' => $p->supplier_id, 'purchase_date' => today()->toDateString(), 'auto_reference' => true, 'payment_mode' => 'UNPAID', 'items' => array_map(fn ($line) => array_diff_key($line, ['total' => true]), $q['replacements'])], $user->id, historicalExchange: $q['resolution'] === 'SAME');
                 $r->update(['replacement_purchase_id' => $replacement->id]);
                 $credit = ReturnSettlementService::minimum($q['available_credit'], $q['replacement_value']);
                 if (Money::compare($credit, 0) > 0) {

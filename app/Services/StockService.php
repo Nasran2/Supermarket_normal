@@ -22,7 +22,7 @@ class StockService
             throw ValidationException::withMessages(['items' => 'Quantities support up to '.$precision.' decimal places.']);
         }
         if (! $product->unit->allow_decimal && Money::compare($quantity, BigDecimal::of($quantity)->toScale(0, RoundingMode::DOWN)->__toString()) !== 0) {
-            throw ValidationException::withMessages(['items' => $product->name.' uses '.$product->unit->short_name.' and requires whole quantities.']);
+            throw ValidationException::withMessages(['items' => $product->name.(\App\Support\Units::enabled() ? ' uses '.$product->unit->short_name.' and' : '').' requires whole quantities.']);
         }
     }
 

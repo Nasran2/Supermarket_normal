@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('title','Dashboard') · {{ $settings['business_name'] ?? 'Twinsofte' }}</title>@vite(['resources/css/app.css','resources/js/app.js'])@stack('head')</head>
+<html lang="en" data-units="{{ config('features.unit')?'1':'0' }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('title','Dashboard') · {{ $settings['business_name'] ?? 'Twinsofte' }}</title>@vite(['resources/css/app.css','resources/js/app.js'])@stack('head')</head>
 <body class="@yield('body-class')">
 <x-demo-watermark/>
 @php($currentRegister = app(\App\Services\RegisterService::class)->current(auth()->id()))

@@ -44,6 +44,10 @@ class SettingsRequest extends FormRequest
             }
         }
 
+        if (! \App\Support\Units::enabled()) {
+            unset($r['show_unit']);
+        }
+
         return $r;
     }
 

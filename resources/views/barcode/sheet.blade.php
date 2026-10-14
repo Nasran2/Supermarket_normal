@@ -14,7 +14,7 @@ $fontSizes=app(\App\Services\BarcodePresetService::class)->fontSizes($c);
 .barcode-label{padding:{{ $c['padding_top'] }}mm {{ $c['padding_right'] }}mm {{ $c['padding_bottom'] }}mm {{ $c['padding_left'] }}mm;text-align:{{ $c['alignment'] }};{{ $c['print_border']?'outline:0.15mm solid #000;':'' }};background:white;color:black}
 .barcode-label-content{height:100%;display:flex;flex-direction:column;justify-content:center;gap:0}.barcode-label-content>*{flex:none;box-sizing:border-box;line-height:1.08;margin:0;padding:0;max-width:100%}.barcode-label-graphic{height:{{ $c['barcode_height'] }}mm;display:flex;justify-content:{{ ['left'=>'flex-start','center'=>'center','right'=>'flex-end'][$c['barcode_alignment']] }}}
 .barcode-label-graphic svg{display:block;height:{{ $c['barcode_height'] }}mm;max-width:100%;background:#fff}
-@foreach(\App\Services\BarcodePresetService::CONTENT as $key).barcode-label-{{ $key }}{font-size:{{ $fontSizes[$key]*0.75 }}pt;font-weight:{{ $c[$key.'_bold']?'700':'400' }}}
+@foreach(\App\Services\BarcodePresetService::CONTENT as $key)@continue($key==='unit' && ! \App\Support\Units::enabled()).barcode-label-{{ $key }}{font-size:{{ $fontSizes[$key]*0.75 }}pt;font-weight:{{ $c[$key.'_bold']?'700':'400' }}}
 @endforeach
 .barcode-label-product_name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:{{ $c['product_name_lines'] }};overflow:hidden;overflow-wrap:anywhere}
 .barcode-label-product_name.barcode-name-ellipsis{-webkit-line-clamp:1;display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
@@ -35,7 +35,7 @@ $svgKey=$label['barcode_type'].'|'.$label['barcode'];
 $svgCache[$svgKey]??=app(\App\Services\BarcodeService::class)->svg($label['barcode'],$label['barcode_type'],(string)\Brick\Math\BigDecimal::of($c['sticker_width'])->minus($c['padding_left'])->minus($c['padding_right']),$c['barcode_height']);
 @endphp<div class="barcode-label-graphic">{!! $svgCache[$svgKey] !!}</div>@endif
 @if($c['show_barcode_number'])<div class="barcode-label-barcode_number">{{ $label['barcode'] }}</div>@endif
-@foreach(['sku','unit','expiry','batch','custom_text','secret_code'] as $key)
+@foreach(['sku','unit','expiry','batch','custom_text','secret_code'] as $key)@continue($key==='unit' && ! \App\Support\Units::enabled())
 @continue(!$c['show_'.$key] || (in_array($key,['expiry','batch']) && !config('features.expiry')))
 @php($value=in_array($key,['custom_text','secret_code'])?$c[$key]:($label[$key]??null))
 @if($value)<div class="barcode-label-{{ $key }}">{{ $key==='expiry'?'Exp: '.\Carbon\Carbon::parse($value)->format('d/m/Y'):($key==='batch'?'Batch: '.$value:$value) }}</div>@endif

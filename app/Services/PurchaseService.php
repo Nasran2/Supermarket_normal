@@ -19,9 +19,9 @@ class PurchaseService
 {
     public function __construct(private StockService $stock) {}
 
-    public function save(array $data, int $userId, ?Purchase $purchase = null): Purchase
+    public function save(array $data, int $userId, ?Purchase $purchase = null, bool $historicalExchange = false): Purchase
     {
-        return DB::transaction(function () use ($data, $userId, $purchase) {
+        return DB::transaction(function () use ($data, $userId, $purchase, $historicalExchange) {
             $user = User::findOrFail($userId);
             if (! $user->hasPermission('purchases.manage_charges')) {
                 if ($purchase) {
@@ -70,9 +70,9 @@ class PurchaseService
             foreach ($data['items'] as $index => $item) {
                 $p = $products->get($item['product_id']);
                 if (! $p || ! $p->active || ! $p->unit->active) {
-                    throw ValidationException::withMessages(['items' => 'Choose active products and units.']);
+                    throw ValidationException::withMessages(['items' => 'Choose available products.']);
                 }
-                $selected = app(ProductUnitService::class)->resolve($p, $item['unit_id'] ?? null, (string) $item['quantity']);
+                $selected = app(ProductUnitService::class)->resolve($p, $item['unit_id'] ?? null, (string) $item['quantity'], historical: $historicalExchange);
                 $baseCost = app(ProductUnitService::class)->rate((string) $item['cost'], $selected['converted_quantity'], $selected['base_quantity']);
                 if (Money::compare($baseCost, '9999999999999.99') > 0) {
                     throw ValidationException::withMessages(['items' => 'Converted cost exceeds the supported range.']);

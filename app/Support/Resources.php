@@ -36,7 +36,12 @@ class Resources
         $all = self::all();
         abort_unless(isset($all[$resource]), 404);
 
-        return $all[$resource];
+        $definition = $all[$resource];
+        if ($resource === 'products' && ! Units::enabled()) {
+            unset($definition['fields']['unit_id'], $definition['columns']['unit.short_name']);
+        }
+
+        return $definition;
     }
 
     public static function permission(string $resource, string $action): string

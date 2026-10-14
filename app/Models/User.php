@@ -37,6 +37,9 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
+        if (\App\Support\Units::permission($permission) && ! \App\Support\Units::enabled()) {
+            return false;
+        }
         if (str_starts_with($permission, 'cheques.') && ! config('features.cheque')) {
             return false;
         }

@@ -1,3 +1,5 @@
+const lineUnit = document.getElementById('line-unit') || document.createElement('select');
+import { unitsEnabled, unitLabel, quantityText } from './units.js';
 import { draftStore } from './pos-draft.js';
 import { sellingPriceOptions, priceOptionForItem, stockChoiceKey } from './pos-price-options.js';
 import { createProductScanner, exactProductMatch } from './pos-scanner.js';
@@ -225,7 +227,7 @@ async function restoreDraft() {
     });
     orderLoading = false;
     message.textContent = cart.some((p) => p.unavailable)
-      ? 'Some saved items or units are unavailable. Edit their unit or remove them before payment.'
+      ? 'Some saved items are unavailable. Edit or remove them before payment.'
       : 'Saved order restored.';
     render();
   } catch (error) {
@@ -412,7 +414,7 @@ async function search(autoAdd = false, page = 1) {
       ? products
           .map(
             (p) =>
-              `<button class="product-tile" data-product="${p.id}" type="button">${p.image ? `<img src="${escape(p.image)}" alt="${escape(p.name)}">` : `<span class="product-art"><i data-lucide="package"></i></span>`}<strong>${escape(p.name)}</strong><small>${escape(p.category)} · ${escape(p.sku)}</small><span class="tile-bottom"><b>${priceRange(p)}</b><span>${p.track_stock === false ? 'Stock not maintained' : `${Number(p.stock)} ${escape(p.unit)}`}</span></span></button>`,
+              `<button class="product-tile" data-product="${p.id}" type="button">${p.image ? `<img src="${escape(p.image)}" alt="${escape(p.name)}">` : `<span class="product-art"><i data-lucide="package"></i></span>`}<strong>${escape(p.name)}</strong><small>${escape(p.category)} · ${escape(p.sku)}</small><span class="tile-bottom"><b>${priceRange(p)}</b><span>${p.track_stock === false ? 'Stock not maintained' : `${escape(quantityText(p.stock, p.unit))}`}</span></span></button>`,
           )
           .join('')
       : '<div class="empty-state col-span-full"><i data-lucide="search-x"></i><h3>No products found</h3><p>Add products or change your search.</p></div>';
@@ -476,7 +478,7 @@ function add(p) {
   $('price-choice-options').innerHTML = groups
     .map(
       (group, index) =>
-        `<button type="button" class="price-choice" data-price-choice="${index}"><span class="price-choice-rate"><small>Selling price / ${escape(p.unit)}</small><strong>${moneyHTML(group.stock_price)}</strong>${p.track_expiry && p.show_expiry ? `<small>Expiry: ${escape(group.expiry_label)} · ${escape(group.expiry_status)}</small>${['Urgent', 'Expiring soon'].includes(group.expiry_status) ? `<small class="text-warning">Expires in ${group.days_remaining} days</small>` : ''}${group.recommended ? '<small>Recommended — earliest expiry</small>' : ''}` : ''}${group.reference ? `<small class="price-choice-source">${escape(group.reference)}</small>` : ''}${group.received ? `<small class="price-choice-received">${escape(group.received)}</small>` : ''}</span><span class="price-choice-stock"><strong>${Number(group.quantity).toLocaleString()} ${escape(p.unit)}</strong><small>Available stock</small><span class="price-choice-add">Add to cart <kbd>${index + 1}</kbd></span></span></button>`,
+        `<button type="button" class="price-choice" data-price-choice="${index}"><span class="price-choice-rate"><small>Selling price${unitsEnabled() ? ' / ' + escape(unitLabel(p.unit)) : ''}</small><strong>${moneyHTML(group.stock_price)}</strong>${p.track_expiry && p.show_expiry ? `<small>Expiry: ${escape(group.expiry_label)} · ${escape(group.expiry_status)}</small>${['Urgent', 'Expiring soon'].includes(group.expiry_status) ? `<small class="text-warning">Expires in ${group.days_remaining} days</small>` : ''}${group.recommended ? '<small>Recommended — earliest expiry</small>' : ''}` : ''}${group.reference ? `<small class="price-choice-source">${escape(group.reference)}</small>` : ''}${group.received ? `<small class="price-choice-received">${escape(group.received)}</small>` : ''}</span><span class="price-choice-stock"><strong>${Number(group.quantity).toLocaleString()}${unitLabel(p.unit) ? ' ' + escape(unitLabel(p.unit)) : ''}</strong><small>Available stock</small><span class="price-choice-add">Add to cart <kbd>${index + 1}</kbd></span></span></button>`,
     )
     .join('');
   priceDialog.showModal();
@@ -578,7 +580,7 @@ function render(persist = true) {
     ? cart
         .map(
           (p) =>
-            `<div class="cart-line compact-cart-line" data-cart-id="${p.line_key}"><button class="cart-item-name ${lineDiscountCents(p) > 0n ? 'has-line-discount' : ''} ${p.unavailable ? 'unavailable' : ''}" data-action="edit" type="button" title="${escape(p.name)} · ${escape(p.unit)} · Edit price and line discount" aria-label="Edit ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><span>${escape(p.name)}</span><small>${escape(p.unit)} · ${moneyHTML(p.unit_price ?? p.price)}${p.stock_reference ? ` · ${escape(p.stock_reference)}` : ''}</small>${p.track_expiry && p.show_expiry && (p.expires_at || p.expiry_label) ? `<small>Exp: ${escape(p.expiry_label || p.expires_at)}${['Urgent', 'Expiring soon'].includes(p.expiry_status) ? ` · Expires in ${p.days_remaining} days` : ''}</small>` : ''}${lineDiscountCents(p) > 0n ? `<small class="cart-item-discount">${p.use_default_discount ? 'Default' : 'Discount'} −${moneyHTML(Number(lineDiscountCents(p)) / 100)}</small>` : ''}</button><div class="cart-qty-controls"><button class="icon-button" data-action="minus" type="button" aria-label="Decrease quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>−</button><input class="cart-quantity" type="number" required max="999999" min="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" step="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" value="${p.quantity}" aria-label="Quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><button class="icon-button" data-action="plus" type="button" aria-label="Increase quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>+</button></div><strong class="cart-line-amount" title="${moneyHTML(Number(lineCents(p)) / 100)}">${moneyHTML(Number(lineCents(p)) / 100)}</strong><button class="icon-button cart-remove" ${orderLoading ? 'disabled' : ''} data-action="remove" title="Remove item" aria-label="Remove ${escape(p.name)}" type="button"><i data-lucide="x" style="width:14px"></i></button></div>`,
+            `<div class="cart-line compact-cart-line" data-cart-id="${p.line_key}"><button class="cart-item-name ${lineDiscountCents(p) > 0n ? 'has-line-discount' : ''} ${p.unavailable ? 'unavailable' : ''}" data-action="edit" type="button" title="${escape(p.name)}${unitsEnabled() ? ' · ' + escape(unitLabel(p.unit)) : ''} · Edit price and line discount" aria-label="Edit ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><span>${escape(p.name)}</span><small>${unitsEnabled() ? escape(unitLabel(p.unit)) + ' · ' : ''}${moneyHTML(p.unit_price ?? p.price)}${p.stock_reference ? ` · ${escape(p.stock_reference)}` : ''}</small>${p.track_expiry && p.show_expiry && (p.expires_at || p.expiry_label) ? `<small>Exp: ${escape(p.expiry_label || p.expires_at)}${['Urgent', 'Expiring soon'].includes(p.expiry_status) ? ` · Expires in ${p.days_remaining} days` : ''}</small>` : ''}${lineDiscountCents(p) > 0n ? `<small class="cart-item-discount">${p.use_default_discount ? 'Default' : 'Discount'} −${moneyHTML(Number(lineDiscountCents(p)) / 100)}</small>` : ''}</button><div class="cart-qty-controls"><button class="icon-button" data-action="minus" type="button" aria-label="Decrease quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>−</button><input class="cart-quantity" type="number" required max="999999" min="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" step="${p.decimal ? String(10 ** -Number(pos.dataset.quantityPrecision)) : '1'}" value="${p.quantity}" aria-label="Quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}><button class="icon-button" data-action="plus" type="button" aria-label="Increase quantity for ${escape(p.name)}" ${orderLoading ? 'disabled' : ''}>+</button></div><strong class="cart-line-amount" title="${moneyHTML(Number(lineCents(p)) / 100)}">${moneyHTML(Number(lineCents(p)) / 100)}</strong><button class="icon-button cart-remove" ${orderLoading ? 'disabled' : ''} data-action="remove" title="Remove item" aria-label="Remove ${escape(p.name)}" type="button"><i data-lucide="x" style="width:14px"></i></button></div>`,
         )
         .join('')
     : `<div class="cart-empty"><i data-lucide="shopping-basket" style="width:35px;height:35px"></i><strong>Your order is empty</strong><small>${pos.dataset.barcode === '1' ? 'Scan a barcode or choose a product.' : 'Choose a product to start.'}</small></div>`;
@@ -696,7 +698,7 @@ function syncQuantities() {
   for (const input of document.querySelectorAll('.cart-quantity')) {
     if (!validQuantity(input)) {
       input.reportValidity();
-      message.textContent = 'Enter a valid quantity for this unit.';
+      message.textContent = 'Enter a valid quantity.';
       return false;
     }
     const p = cart.find((p) => p.line_key === input.closest('[data-cart-id]').dataset.cartId);
@@ -809,7 +811,7 @@ function openLine(item) {
   editingLine = item;
   $('line-editor-title').textContent = item.name;
   $('line-editor-product').textContent = 'Edit this item. The cart displays only its final amount.';
-  const select = $('line-unit');
+  const select = lineUnit;
   select.replaceChildren();
   (item.units || []).forEach((unit) => {
     const option = document.createElement('option');
@@ -817,7 +819,7 @@ function openLine(item) {
     option.textContent = `${unit.name} (${unit.short_name})`;
     select.append(option);
   });
-  select.value = item.unit_id;
+  select.value = unitsEnabled() ? item.unit_id : item.units?.[0]?.id;
   $('line-quantity').value = item.quantity;
   $('line-price').value = item.unit_price ?? item.price;
   $('line-use-default').checked = item.use_default_discount === true;
@@ -836,7 +838,7 @@ function openLine(item) {
   lineDialog.scrollTop = 0;
 }
 function currentLineEdit() {
-  const unit = editingLine?.units?.find((u) => u.id === Number($('line-unit').value));
+  const unit = editingLine?.units?.find((u) => u.id === Number(lineUnit.value));
   const price = $('line-price').value;
   return {
     ...editingLine,
@@ -860,12 +862,12 @@ function updateLineEditor() {
   $('line-quantity').min = step;
   $('line-discount-value').max = item.discount_type === 'PERCENT' ? '100' : '999999999';
   $('line-catalog-price').textContent =
-    `Catalogue price: ${money(item.price)} / ${item.unit || 'unit'}`;
+    `Catalogue price: ${money(item.price)}${unitsEnabled() ? ' / ' + (item.unit || 'unit') : ''}`;
   $('line-preview-total').textContent =
     lineCents(item) < 0n ? 'Review discount' : money(Number(lineCents(item)) / 100);
 }
-$('line-unit').addEventListener('change', () => {
-  const unit = editingLine.units.find((u) => u.id === Number($('line-unit').value));
+lineUnit.addEventListener('change', () => {
+  const unit = editingLine.units.find((u) => u.id === Number(lineUnit.value));
   $('line-price').value = unit?.price || '0';
   $('line-quantity').value = '1';
   $('line-discount-value').value = $('line-use-default').checked
@@ -878,7 +880,7 @@ $('line-form').addEventListener('input', updateLineEditor);
   $(id).addEventListener('click', () => lineDialog.close()),
 );
 $('reset-line-price').addEventListener('click', () => {
-  const unit = editingLine.units.find((u) => u.id === Number($('line-unit').value));
+  const unit = editingLine.units.find((u) => u.id === Number(lineUnit.value));
   $('line-price').value = unit?.price || '0';
   $('line-use-default').checked = true;
   $('line-discount-value').value = editingLine.default_discount_value || '0';
@@ -911,7 +913,7 @@ $('line-form').addEventListener('submit', (event) => {
       scaled(item.unit_price ?? item.price, 2) < scaled(item.price, 2))
   ) {
     error.textContent = item.unavailable
-      ? 'Choose an available unit or remove this item from the cart.'
+      ? 'Choose an available item or remove it from the cart.'
       : lineCents(item) < 0n
         ? 'Line discount cannot exceed the line amount.'
         : 'Price reductions are disabled in POS settings.';

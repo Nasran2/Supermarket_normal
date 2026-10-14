@@ -50,13 +50,13 @@ class SaleService
         foreach ($data['items'] as $item) {
             $p = $products->get($item['product_id']);
             if (! $p || ! $p->active || ! $p->unit->active) {
-                throw ValidationException::withMessages(['items' => 'One or more products or units are inactive.']);
+                throw ValidationException::withMessages(['items' => 'One or more products are unavailable.']);
             }
             $q = (string) $item['quantity'];
             $units = app(ProductUnitService::class);
-            $baseQuantity = $units->resolve($p, $item['unit_id'] ?? null, $q)['base_stock_quantity'];
+            $baseQuantity = $units->resolve($p, $item['unit_id'] ?? null, $q, historical: $historicalExchange)['base_stock_quantity'];
             $allocation = app(StockLayerService::class)->plan($p, $baseQuantity, isset($item['stock_price']) ? (string) $item['stock_price'] : null, $reserved, $lock, $editing, isset($item['stock_layer_id']) ? (int) $item['stock_layer_id'] : null, $returnCredits, $item['expires_at'] ?? null, (bool) ($item['expired_confirmed'] ?? false));
-            $selected = $units->resolve($p, $item['unit_id'] ?? null, $q, $allocation['stock_price']);
+            $selected = $units->resolve($p, $item['unit_id'] ?? null, $q, $allocation['stock_price'], $historicalExchange);
             abort_if(! $historicalExchange && isset($item['unit_price']) && Money::compare($item['unit_price'], $selected['price']) !== 0 && ! $user->hasPermission('pos.override_price'), 403);
             $useDefault = (bool) ($item['use_default_discount'] ?? (! isset($item['discount_type']) && ! isset($item['discount_value'])));
             if ($useDefault) {
@@ -120,7 +120,7 @@ class SaleService
             }
         }
 
-        return $quote;
+        return \App\Support\Units::payload($quote);
     }
 
     public function complete(array $data, User $user): Sale

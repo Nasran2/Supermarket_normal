@@ -35,7 +35,7 @@ class Permissions
         foreach ([
             'pos.access' => ['Point of sale', 'Open POS', 'Search products and build a cart. Completing an order also requires Create sales.', []],
             'pos.discount' => ['Point of sale', 'Apply discounts', 'Apply item and invoice discounts within the configured limits.', ['sales.create', 'sales.edit']],
-            'pos.override_price' => ['Point of sale', 'Override selling price', 'Change the unit price for an order.', ['sales.create', 'sales.edit']],
+            'pos.override_price' => ['Point of sale', 'Override selling price', 'Change the price for an order.', ['sales.create', 'sales.edit']],
             'pos.split_payment' => ['Point of sale', 'Split payments', 'Use multiple payment methods on an order.', ['sales.create', 'sales.edit']],
             'pos.due_sale' => ['Point of sale', 'Complete a sale with a balance due', 'Record unpaid or partially paid sales for a named customer.', ['sales.create']],
             'sales.void' => ['Sales', 'Void sale', 'Reverse a completed sale while retaining its audit history.', []],
@@ -122,7 +122,7 @@ class Permissions
 
     public static function visible(): array
     {
-        return array_filter(self::all(), fn ($info, $name) => (config('features.cheque') || ! str_starts_with($name, 'cheques.')) && (config('features.barcode') || ! str_starts_with($name, 'barcode.')) && (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
+        return array_filter(self::all(), fn ($info, $name) => (Units::enabled() || ! Units::permission($name)) && (config('features.cheque') || ! str_starts_with($name, 'cheques.')) && (config('features.barcode') || ! str_starts_with($name, 'barcode.')) && (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
     }
 
     public static function info(string $name): array

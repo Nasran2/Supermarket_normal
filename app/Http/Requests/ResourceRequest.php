@@ -109,7 +109,7 @@ class ResourceRequest extends FormRequest
         if ($resource === 'expenses') {
             $r['amount'][] = 'gt:0';
         }
-        if (in_array($resource, ['products', 'unit-presets'])) {
+        if (in_array($resource, ['products', 'unit-presets']) && \App\Support\Units::enabled()) {
             $r['conversions'] = ['sometimes', 'array', 'max:20'];
             $r['conversions.*'] = ['array:unit_id,base_quantity,converted_quantity'.($resource === 'products' ? ',price' : '')];
             $r['conversions.*.unit_id'] = ['required', 'integer', 'distinct', Rule::exists('units', 'id')->where('active', true), 'different:unit_id'];
@@ -146,6 +146,9 @@ class ResourceRequest extends FormRequest
             $r['track_stock'] = ['sometimes', 'boolean'];
             $r['default_discount_type'] = ['sometimes', 'in:NONE,AMOUNT,PERCENT'];
             $r['default_discount_value'] = ['sometimes', 'numeric', 'min:0', 'max:'.($this->input('default_discount_type') === 'PERCENT' ? 100 : 999999999), 'decimal:0,2'];
+        }
+        if ($resource === 'products' && ! \App\Support\Units::enabled()) {
+            unset($r['unit_id']);
         }
         if ($resource === 'products' && $id) {
             unset($r['stock']);

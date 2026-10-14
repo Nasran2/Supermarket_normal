@@ -95,6 +95,9 @@ final class AuditPresentation
     {
         $result = [];
         foreach ($values as $key => $value) {
+            if (! Units::enabled() && in_array($key, ['unit', 'unit_id', 'primary_unit_id', 'unit_name', 'short_name', 'conversions', 'base_quantity', 'converted_quantity', 'allow_decimal', 'default_slot', 'show_unit', 'unit_font_size', 'unit_bold'])) {
+                continue;
+            }
             if (! config('features.cheque') && (str_starts_with((string) $key, 'cheque') || (is_array($value) && (($value['method_type'] ?? '') === 'CHEQUE' || ! empty($value['cheque_id']))))) {
                 continue;
             }

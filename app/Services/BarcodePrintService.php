@@ -28,13 +28,13 @@ class BarcodePrintService
 
                     continue;
                 }
-                $result[$key] = ['key' => $key, 'price' => $price, 'unit_id' => $unit['id'], 'unit' => $unit['short_name'], 'stock' => $qty, 'layer_id' => $lot, 'expires_at' => Expiry::tracks($p) ? $layer->expires_at?->format('Y-m-d') : null, 'batch_number' => Expiry::tracks($p) ? $layer->batch_number : null];
+                $result[$key] = ['key' => $key, 'price' => $price, 'unit_id' => $unit['id'], 'unit' => \App\Support\Units::label($unit['short_name']), 'stock' => $qty, 'layer_id' => $lot, 'expires_at' => Expiry::tracks($p) ? $layer->expires_at?->format('Y-m-d') : null, 'batch_number' => Expiry::tracks($p) ? $layer->batch_number : null];
             }
         }
         if (! $result) {
             foreach (app(ProductUnitService::class)->options($p) as $u) {
                 $key = $u['id'].'|'.$u['price'].'|';
-                $result[$key] = ['key' => $key, 'price' => $u['price'], 'unit_id' => $u['id'], 'unit' => $u['short_name'], 'stock' => $p->track_stock ? $p->stock : '0.000', 'layer_id' => null, 'expires_at' => null, 'batch_number' => null];
+                $result[$key] = ['key' => $key, 'price' => $u['price'], 'unit_id' => $u['id'], 'unit' => \App\Support\Units::label($u['short_name']), 'stock' => $p->track_stock ? $p->stock : '0.000', 'layer_id' => null, 'expires_at' => null, 'batch_number' => null];
             }
         }
 
@@ -82,7 +82,7 @@ class BarcodePrintService
             }
             $option = collect($this->options($p))->firstWhere('key', $row['option']);
             if (! $option) {
-                throw ValidationException::withMessages(['items.'.$i.'.option' => 'Select an available selling price, unit and stock lot.']);
+                throw ValidationException::withMessages(['items.'.$i.'.option' => \App\Support\Units::enabled() ? 'Select an available selling price, unit and stock lot.' : 'Select an available selling price and stock lot.']);
             }
             $quantity = (int) $row['quantity'];
             $total += $quantity;

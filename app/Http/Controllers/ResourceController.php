@@ -193,7 +193,7 @@ class ResourceController extends Controller
         }
         if (in_array($resource, ['products', 'unit-presets'])) {
             if ($resource === 'products' && ! $record->exists) {
-                $record->unit_id = app(DefaultUnitService::class)->current()?->id;
+                $record->unit_id = app(DefaultUnitService::class)->resolve()->id;
             }
             $units = Unit::where('active', true)->orderBy('name')->get();
             $presets = UnitPreset::with(['unit', 'conversions.unit'])->orderBy('name')->get();

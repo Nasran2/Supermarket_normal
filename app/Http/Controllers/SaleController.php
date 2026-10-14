@@ -75,13 +75,15 @@ class SaleController extends Controller
             'payments' => $sale->payments->map(fn ($p) => ['id' => $p->payment_method_id, 'name' => $p->method_name, 'amount' => $p->sale_amount, 'collected' => Money::sub($p->amount_paid, $p->change), 'reference' => $p->reference ?? ''])->all(),
             'items' => $sale->items->map(function ($i) {
                 $stockPrice = $i->stock_price ?? app(ProductUnitService::class)->rate($i->catalog_price ?? $i->price, $i->quantity, $i->base_quantity ?? $i->quantity);
-                $options = array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->options($i->product, $stockPrice));
-                $id = $i->unit_id ?? $i->product->unit_id;
+                $options = array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->publicOptions($i->product, $stockPrice));
+                $id = \App\Support\Units::enabled() ? ($i->unit_id ?? $i->product->unit_id) : $i->product->unit_id;
+                $quantity = \App\Support\Units::enabled() ? $i->quantity : ($i->base_quantity ?? $i->quantity);
+                $price = \App\Support\Units::enabled() ? $i->price : app(ProductUnitService::class)->rate($i->price, $i->quantity, $quantity);
                 $selected = collect($options)->firstWhere('id', $id);
 
                 $allocation = $i->allocations->count() === 1 ? $i->allocations->first() : null;
 
-                return ['expires_at' => $allocation?->expires_at, 'use_default_discount' => false, 'track_stock' => $i->track_stock, 'stock_layer_id' => $allocation?->stock_layer_id, 'stock_reference' => $allocation?->layer?->source_reference ?? '', 'stock_price' => $stockPrice, 'line_key' => (string) Str::uuid(), 'id' => $i->product_id, 'name' => $i->name, 'units' => $options, 'unit_id' => $id, 'unit' => $i->unit, 'decimal' => $selected['decimal'] ?? false, 'price' => $i->catalog_price ?? $i->price, 'unit_price' => $i->price, 'quantity' => $i->quantity, 'discount_type' => $i->discount_type ?? 'AMOUNT', 'discount_value' => $i->discount_value ?? '0', 'unavailable' => ! $selected || ! $i->product->active || ! $i->product->unit->active];
+                return ['expires_at' => $allocation?->expires_at, 'use_default_discount' => false, 'track_stock' => $i->track_stock, 'stock_layer_id' => $allocation?->stock_layer_id, 'stock_reference' => $allocation?->layer?->source_reference ?? '', 'stock_price' => $stockPrice, 'line_key' => (string) Str::uuid(), 'id' => $i->product_id, 'name' => $i->name, 'units' => $options, 'unit_id' => $id, 'unit' => \App\Support\Units::label($i->unit), 'decimal' => $selected['decimal'] ?? false, 'price' => \App\Support\Units::enabled() ? ($i->catalog_price ?? $i->price) : $stockPrice, 'unit_price' => $price, 'quantity' => $quantity, 'discount_type' => $i->discount_type ?? 'AMOUNT', 'discount_value' => $i->discount_value ?? '0', 'unavailable' => ! $selected || ! $i->product->active || ! $i->product->unit->active];
             })->all()];
 
         return view('pos.index', compact('register', 'methods', 'customers', 'categories', 'editingSale', 'editSeed'));

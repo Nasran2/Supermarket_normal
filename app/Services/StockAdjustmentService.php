@@ -35,14 +35,14 @@ class StockAdjustmentService
             foreach ($data['items'] as $i => $input) {
                 $p = $products->get($input['product_id']);
                 if (! $p || ! $p->track_stock || ! $p->active || ! $p->unit->active) {
-                    $this->fail('Choose active products with active primary units.');
+                    $this->fail('Choose available products with stock tracking.');
                 }
-                if ((int) $input['unit_id'] !== $p->unit_id || Money::compare($input['expected_stock'], $p->stock) !== 0 || Money::compare($input['expected_price'], $p->price) !== 0 || ($user->hasPermission('products.view_cost') && Money::compare($input['expected_cost'], $p->cost) !== 0)) {
+                if ((\App\Support\Units::enabled() && (int) ($input['unit_id'] ?? 0) !== $p->unit_id) || Money::compare($input['expected_stock'], $p->stock) !== 0 || Money::compare($input['expected_price'], $p->price) !== 0 || ($user->hasPermission('products.view_cost') && Money::compare($input['expected_cost'], $p->cost) !== 0)) {
                     $this->fail($p->name.' changed since it was selected. Reload the product before saving.');
                 }
                 $old = $oldItems->get($p->id);
                 if ($old && $old->unit_id !== $p->unit_id) {
-                    $this->fail('The primary unit changed. This adjustment cannot be edited.');
+                    $this->fail('The stock basis changed. This adjustment cannot be edited.');
                 }
                 $qty = (string) $input['quantity'];
                 if (Money::compare($qty, 0) > 0) {
@@ -142,7 +142,7 @@ class StockAdjustmentService
             foreach ($batch->items as $item) {
                 $p = $products->get($item->product_id);
                 if (! $p || $p->unit_id !== $item->unit_id) {
-                    $this->fail('A product or primary unit changed; this batch cannot be reversed.');
+                    $this->fail('A product changed; this batch cannot be reversed.');
                 }
                 $delta = (string) BigDecimal::of($item->quantity_change)->negated()->toScale(3);
                 if (Money::compare(Money::quantity($p->stock, $delta), 0) < 0) {

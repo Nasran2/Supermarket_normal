@@ -64,7 +64,8 @@ if (library) {
 }
 
 const guide = document.querySelector('#documentation-guide');
-if (guide) {
+guide?.querySelector('[data-documentation-print]')?.addEventListener('click', () => window.print());
+if (guide?.querySelector('.documentation-player')) {
   const labels = JSON.parse(guide.dataset.documentationLabels);
   const scenes = [...guide.querySelectorAll('[data-demo-scene]')];
   const written = [...guide.querySelectorAll('[data-written-step]')];
@@ -263,7 +264,7 @@ if (guide) {
     expand.setAttribute('aria-expanded', 'false');
     expand.focus({ preventScroll: true });
   });
-  guide.querySelector('[data-documentation-print]').addEventListener('click', () => window.print());
+
   const pause = () => {
     stopTimer(true);
     playing = false;

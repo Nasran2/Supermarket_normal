@@ -24,7 +24,7 @@ class PurchaseChargeService
             $allocated = $cumulative;
             $line['base_cost'] = (string) BigDecimal::of(Money::add($line['total'], $line['allocated_charge']))->dividedBy($line['base_quantity'], 2, RoundingMode::HALF_UP);
             if (Money::compare($line['base_cost'], '9999999999999.99') > 0) {
-                throw ValidationException::withMessages(['charges' => 'Allocated cost exceeds the supported unit cost.']);
+                throw ValidationException::withMessages(['charges' => 'Allocated cost exceeds the supported cost.']);
             }
         }
 

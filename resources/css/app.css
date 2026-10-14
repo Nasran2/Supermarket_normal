@@ -5728,3 +5728,20 @@ body.nav-collapsed .sidebar:not(.mobile-open) .nav-chevron {
 .cheque-card{padding:24px;margin-bottom:20px}.cheque-card h2,.cheque-card h3{margin-bottom:12px}.cheque-card .filter-bar{flex-wrap:wrap;gap:12px;padding:0 0 20px}.cheque-card .filter-bar .field{min-width:145px;flex:1;margin:0}.cheque-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}.cheque-summary .card{padding:18px}.cheque-summary strong{display:block;margin-top:8px}.cheque-entry{border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}.cheque-entry legend{padding:0 6px;font-weight:600}.cheque-editor{margin:18px 0}.cheque-entry .form-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.cheque-entry .field{margin:0}.cheque-card details{margin-top:20px}.cheque-card details summary{font-weight:600;cursor:pointer}.cheque-editor[hidden],.cheque-entry label[hidden],[data-receive-party][hidden],[data-supplier-party][hidden],[data-add-cheque][hidden],[data-remove-cheque][hidden]{display:none}.cheque-card .table-secondary{display:block}.cheque-pos-entries{grid-column:1/-1}
 @media(max-width:640px){.cheque-card{padding:16px}.cheque-summary{grid-template-columns:1fr 1fr}.cheque-entry .form-grid{grid-template-columns:1fr}.cheque-entry .field input,.cheque-entry .field select{width:100%}}
 .cheque-table{min-width:1050px}.cheque-table th:nth-child(4),.cheque-table td:nth-child(4),.cheque-table th:nth-child(5),.cheque-table td:nth-child(5),.cheque-table td:nth-child(6){white-space:nowrap}.cheque-table td:nth-child(2){min-width:180px}.cheque-table td:last-child{min-width:240px}.cheque-table .heading-actions{display:flex;flex-wrap:wrap;gap:5px}.cheque-table .btn{padding:7px 9px;font-size:11px;white-space:nowrap}.cheque-table td:first-child{min-width:130px}
+
+/* Optional unit module: absent fields must not reserve grid space. */
+html[data-units="0"] .line-editor-fields { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 761px) {
+  html[data-units="0"] .purchase-line,
+  html[data-units="0"] .purchase-line-header {
+    grid-template-columns: minmax(140px, 1fr) 80px 100px 100px 100px 30px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  html[data-units="0"] .purchase-line,
+  html[data-units="0"] .purchase-line-header {
+    grid-template-columns: minmax(120px, 1fr) 65px 85px 85px 85px 28px;
+  }
+}
+
+html[data-units="0"] .documentation-guide-layout { grid-template-columns: minmax(0, 1fr); }

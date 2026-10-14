@@ -29,6 +29,9 @@ class ExpiryController extends Controller
         $canCost = $request->user()->hasPermission('expiry.view_cost') && $request->user()->hasPermission('products.view_cost');
         if (! empty($filters['format'])) {
             $headers = ['Product', 'SKU', 'Supplier', 'Source', 'Expiry', 'Days remaining', 'Quantity', 'Unit'];
+            if (! \App\Support\Units::enabled()) {
+                array_pop($headers);
+            }
             if (Expiry::setting('expiry_batch_enabled')) {
                 array_splice($headers, 2, 0, ['Batch']);
             }

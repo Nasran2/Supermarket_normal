@@ -76,7 +76,7 @@ class StockLayerService
             return $this->expiryChoices($p, $editing);
         }
         if (! $p->track_stock) {
-            return [['stock_price' => $p->price, 'quantity' => '999999.000', 'stock_layer_id' => null, 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p))]];
+            return [['stock_price' => $p->price, 'quantity' => '999999.000', 'stock_layer_id' => null, 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->publicOptions($p))]];
         }
         $this->ensureLegacy($p);
         $credits = $this->credits($editing, $p);
@@ -88,7 +88,7 @@ class StockLayerService
                 continue;
             }
             $key = $layer->selling_price;
-            $groups[$key] ??= ['stock_price' => $key, 'quantity' => '0.000', 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p, $key))];
+            $groups[$key] ??= ['stock_price' => $key, 'quantity' => '0.000', 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->publicOptions($p, $key))];
             $groups[$key]['quantity'] = Money::quantity($groups[$key]['quantity'], $quantity);
         }
         ksort($groups, SORT_NUMERIC);
@@ -118,7 +118,7 @@ class StockLayerService
             return $this->expiryChoices($p, $editing);
         }
         if (! $p->track_stock) {
-            return [['stock_price' => $p->price, 'quantity' => '999999.000', 'stock_layer_id' => null, 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p))]];
+            return [['stock_price' => $p->price, 'quantity' => '999999.000', 'stock_layer_id' => null, 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->publicOptions($p))]];
         }
         $this->ensureLegacy($p);
         $credits = $this->credits($editing, $p);
@@ -126,7 +126,7 @@ class StockLayerService
 
         return $layers->filter(fn ($layer) => $layer->status === 'ACTIVE' && Money::compare(Money::quantity($layer->remaining_quantity, $credits[$layer->id] ?? '0'), 0) > 0)
             ->sort(fn ($a, $b) => Money::compare($a->selling_price, $b->selling_price) ?: $a->received_at <=> $b->received_at ?: $a->id <=> $b->id)
-            ->map(fn ($layer) => ['stock_layer_id' => $layer->id, 'stock_price' => $layer->selling_price, 'quantity' => Money::quantity($layer->remaining_quantity, $credits[$layer->id] ?? '0'), 'reference' => $layer->source_reference, 'received' => $layer->received_at?->format('d M Y'), 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->options($p, $layer->selling_price))])->values()->all();
+            ->map(fn ($layer) => ['stock_layer_id' => $layer->id, 'stock_price' => $layer->selling_price, 'quantity' => Money::quantity($layer->remaining_quantity, $credits[$layer->id] ?? '0'), 'reference' => $layer->source_reference, 'received' => $layer->received_at?->format('d M Y'), 'units' => array_map(fn ($option) => array_diff_key($option, ['cost' => true]), app(ProductUnitService::class)->publicOptions($p, $layer->selling_price))])->values()->all();
     }
 
     public function expiryChoices(Product $p, ?Sale $editing = null): array
@@ -145,7 +145,7 @@ class StockLayerService
             $date = $layer->expires_at->toDateString();
             $fefo = Expiry::setting('expiry_selection_mode') === 'FEFO' && ! Expiry::expired($date);
             $key = $layer->selling_price.'|'.($fefo ? 'FEFO' : $date);
-            $groups[$key] ??= ['stock_layer_id' => null, 'stock_price' => $layer->selling_price, 'expires_at' => $fefo ? null : $date, 'expiry_label' => $fefo ? 'Earliest expiry first' : $layer->expires_at->format('d M Y'), 'expiry_status' => Expiry::status($date), 'days_remaining' => Expiry::days($date), 'expired' => Expiry::expired($date), 'fefo' => $fefo, 'quantity' => '0.000', 'units' => array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->options($p, $layer->selling_price))];
+            $groups[$key] ??= ['stock_layer_id' => null, 'stock_price' => $layer->selling_price, 'expires_at' => $fefo ? null : $date, 'expiry_label' => $fefo ? 'Earliest expiry first' : $layer->expires_at->format('d M Y'), 'expiry_status' => Expiry::status($date), 'days_remaining' => Expiry::days($date), 'expired' => Expiry::expired($date), 'fefo' => $fefo, 'quantity' => '0.000', 'units' => array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->publicOptions($p, $layer->selling_price))];
             $groups[$key]['quantity'] = Money::quantity($groups[$key]['quantity'], $qty);
         }
         $rows = array_values($groups);
@@ -251,7 +251,7 @@ class StockLayerService
             $left = Money::quantity($left, '-'.$take);
         }
         if (Money::compare($left, 0) > 0) {
-            $this->fail((Expiry::tracks($p) ? 'Only '.$available.' '.$p->unit->short_name.' are available in the selected expiry batch of '.$p->name.'. Add the remaining quantity from another batch separately.' : 'Only '.$available.' '.$p->unit->short_name.' of '.$p->name.' are available at '.Money::display($price).'. Choose another price for the remaining quantity.'));
+            $this->fail((Expiry::tracks($p) ? 'Only '.\App\Support\Units::quantity($available, $p->unit).' are available in the selected expiry batch of '.$p->name.'. Add the remaining quantity from another batch separately.' : 'Only '.\App\Support\Units::quantity($available, $p->unit).' of '.$p->name.' are available at '.Money::display($price).'. Choose another price for the remaining quantity.'));
         }
         $total = $hasLandedCost ? Money::sum(array_column($allocations, 'cost_total')) : (string) $cost->toScale(2, RoundingMode::HALF_UP);
         $last = count($allocations) - 1;

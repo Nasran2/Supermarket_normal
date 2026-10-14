@@ -1,3 +1,4 @@
+import { unitsEnabled, quantityText } from './units.js';
 const container = document.getElementById('purchase-items'),
   template = document.getElementById('purchase-item-template');
 let index = 0;
@@ -89,13 +90,13 @@ function add(initial = {}, prepend = false) {
     qty = line.querySelector('[data-field=quantity]'),
     cost = line.querySelector('[data-field=cost]'),
     selling = line.querySelector('[data-field=selling_price]'),
-    unitSelect = line.querySelector('[data-field=unit_id]');
+    unitSelect = line.querySelector('[data-field=unit_id]') || document.createElement('select');
     
   productInput.value = product.id;
 
   function unit(keepInitial = false) {
     const options = product.units || [];
-    const selectedId = keepInitial ? initial.unit_id : null;
+    const selectedId = unitsEnabled() && keepInitial ? initial.unit_id : null;
     unitSelect.replaceChildren();
     options.forEach((u) => {
       const option = document.createElement('option');
@@ -160,7 +161,7 @@ function add(initial = {}, prepend = false) {
   
   unit(true);
   if (initial.selling_price == null) selling.value = unitSelect.selectedOptions[0]?.dataset.price ?? product.price ?? 0;
-  line.querySelector('[data-field-display=prices]').textContent = (product.prices || []).map((group) => `${group.stock_price} · ${Number(group.quantity)} ${product.unit}`).join(' / ');
+  line.querySelector('[data-field-display=prices]').textContent = (product.prices || []).map((group) => `${group.stock_price} · ${quantityText(group.quantity, product.unit)}`).join(' / ');
   window.refreshIcons?.();
   total();
 }

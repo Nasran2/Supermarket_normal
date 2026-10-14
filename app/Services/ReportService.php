@@ -387,7 +387,7 @@ class ReportService
                 'Closing balance' => (string) $closing,
             ];
         } elseif ($kind === 'audit') {
-            $query = SalesVisibility::apply(AuditLog::with('user')->where('action', 'not like', 'hr.%')->when(! config('features.barcode'), fn ($q) => $q->where('action', 'not like', 'barcode.%')->where('action', '!=', 'settings.barcode')), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
+            $query = SalesVisibility::apply(AuditLog::with('user')->when(! \App\Support\Units::enabled(), fn ($q) => $q->where('action', 'not like', 'units.%')->where('action', 'not like', 'unit-presets.%')->where('action', '!=', 'unit.default'))->where('action', 'not like', 'hr.%')->when(! config('features.barcode'), fn ($q) => $q->where('action', 'not like', 'barcode.%')->where('action', '!=', 'settings.barcode')), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
             if (SalesVisibility::mode() !== 'ALL') {
                 $subjects = [Sale::class => Sale::visibleTo()->select('id')];
                 foreach ([SaleReturn::class, SaleCollection::class, SaleRevision::class] as $subject) {
@@ -404,6 +404,14 @@ class ReportService
             $map = fn ($a) => [$a->created_at->format('Y-m-d H:i:s'), $a->user?->name ?? 'System', $a->action, class_basename($a->subject_type).' #'.$a->subject_id, json_encode($a->before), json_encode($a->after)];
         } else {
             abort(404);
+        }
+
+        if (! \App\Support\Units::enabled()) {
+            $hidden = array_keys(array_filter($headers, fn ($header) => in_array($header, ['Unit', 'Primary unit', 'Conversion'])));
+            $headers = array_values(array_diff_key($headers, array_flip($hidden)));
+            $headers = array_map(fn ($header) => str_replace(' / unit', '', $header), $headers);
+            $originalMap = $map;
+            $map = fn ($row) => array_values(array_diff_key($originalMap($row), array_flip($hidden)));
         }
 
         return compact('query', 'headers', 'map', 'cards');

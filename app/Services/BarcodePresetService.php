@@ -72,7 +72,7 @@ class BarcodePresetService
         $textHeight = 0;
         $minimumTextHeight = 0;
         foreach (self::CONTENT as $key) {
-            if ($key === 'barcode' || ! $c['show_'.$key] || (in_array($key, ['expiry', 'batch']) && ! Expiry::enabled())) {
+            if (($key === 'unit' && ! \App\Support\Units::enabled()) || $key === 'barcode' || ! $c['show_'.$key] || (in_array($key, ['expiry', 'batch']) && ! Expiry::enabled())) {
                 continue;
             }
             $lines = $key === 'product_name' ? $c['product_name_lines'] : 1;
@@ -92,7 +92,7 @@ class BarcodePresetService
 
     public function fontSizes(array $c): array
     {
-        $keys = array_filter(self::CONTENT, fn ($key) => $key !== 'barcode' && $c['show_'.$key] && (! in_array($key, ['expiry', 'batch']) || Expiry::enabled()));
+        $keys = array_filter(self::CONTENT, fn ($key) => ($key !== 'unit' || \App\Support\Units::enabled()) && $key !== 'barcode' && $c['show_'.$key] && (! in_array($key, ['expiry', 'batch']) || Expiry::enabled()));
         $height = function (float $scale) use ($keys, $c) {
             $mm = 0;
             foreach ($keys as $key) {
@@ -139,6 +139,11 @@ class BarcodePresetService
                     foreach (['show_'.$key, $key.'_font_size', $key.'_bold'] as $field) {
                         $configuration[$field] = $preset->configuration[$field] ?? $configuration[$field];
                     }
+                }
+            }
+            if ($preset && ! \App\Support\Units::enabled()) {
+                foreach (['show_unit', 'unit_font_size', 'unit_bold'] as $field) {
+                    $configuration[$field] = $preset->configuration[$field] ?? $configuration[$field];
                 }
             }
             $preset ??= new BarcodeLabelPreset(['created_by' => auth()->id()]);

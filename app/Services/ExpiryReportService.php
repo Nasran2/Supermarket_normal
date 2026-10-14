@@ -60,6 +60,9 @@ class ExpiryReportService
     {
         $days = Expiry::days($layer->expires_at);
         $row = [$layer->product->name, $layer->product->sku, $layer->purchaseItem?->purchase?->supplier?->name ?? '—', $layer->source_reference, $layer->expires_at?->format('d M Y') ?? 'Unknown', $days === null ? '—' : ($days < 0 ? abs($days).' days ago' : $days.' days'), $layer->remaining_quantity, $layer->product->unit->short_name];
+        if (! \App\Support\Units::enabled()) {
+            array_pop($row);
+        }
         if (Expiry::setting('expiry_batch_enabled')) {
             array_splice($row, 2, 0, [$layer->batch_number ?? '—']);
         }

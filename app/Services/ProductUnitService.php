@@ -40,18 +40,18 @@ class ProductUnitService
     {
         $value = (string) BigDecimal::of($amount)->multipliedBy($numerator)->dividedBy($denominator, 2, RoundingMode::HALF_UP);
         if (Money::compare($value, '9999999999999.99') > 0) {
-            throw ValidationException::withMessages(['conversions' => 'Converted unit price or cost exceeds the supported range.']);
+            throw ValidationException::withMessages(['conversions' => \App\Support\Units::enabled() ? 'Converted unit price or cost exceeds the supported range.' : 'Price or cost exceeds the supported range.']);
         }
 
         return $value;
     }
 
-    public function options(Product $product, ?string $basePrice = null): array
+    public function options(Product $product, ?string $basePrice = null, bool $historical = false): array
     {
         $product->loadMissing(['unit', 'conversions.unit']);
         $basePrice ??= $product->price;
         $options = [['id' => $product->unit_id, 'name' => $product->unit->name, 'short_name' => $product->unit->short_name, 'decimal' => $product->unit->allow_decimal, 'price' => $basePrice, 'cost' => $product->cost, 'base_quantity' => '1', 'converted_quantity' => '1']];
-        foreach ($product->conversions as $row) {
+        foreach ((\App\Support\Units::enabled() || $historical) ? $product->conversions : [] as $row) {
             if (! $row->unit->active) {
                 continue;
             }
@@ -61,12 +61,24 @@ class ProductUnitService
         return $options;
     }
 
-    public function resolve(Product $product, ?int $unitId, string $quantity, ?string $basePrice = null): array
+    public function publicOptions(Product $product, ?string $basePrice = null): array
     {
-        $unitId ??= $product->unit_id;
-        $option = collect($this->options($product, $basePrice))->firstWhere('id', $unitId);
+        return array_map(function ($option) {
+            if (! \App\Support\Units::enabled()) {
+                $option['name'] = '';
+                $option['short_name'] = '';
+            }
+
+            return $option;
+        }, $this->options($product, $basePrice));
+    }
+
+    public function resolve(Product $product, ?int $unitId, string $quantity, ?string $basePrice = null, bool $historical = false): array
+    {
+        $unitId = (\App\Support\Units::enabled() || $historical) ? ($unitId ?? $product->unit_id) : $product->unit_id;
+        $option = collect($this->options($product, $basePrice, $historical))->firstWhere('id', $unitId);
         if (! $option) {
-            throw ValidationException::withMessages(['items' => 'The selected unit is unavailable for '.$product->name.'.']);
+            throw ValidationException::withMessages(['items' => \App\Support\Units::enabled() ? 'The selected unit is unavailable for '.$product->name.'.' : $product->name.' is unavailable.']);
         }
         $selected = clone $product;
         $selected->setRelation('unit', Unit::findOrFail($unitId));
@@ -76,7 +88,7 @@ class ProductUnitService
         $baseQuantity = (string) $exact->dividedBy($option['converted_quantity'], $precision, RoundingMode::HALF_UP)->toScale(3);
         // Whole-piece stock must never silently round a fractional piece.
         if (! $product->unit->allow_decimal && $exact->compareTo(BigDecimal::of($baseQuantity)->multipliedBy($option['converted_quantity'])) !== 0) {
-            throw ValidationException::withMessages(['items' => 'This conversion would use a fractional '.$product->unit->short_name.'. Enter a compatible quantity.']);
+            throw ValidationException::withMessages(['items' => \App\Support\Units::enabled() ? 'This conversion would use a fractional '.$product->unit->short_name.'. Enter a compatible quantity.' : 'Enter a compatible whole quantity.']);
         }
         app(StockService::class)->validateQuantity($product, $baseQuantity);
 

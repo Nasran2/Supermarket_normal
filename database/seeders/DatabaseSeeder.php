@@ -52,9 +52,7 @@ class DatabaseSeeder extends Seeder
                 Unit::create(['short_name' => $short, 'name' => $name, 'allow_decimal' => $decimal, 'active' => true]);
             }
         }
-        if (! Unit::where('default_slot', 1)->exists()) {
-            Unit::where('short_name', 'pcs')->update(['default_slot' => 1]);
-        }
+        app(\App\Services\DefaultUnitService::class)->resolve();
 
         // 4. Multiple Units (Unit Presets)
         $pcs = Unit::where('short_name', 'pcs')->first();

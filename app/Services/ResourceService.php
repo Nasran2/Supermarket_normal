@@ -91,6 +91,10 @@ class ResourceService
                 if ($id) {
                     $this->guardEditable($resource, $record);
                 }
+                if ($resource === 'products' && ! \App\Support\Units::enabled()) {
+                    $data['unit_id'] = $id ? $record->unit_id : app(DefaultUnitService::class)->resolve()->id;
+                    unset($data['conversions'], $data['conversions_present']);
+                }
                 $before = $record->getAttributes();
                 $values = $data;
                 if ($resource === 'roles') {
@@ -218,10 +222,10 @@ class ResourceService
                         $record->unsetRelation('conversions');
                     }
                     if (! $unit->active) {
-                        throw ValidationException::withMessages(['unit_id' => 'Choose an active primary unit.']);
+                        throw ValidationException::withMessages([\App\Support\Units::enabled() ? 'unit_id' : 'product' => \App\Support\Units::enabled() ? 'Choose an active primary unit.' : 'This product is unavailable. Contact an administrator.']);
                     }
                     if (! $unit->allow_decimal && Money::compare($data['low_stock'], (string) intval($data['low_stock'])) !== 0) {
-                        throw ValidationException::withMessages(['low_stock' => 'This unit requires a whole quantity.']);
+                        throw ValidationException::withMessages(['low_stock' => 'Enter a whole quantity.']);
                     }
                     $values['updated_by'] = auth()->id();
                     if (! $id) {
@@ -306,6 +310,15 @@ class ResourceService
                 $permissionIds = $values['permissions'] ?? [];
                 if ($resource === 'roles') {
                     $hidden = Permission::whereNotIn('name', array_keys(Permissions::visible()))->pluck('id')->all();
+                    if (array_intersect($data['permissions'] ?? [], $hidden)) {
+                        throw ValidationException::withMessages(['permissions' => 'These feature permissions are disabled. Enable the module before changing them.']);
+                    }
+                    if ($id) {
+                        $permissionIds = array_unique(array_merge($permissionIds, $record->permissions->whereIn('id', $hidden)->pluck('id')->all()));
+                    }
+                }
+                if ($resource === 'roles' && ! \App\Support\Units::enabled()) {
+                    $hidden = Permission::all()->filter(fn ($p) => \App\Support\Units::permission($p->name))->pluck('id')->all();
                     if (array_intersect($data['permissions'] ?? [], $hidden)) {
                         throw ValidationException::withMessages(['permissions' => 'These feature permissions are disabled. Enable the module before changing them.']);
                     }

@@ -5,12 +5,12 @@
 <label class="field">Labels Per Row<input type="number" data-config="labels_per_row" min="1" max="12" value="{{ $configuration['labels_per_row'] }}" required></label><label class="field">Skip Labels (partly used sheet)<input type="number" data-config="skip_labels" min="0" max="1000" value="{{ $configuration['skip_labels'] }}"></label>
 </div></fieldset>
 <fieldset><legend>Label content</legend><div class="barcode-content-options">
-@foreach(\App\Services\BarcodePresetService::CONTENT as $key)@continue(in_array($key,['expiry','batch']) && !config('features.expiry'))
+@foreach(\App\Services\BarcodePresetService::CONTENT as $key)@continue($key==='unit' && ! \App\Support\Units::enabled())@continue(in_array($key,['expiry','batch']) && !config('features.expiry'))
 <label class="inline-check"><input type="checkbox" data-config="show_{{ $key }}" @checked($configuration['show_'.$key])>{{ ucwords(str_replace('_',' ',$key)) }}</label>
 @endforeach
 </div><div class="form-grid"><label class="field">Custom Text<input data-config="custom_text" value="{{ $configuration['custom_text'] }}" maxlength="120"></label><label class="field">Secret Code (custom internal code)<input data-config="secret_code" value="{{ $configuration['secret_code'] }}" maxlength="40"><small>This is user-defined text. Product cost is never used.</small></label></div></fieldset>
 <fieldset><legend>Typography · px</legend><div class="barcode-fonts">
-@foreach(\App\Services\BarcodePresetService::CONTENT as $key)@continue($key==='barcode' || (in_array($key,['expiry','batch']) && !config('features.expiry')))
+@foreach(\App\Services\BarcodePresetService::CONTENT as $key)@continue($key==='unit' && ! \App\Support\Units::enabled())@continue($key==='barcode' || (in_array($key,['expiry','batch']) && !config('features.expiry')))
 <div><label class="field">{{ ucwords(str_replace('_',' ',$key)) }}<input type="number" data-config="{{ $key }}_font_size" value="{{ $configuration[$key.'_font_size'] }}" min="6" max="32" required></label><label class="inline-check"><input type="checkbox" data-config="{{ $key }}_bold" @checked($configuration[$key.'_bold'])>Bold</label></div>
 @endforeach
 </div></fieldset>

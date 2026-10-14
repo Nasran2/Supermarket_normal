@@ -67,7 +67,7 @@ class NoReceiptSalesReturnService
             $costSource = 'MANUAL';
         }
 
-        return ['suggested_credit_price' => $priceRule === 'MANUAL' ? null : Money::round((string) $option['price']), 'credit_price_source' => $priceSource, 'cost_basis' => $cost, 'cost_basis_source' => $costSource, 'cost_basis_reference' => $costReference, 'stock_selling_price' => Money::round((string) $basePrice), 'unit_id' => $option['id'], 'unit' => $option['short_name']];
+        return ['suggested_credit_price' => $priceRule === 'MANUAL' ? null : Money::round((string) $option['price']), 'credit_price_source' => $priceSource, 'cost_basis' => $cost, 'cost_basis_source' => $costSource, 'cost_basis_reference' => $costReference, 'stock_selling_price' => Money::round((string) $basePrice), 'unit_id' => $option['id'], 'unit' => \App\Support\Units::label($option['short_name'])];
     }
 
     public function matches(Product $product, Customer $customer, User $user): array
@@ -80,7 +80,7 @@ class NoReceiptSalesReturnService
             if (! $line || Money::compare($line['remaining'], 0) <= 0) {
                 continue;
             }
-            $matches[] = ['sale_item_id' => $item->id, 'invoice' => $item->sale->invoice, 'date' => $item->sale->sold_at->format('d M Y'), 'quantity' => $item->quantity, 'base_quantity' => $item->base_quantity ?? $item->quantity, 'remaining' => $line['remaining'], 'unit' => $item->unit, 'unit_id' => $item->unit_id, 'net_price' => app(StockReturnService::class)->portion($line['net'], '1', $item->quantity), 'original_price' => $item->price, 'allocated_discount' => Money::sub(Money::mul($item->price, $item->quantity), $line['net']), 'restock_prices' => $item->allocations()->with('layer')->orderByDesc('id')->get()->map(fn ($a) => ['expires_at' => Expiry::enabled() ? ($a->expires_at ?? $a->layer->expires_at?->toDateString()) : null, 'expiry_label' => Expiry::enabled() ? $a->layer->expires_at?->format('d M Y') : null, 'stock_price' => $a->layer->selling_price, 'quantity' => Money::quantity($a->quantity, '-'.$a->returned_quantity), 'units' => array_map(fn ($u) => array_diff_key($u, ['cost' => true]), app(ProductUnitService::class)->options($product, $a->layer->selling_price))])->all()];
+            $matches[] = ['sale_item_id' => $item->id, 'invoice' => $item->sale->invoice, 'date' => $item->sale->sold_at->format('d M Y'), 'quantity' => $item->quantity, 'base_quantity' => $item->base_quantity ?? $item->quantity, 'remaining' => $line['remaining'], 'unit' => $item->unit, 'unit_id' => $item->unit_id, 'decimal' => ($item->unitRecord ?? $item->product->unit)->allow_decimal, 'net_price' => app(StockReturnService::class)->portion($line['net'], '1', $item->quantity), 'original_price' => $item->price, 'allocated_discount' => Money::sub(Money::mul($item->price, $item->quantity), $line['net']), 'restock_prices' => $item->allocations()->with('layer')->orderByDesc('id')->get()->map(fn ($a) => ['expires_at' => Expiry::enabled() ? ($a->expires_at ?? $a->layer->expires_at?->toDateString()) : null, 'expiry_label' => Expiry::enabled() ? $a->layer->expires_at?->format('d M Y') : null, 'stock_price' => $a->layer->selling_price, 'quantity' => Money::quantity($a->quantity, '-'.$a->returned_quantity), 'units' => array_map(fn ($u) => array_diff_key($u, ['cost' => true]), app(ProductUnitService::class)->publicOptions($product, $a->layer->selling_price))])->all()];
             if (count($matches) === 5) {
                 break;
             }
@@ -132,6 +132,9 @@ class NoReceiptSalesReturnService
                 }
             }
             $linked = ! empty($input['sale_item_id']);
+            if (! \App\Support\Units::enabled() && ! $linked) {
+                $input['unit_id'] = $product->unit_id;
+            }
             $key = $linked ? 'sale:'.$input['sale_item_id'] : 'product:'.$product->id.':'.($input['unit_id'] ?? $product->unit_id);
             if (isset($seen[$key])) {
                 ReturnSettlementService::fail('Combine duplicate returned product rows before continuing.');
@@ -140,7 +143,7 @@ class NoReceiptSalesReturnService
             if ($linked) {
                 $item = SaleItem::with('sale', 'product.unit')->findOrFail($input['sale_item_id']);
                 if ($item->product_id !== $product->id || $item->sale->customer_id !== $customer?->id || (! empty($input['unit_id']) && (int) $input['unit_id'] !== $item->unit_id)) {
-                    ReturnSettlementService::fail('The linked sale does not match the selected customer, product and unit.');
+                    ReturnSettlementService::fail('The linked sale does not match the selected customer and product.');
                 }
                 if ($days && $item->sale->sold_at->lt(today()->subDays($days))) {
                     ReturnSettlementService::fail('The linked purchase is outside the no-receipt return days limit.');
@@ -184,7 +187,7 @@ class NoReceiptSalesReturnService
             if ($cost === null) {
                 abort_unless($user->hasPermission('sales_returns.no_receipt_approve') && $user->hasPermission('returns.view_cost'), 403);
                 if (! isset($input['cost_basis']) || empty(trim($input['notes'] ?? ''))) {
-                    ReturnSettlementService::fail('A manager must confirm the estimated primary-unit cost and enter notes.');
+                    ReturnSettlementService::fail('A manager must confirm the estimated cost and enter notes.');
                 }
                 $cost = Money::round((string) $input['cost_basis']);
             } elseif (isset($input['cost_basis']) && Money::compare((string) $input['cost_basis'], $cost) !== 0) {

@@ -49,6 +49,25 @@ class DocumentationService
                 $step['frames'] = $walkthroughs[$slug][$index];
                 $steps[] = $step;
             }
+            if (! \App\Support\Units::enabled()) {
+                // Existing walkthrough screenshots include the unit sidebar and controls.
+                // Present the complete written guide without exposing those stale screens.
+                if ($slug === 'units-and-categories') {
+                    $guide['title'] = 'Organize product categories';
+                    $guide['description'] = 'Group products into categories for browsing and reporting.';
+                    $guide['path'] = 'Categories';
+                    $guide['tip'] = 'Choose clear category names so staff can find products quickly.';
+                    $steps = array_slice($steps, 0, 1);
+                    $guide['link'] = ['permission' => 'categories.view', 'route' => 'manage.index', 'parameters' => ['resource' => 'categories']];
+                }
+                $guide = array_replace_recursive($guide, config('documentation-quantity.'.$slug, []));
+                $steps = array_replace_recursive($steps, config('documentation-quantity.'.$slug.'.steps', []));
+                foreach ($steps as &$step) {
+                    $step['frames'] = [];
+                }
+                unset($step);
+            }
+            $guide['screens_enabled'] = \App\Support\Units::enabled();
             $guide['steps'] = $steps;
             $guide['search'] = mb_strtolower(implode(' ', array_merge(...array_map(fn ($text) => array_values($this->copies($text)), [$guide['title'], $guide['description'], $guide['category'], $guide['path'], ...array_column($steps, 'title'), ...array_column($steps, 'text')]))));
             $guides[$slug] = $guide;
