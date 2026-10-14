@@ -5729,6 +5729,20 @@ body.nav-collapsed .sidebar:not(.mobile-open) .nav-chevron {
 @media(max-width:640px){.cheque-card{padding:16px}.cheque-summary{grid-template-columns:1fr 1fr}.cheque-entry .form-grid{grid-template-columns:1fr}.cheque-entry .field input,.cheque-entry .field select{width:100%}}
 .cheque-table{min-width:1050px}.cheque-table th:nth-child(4),.cheque-table td:nth-child(4),.cheque-table th:nth-child(5),.cheque-table td:nth-child(5),.cheque-table td:nth-child(6){white-space:nowrap}.cheque-table td:nth-child(2){min-width:180px}.cheque-table td:last-child{min-width:240px}.cheque-table .heading-actions{display:flex;flex-wrap:wrap;gap:5px}.cheque-table .btn{padding:7px 9px;font-size:11px;white-space:nowrap}.cheque-table td:first-child{min-width:130px}
 
+.cheque-due-alert.card {
+  border-color: #fecaca;
+  border-left: 4px solid #dc2626;
+  background: #fff7f7;
+}
+.cheque-due-alert .card-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #b91c1c;
+}
+.cheque-due-alert .card-heading .text-link { color: #b91c1c; }
+.cheque-due-alert .card-heading .text-link:hover { color: #991b1b; }
+
 /* Optional unit module: absent fields must not reserve grid space. */
 html[data-units="0"] .line-editor-fields { grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 761px) {
