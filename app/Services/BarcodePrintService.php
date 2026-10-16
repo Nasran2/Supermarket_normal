@@ -6,13 +6,14 @@ use App\Models\Product;
 use App\Models\Purchase;
 use App\Support\Expiry;
 use App\Support\Money;
+use App\Support\Units;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Validation\ValidationException;
 
 class BarcodePrintService
 {
-    public function options(Product $p): array
+    public function options(Product $p, bool $internal = false): array
     {
         $p->loadMissing('unit', 'conversions.unit', 'stockLayers');
         $layers = $p->stockLayers->filter(fn ($l) => $l->status === 'ACTIVE' && Money::compare($l->remaining_quantity, 0) > 0);
@@ -21,24 +22,43 @@ class BarcodePrintService
             $lot = Expiry::tracks($p) ? $layer->id : null;
             foreach (app(ProductUnitService::class)->options($p, $layer->selling_price) as $unit) {
                 $price = $unit['price'];
-                $key = $unit['id'].'|'.$price.'|'.$lot;
+                $cost = SecretCodeService::enabled() ? app(ProductUnitService::class)->rate($layer->cost_price, $unit['base_quantity'], $unit['converted_quantity']) : '0.00';
+                $key = $unit['id'].'|'.$price.'|'.$lot.$this->costKey($cost);
                 $qty = (string) BigDecimal::of($layer->remaining_quantity)->multipliedBy($unit['converted_quantity'])->dividedBy($unit['base_quantity'], 3, RoundingMode::DOWN);
                 if (isset($result[$key])) {
                     $result[$key]['stock'] = Money::quantity($result[$key]['stock'], $qty);
 
                     continue;
                 }
-                $result[$key] = ['key' => $key, 'price' => $price, 'unit_id' => $unit['id'], 'unit' => \App\Support\Units::label($unit['short_name']), 'stock' => $qty, 'layer_id' => $lot, 'expires_at' => Expiry::tracks($p) ? $layer->expires_at?->format('Y-m-d') : null, 'batch_number' => Expiry::tracks($p) ? $layer->batch_number : null];
+                $result[$key] = ['key' => $key, 'price' => $price, 'unit_id' => $unit['id'], 'unit' => Units::label($unit['short_name']), 'stock' => $qty, 'layer_id' => $lot, 'expires_at' => Expiry::tracks($p) ? $layer->expires_at?->format('Y-m-d') : null, 'batch_number' => Expiry::tracks($p) ? $layer->batch_number : null];
+                if ($internal) {
+                    $result[$key]['_cost'] = $cost;
+                }
             }
         }
         if (! $result) {
             foreach (app(ProductUnitService::class)->options($p) as $u) {
-                $key = $u['id'].'|'.$u['price'].'|';
-                $result[$key] = ['key' => $key, 'price' => $u['price'], 'unit_id' => $u['id'], 'unit' => \App\Support\Units::label($u['short_name']), 'stock' => $p->track_stock ? $p->stock : '0.000', 'layer_id' => null, 'expires_at' => null, 'batch_number' => null];
+                $key = $u['id'].'|'.$u['price'].'|'.$this->costKey($u['cost']);
+                $result[$key] = ['key' => $key, 'price' => $u['price'], 'unit_id' => $u['id'], 'unit' => Units::label($u['short_name']), 'stock' => $p->track_stock ? $p->stock : '0.000', 'layer_id' => null, 'expires_at' => null, 'batch_number' => null];
+                if ($internal) {
+                    $result[$key]['_cost'] = $u['cost'];
+                }
             }
         }
 
-        return array_values($result);
+        $options = array_values($result);
+        if (SecretCodeService::enabled()) {
+            foreach ($options as $index => &$option) {
+                $option['stock_group'] = $index + 1;
+            }
+        }
+
+        return $options;
+    }
+
+    private function costKey(string $cost): string
+    {
+        return SecretCodeService::enabled() ? '|'.substr(hash_hmac('sha256', Money::round($cost), (string) config('app.key')), 0, 16) : '';
     }
 
     public function product(Product $p): array
@@ -58,7 +78,7 @@ class BarcodePrintService
             $options = $this->options($p);
             $price = Money::round((string) ($item->base_selling_price ?? $item->selling_price ?? $p->price));
             $layer = $item->stockLayers->first();
-            $key = $p->unit_id.'|'.$price.'|'.(Expiry::tracks($p) ? $layer?->id : '');
+            $key = $p->unit_id.'|'.$price.'|'.(Expiry::tracks($p) ? $layer?->id : '').$this->costKey((string) ($layer?->cost_price ?? $item->base_cost ?? $item->cost));
             $rows[] = ['product' => $this->product($p), 'option' => collect($options)->contains('key', $key) ? $key : '', 'quantity' => max(1, (int) ceil((float) ($item->base_quantity ?? $item->quantity)))];
         }
 
@@ -80,9 +100,9 @@ class BarcodePrintService
             if (! $p || ! $p->barcode) {
                 throw ValidationException::withMessages(['items.'.$i => 'No barcode assigned. Generate or enter a barcode before printing.']);
             }
-            $option = collect($this->options($p))->firstWhere('key', $row['option']);
+            $option = collect($this->options($p, true))->firstWhere('key', $row['option']);
             if (! $option) {
-                throw ValidationException::withMessages(['items.'.$i.'.option' => \App\Support\Units::enabled() ? 'Select an available selling price, unit and stock lot.' : 'Select an available selling price and stock lot.']);
+                throw ValidationException::withMessages(['items.'.$i.'.option' => Units::enabled() ? 'Select an available selling price, unit and stock lot.' : 'Select an available selling price and stock lot.']);
             }
             $quantity = (int) $row['quantity'];
             $total += $quantity;
@@ -102,6 +122,9 @@ class BarcodePrintService
             // Validate encoding and safe module width even when the graphic is hidden.
             $barcodes->svg($p->barcode, $type, (string) $width, $c['barcode_height']);
             $labels[] = ['product_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => $p->barcode, 'barcode_type' => $type, 'price' => $option['price'], 'unit' => $option['unit'], 'expiry' => $option['expires_at'], 'batch' => $option['batch_number'], 'quantity' => $quantity, 'shop_name' => app(SettingsService::class)->get('business_name', ''), 'currency' => app(SettingsService::class)->get('currency_symbol', 'Rs.')];
+            if (SecretCodeService::enabled() && $c['show_secret_code']) {
+                $labels[array_key_last($labels)]['secret_code'] = app(SecretCodeService::class)->encode($option['_cost'], $option['price']);
+            }
         }
         if ($total > (int) $barcodes->setting('barcode_large_job', 500) && empty($data['confirmed']) && request()->routeIs('barcode.jobs.store')) {
             throw ValidationException::withMessages(['confirmed' => 'Confirm the large print job before continuing.']);

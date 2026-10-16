@@ -121,6 +121,24 @@ Shop name and currency come from Business Settings. Secret Code is only user-def
 
 Barcode Labels → Print History lists generated jobs, user, date, preset and label count. A job stores its original configuration plus product name, barcode, format, selected price/unit/expiry/batch, shop name and currency. Editing/deleting a preset or changing a product does not change a previous job. Reprinting needs print permission and either ownership of the job or history permission; bulk jobs additionally need bulk permission. Job history is generated-job history, not a physical printer status monitor.
 
+## Optional secret cost codes
+
+Set both `BARCODE=true` and `SCODE=true`, then clear cached configuration with `php artisan config:clear`. `SCODE=false` hides all cost-code controls and prevents codes from appearing in previews, calibration pages and reprints, including previously saved jobs. Mapping settings and preset choices are retained for re-enabling. No database migration is required for this addition; settings and label layouts use the existing JSON storage.
+
+Open **Barcode Settings → Secret cost code**. Assign a unique A–Z/a–z letter to each digit 0–9. Case is preserved, so 1→a, 2→b, 3→c turns 231 into `bca`. Duplicate letters (including A/a), nonletters, and fillers overlapping the mapping are rejected. Settings require the existing `barcode.manage_settings` permission; product search, preview and print pages do not expose the letter mapping or raw costs.
+
+For a cost of 850, mapping 8→G, 5→T, 0→K gives `GTK`. With selling price 1250 and filler X, **Match selling-price digit count** prints `GTKX` (suffix) or `XGTK` (prefix). Use separate filler letters, for example XYZ; newly generated jobs randomly select filler characters from that set. Staff ignore these filler letters when reading the cost. Minimum length can make codes longer even when cost and selling price have the same digit count. Fixed-length padding and no-padding modes are also available. Real codes longer than the target are kept in full; no cost digits are removed.
+
+Whole-unit mode rounds to the nearest whole amount. Exact-cents mode encodes two decimal places without a decimal point: 850.50 encodes the digits 85050, and the last two decoded digits are cents. Selling-price length uses the same precision. Zero costs and zeroes within the amount are encoded normally.
+
+Barcode Settings controls default visibility, font size, alignment and position (top, before/after price, before barcode, bottom). Existing and new presets follow these defaults. In **Advanced Label Setup → Secret cost code** or a preset editor, uncheck **Use size, position and visibility from Barcode Settings** to customize that layout. Existing text auto-fit and overflow checks apply; oversized codes block printing until the layout fits.
+
+Costs come from the selected available stock layer, converted to the selected unit. Product cost is the fallback when no available stock layers exist. When two stock groups have the same selling price but different costs, they appear as separate choices, with a group number and available quantity. Purchase label selections include the matching received cost group when still available. This does not change the product's scannable barcode, inventory, sales or purchasing amounts.
+
+Each generated job snapshots its encoded cost codes and effective layout. Reprinting does not recompute codes after product-cost, mapping or padding changes. Keep the previous mapping for existing labels when changing it. Legacy jobs with only the old literal internal-text field do not acquire a cost code retrospectively; generate a new job to use this feature.
+
+`SecretCodeTest` covers encoding, padding, precision, setting validation, permissions, stock/unit costs, snapshots, feature disabling and preset preservation. `tests/secret-code-browser.test.cjs` checks the settings form, both padding positions, layout overrides, saved presets, generated print pages, mobile layout and disabled-feature behavior against the isolated fixture in `tests/Support/secret-code-browser-bootstrap.php`.
+
 ## Printer calibration and troubleshooting
 
 Settings → Barcode → Print Test Label prints four sample labels. Measure them with a ruler. Set the driver to the actual roll/sheet size, scale 100% / Actual Size, turn off Fit to Page and browser headers/footers. Start with zero offsets; adjust paper margins and small offsets only after confirming paper width, sticker size and gaps. For fixed sheets enter the actual paper height so page breaks align with rows.

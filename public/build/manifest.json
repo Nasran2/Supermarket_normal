@@ -1,6 +1,6 @@
 {
-  "_barcode-layout-B_o5AN8K.js": {
-    "file": "assets/barcode-layout-B_o5AN8K.js",
+  "_barcode-layout-BGx-9NiP.js": {
+    "file": "assets/barcode-layout-BGx-9NiP.js",
     "name": "barcode-layout"
   },
   "_pos-price-options-BXcz7Ggt.js": {
@@ -36,21 +36,21 @@
     ]
   },
   "resources/js/barcode-preset.js": {
-    "file": "assets/barcode-preset-DFUBBflH.js",
+    "file": "assets/barcode-preset-DM18TbQn.js",
     "name": "barcode-preset",
     "src": "resources/js/barcode-preset.js",
     "isEntry": true,
     "imports": [
-      "_barcode-layout-B_o5AN8K.js"
+      "_barcode-layout-BGx-9NiP.js"
     ]
   },
   "resources/js/barcode-print.js": {
-    "file": "assets/barcode-print-DoKXtqWp.js",
+    "file": "assets/barcode-print-Dietecfa.js",
     "name": "barcode-print",
     "src": "resources/js/barcode-print.js",
     "isEntry": true,
     "imports": [
-      "_barcode-layout-B_o5AN8K.js"
+      "_barcode-layout-BGx-9NiP.js"
     ]
   },
   "resources/js/barcode-product.js": {
@@ -60,13 +60,13 @@
     "isEntry": true
   },
   "resources/js/barcode.js": {
-    "file": "assets/barcode-BYWMNUO4.js",
+    "file": "assets/barcode-XUF8cVgJ.js",
     "name": "barcode",
     "src": "resources/js/barcode.js",
     "isEntry": true,
     "imports": [
       "_units-BWArtpcn.js",
-      "_barcode-layout-B_o5AN8K.js"
+      "_barcode-layout-BGx-9NiP.js"
     ]
   },
   "resources/js/pos.js": {

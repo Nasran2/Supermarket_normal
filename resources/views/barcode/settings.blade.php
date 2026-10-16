@@ -7,5 +7,7 @@
 @if($type==='checkbox')<label class="check-card"><input type="hidden" name="{{ $key }}" value="0"><input type="checkbox" name="{{ $key }}" value="1" @checked($value)><span>{{ $label }}</span></label>
 @else<label class="field">{{ $label }}@if(in_array($type,['type','printer']))<select name="{{ $key }}">@foreach($type==='type'?array_combine(\App\Services\BarcodeService::TYPES,\App\Services\BarcodeService::TYPES):['LABEL'=>'Barcode / Label Printer','NORMAL'=>'Normal Printer','THERMAL'=>'Thermal Roll Printer','CUSTOM'=>'Custom'] as $v=>$text)<option value="{{ $v }}" @selected($value===$v)>{{ $text }}</option>@endforeach</select>@else<input name="{{ $key }}" type="{{ $type }}" value="{{ $value }}" @if($type==='number')min="1" step="1"@endif>@endif</label>@endif
 @endforeach
-</div><p class="muted">Generated EAN/UPC values include valid check digits. Internal generated codes do not establish a registered retail product identifier. Physical paper sizes and the default preset are configured under Label Presets.</p><div class="form-footer"><button class="btn primary">Save Settings</button></div></form>
+</div><p class="muted">Generated EAN/UPC values include valid check digits. Internal generated codes do not establish a registered retail product identifier. Physical paper sizes and the default preset are configured under Label Presets.</p>
+@if(\App\Services\SecretCodeService::enabled())@include('barcode.secret-code-settings')@endif
+<div class="form-footer"><button class="btn primary">Save Settings</button></div></form>
 @endsection

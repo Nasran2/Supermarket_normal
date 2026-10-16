@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\BarcodeLabelPreset;
 use App\Support\Expiry;
+use App\Support\Units;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Support\Facades\DB;
@@ -28,12 +29,35 @@ class BarcodePresetService
             $c[$key.'_bold'] = in_array($key, ['shop_name', 'price', 'barcode_number']);
         }
 
+        $s = app(SecretCodeService::class)->settings();
+        $c += ['secret_code_use_defaults' => true, 'secret_code_position' => $s['scode_position'], 'secret_code_alignment' => $s['scode_alignment']];
+        $c['show_secret_code'] = SecretCodeService::enabled() && $s['scode_show'];
+        $c['secret_code_font_size'] = (int) $s['scode_font_size'];
+
+        return $c;
+    }
+
+    public function forDisplay(array $input): array
+    {
+        $c = array_replace($this->defaults(), array_intersect_key($input, $this->defaults()));
+        // Stored literal codes are legacy data; cost codes are generated per label only.
+        $c['secret_code'] = '';
+        if (! SecretCodeService::enabled()) {
+            $c['show_secret_code'] = false;
+        } elseif (filter_var($c['secret_code_use_defaults'], FILTER_VALIDATE_BOOLEAN)) {
+            $s = app(SecretCodeService::class)->settings();
+            $c['show_secret_code'] = (bool) $s['scode_show'];
+            $c['secret_code_font_size'] = (int) $s['scode_font_size'];
+            $c['secret_code_position'] = $s['scode_position'];
+            $c['secret_code_alignment'] = $s['scode_alignment'];
+        }
+
         return $c;
     }
 
     public function normalize(array $input): array
     {
-        $c = array_replace($this->defaults(), array_intersect_key($input, $this->defaults()));
+        $c = $this->forDisplay($input);
         $rules = [];
         foreach (self::MEASUREMENTS as $key) {
             $rules[$key] = ($key === 'paper_height' ? 'nullable' : 'required').'|numeric|decimal:0,2|min:'.(str_starts_with($key, 'offset_') ? '-20' : (($key === 'barcode_height' ? '5' : (in_array($key, ['sticker_width', 'sticker_height', 'paper_width']) ? '1' : '0')))).'|max:1000';
@@ -44,6 +68,7 @@ class BarcodePresetService
             $rules[$key.'_font_size'] = 'required|integer|min:6|max:32';
             $rules[$key.'_bold'] = 'required|boolean';
         }
+        $rules += ['secret_code_use_defaults' => 'required|boolean', 'secret_code_position' => 'required|in:top,before_price,after_price,before_barcode,bottom', 'secret_code_alignment' => 'required|in:left,center,right'];
         $c = Validator::make($c, $rules)->validate();
         foreach (self::MEASUREMENTS as $key) {
             $c[$key] = $c[$key] === null || $c[$key] === '' ? null : (string) BigDecimal::of((string) $c[$key])->toScale(2);
@@ -58,6 +83,7 @@ class BarcodePresetService
         }
         $c['auto_fit'] = (bool) $c['auto_fit'];
         $c['print_border'] = (bool) $c['print_border'];
+        $c['secret_code_use_defaults'] = (bool) $c['secret_code_use_defaults'];
         $d = fn ($key) => BigDecimal::of($c[$key]);
         $required = $d('margin_left')->plus($d('margin_right'))->plus($d('sticker_width')->multipliedBy($c['labels_per_row']))->plus($d('column_gap')->multipliedBy($c['labels_per_row'] - 1))->plus($d('offset_x')->abs());
         if ($required->isGreaterThan($d('paper_width'))) {
@@ -72,7 +98,7 @@ class BarcodePresetService
         $textHeight = 0;
         $minimumTextHeight = 0;
         foreach (self::CONTENT as $key) {
-            if (($key === 'unit' && ! \App\Support\Units::enabled()) || $key === 'barcode' || ! $c['show_'.$key] || (in_array($key, ['expiry', 'batch']) && ! Expiry::enabled())) {
+            if (($key === 'unit' && ! Units::enabled()) || $key === 'barcode' || ! $c['show_'.$key] || (in_array($key, ['expiry', 'batch']) && ! Expiry::enabled())) {
                 continue;
             }
             $lines = $key === 'product_name' ? $c['product_name_lines'] : 1;
@@ -92,7 +118,7 @@ class BarcodePresetService
 
     public function fontSizes(array $c): array
     {
-        $keys = array_filter(self::CONTENT, fn ($key) => ($key !== 'unit' || \App\Support\Units::enabled()) && $key !== 'barcode' && $c['show_'.$key] && (! in_array($key, ['expiry', 'batch']) || Expiry::enabled()));
+        $keys = array_filter(self::CONTENT, fn ($key) => ($key !== 'secret_code' || SecretCodeService::enabled()) && ($key !== 'unit' || Units::enabled()) && $key !== 'barcode' && $c['show_'.$key] && (! in_array($key, ['expiry', 'batch']) || Expiry::enabled()));
         $height = function (float $scale) use ($keys, $c) {
             $mm = 0;
             foreach ($keys as $key) {
@@ -141,12 +167,17 @@ class BarcodePresetService
                     }
                 }
             }
-            if ($preset && ! \App\Support\Units::enabled()) {
+            if ($preset && ! Units::enabled()) {
                 foreach (['show_unit', 'unit_font_size', 'unit_bold'] as $field) {
                     $configuration[$field] = $preset->configuration[$field] ?? $configuration[$field];
                 }
             }
             $preset ??= new BarcodeLabelPreset(['created_by' => auth()->id()]);
+            if (! SecretCodeService::enabled()) {
+                foreach (['secret_code', 'show_secret_code', 'secret_code_font_size', 'secret_code_bold', 'secret_code_use_defaults', 'secret_code_position', 'secret_code_alignment'] as $field) {
+                    $configuration[$field] = $preset->configuration[$field] ?? $configuration[$field];
+                }
+            }
             $preset->fill(['name' => $data['name'], 'configuration' => $configuration, 'is_default' => $default, 'updated_by' => auth()->id()])->save();
 
             return $preset;

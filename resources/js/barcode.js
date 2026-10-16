@@ -89,6 +89,7 @@ if (app) {
             : Number(value) / 10
           : (value ?? '');
     }
+    app.dispatchEvent(new Event('barcode-config-loaded'));
   }
   function body(confirmed = false) {
     return {
@@ -123,7 +124,7 @@ if (app) {
     $('barcode-products').innerHTML = display
       .map((r) => {
         const p = products.get(r.product_id);
-        return `<tr data-row="${r.id}" class="${r.selected ? 'barcode-row-selected' : ''}"><td><input data-select type="checkbox" ${r.selected ? 'checked' : ''} aria-label="Select ${escape(p.name)}"></td><td><strong>${escape(p.name)}</strong><small>${escape(p.sku)}</small><small class="${p.barcode ? '' : 'barcode-no-code'}">${escape(p.barcode || 'No barcode assigned.')}</small></td><td><select data-option aria-label="Select selling price for ${escape(p.name)}"><option value="">Choose selling price${unitsEnabled() ? ' / unit' : ''}${app.dataset.expiry === '1' ? ' / lot' : ''}</option>${p.options.map((o) => `<option value="${escape(o.key)}" ${r.option === o.key ? 'selected' : ''}>${escape(money(o.price))}${unitsEnabled() ? ' / ' + escape(unitLabel(o.unit)) : ''} · ${Number(o.stock)} available${app.dataset.expiry === '1' && o.expires_at ? ` · Exp: ${escape(o.expires_at)}` : ''}${app.dataset.expiry === '1' && o.batch_number ? ` · ${escape(o.batch_number)}` : ''}</option>`).join('')}</select></td><td><input data-qty type="number" min="1" max="10000" step="1" value="${r.quantity}" aria-label="Quantity to print for ${escape(p.name)}"></td><td><div class="barcode-product-actions"><button class="btn secondary small" data-stock type="button">Use Current Stock Qty</button><button class="btn secondary small" data-another type="button">Another Price / Lot</button><button class="btn secondary small" data-remove type="button">Remove</button>${!p.barcode && app.dataset.canGenerate === '1' ? '<button class="btn secondary small" data-generate type="button">Generate Barcode</button>' : ''}${!p.barcode && app.dataset.canEdit === '1' ? '<button class="btn secondary small" data-enter type="button">Enter Barcode</button>' : ''}</div></td></tr>`;
+        return `<tr data-row="${r.id}" class="${r.selected ? 'barcode-row-selected' : ''}"><td><input data-select type="checkbox" ${r.selected ? 'checked' : ''} aria-label="Select ${escape(p.name)}"></td><td><strong>${escape(p.name)}</strong><small>${escape(p.sku)}</small><small class="${p.barcode ? '' : 'barcode-no-code'}">${escape(p.barcode || 'No barcode assigned.')}</small></td><td><select data-option aria-label="Select selling price for ${escape(p.name)}"><option value="">Choose selling price${unitsEnabled() ? ' / unit' : ''}${app.dataset.expiry === '1' ? ' / lot' : ''}</option>${p.options.map((o) => `<option value="${escape(o.key)}" ${r.option === o.key ? 'selected' : ''}>${escape(money(o.price))}${unitsEnabled() ? ' / ' + escape(unitLabel(o.unit)) : ''}${o.stock_group && p.options.filter((other) => other.price === o.price && other.unit_id === o.unit_id).length > 1 ? ' · Stock group ' + o.stock_group : ''} · ${Number(o.stock)} available${app.dataset.expiry === '1' && o.expires_at ? ` · Exp: ${escape(o.expires_at)}` : ''}${app.dataset.expiry === '1' && o.batch_number ? ` · ${escape(o.batch_number)}` : ''}</option>`).join('')}</select></td><td><input data-qty type="number" min="1" max="10000" step="1" value="${r.quantity}" aria-label="Quantity to print for ${escape(p.name)}"></td><td><div class="barcode-product-actions"><button class="btn secondary small" data-stock type="button">Use Current Stock Qty</button><button class="btn secondary small" data-another type="button">Another Price / Lot</button><button class="btn secondary small" data-remove type="button">Remove</button>${!p.barcode && app.dataset.canGenerate === '1' ? '<button class="btn secondary small" data-generate type="button">Generate Barcode</button>' : ''}${!p.barcode && app.dataset.canEdit === '1' ? '<button class="btn secondary small" data-enter type="button">Enter Barcode</button>' : ''}</div></td></tr>`;
       })
       .join('');
     totals();
@@ -223,7 +224,9 @@ if (app) {
     if (button.hasAttribute('data-stock')) {
       const o = p.options.find((o) => o.key === row.option);
       if (!o) {
-        error(unitsEnabled() ? 'Choose a selling price / unit first.' : 'Choose a selling price first.');
+        error(
+          unitsEnabled() ? 'Choose a selling price / unit first.' : 'Choose a selling price first.',
+        );
         return;
       }
       row.quantity = Math.max(1, Math.ceil(Number(o.stock)));

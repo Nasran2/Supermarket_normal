@@ -27,19 +27,24 @@ $fontSizes=app(\App\Services\BarcodePresetService::class)->fontSizes($c);
 @foreach($rows as $row)<div class="barcode-sheet-row">@foreach($row as $label)
 @if($label===null)<div class="barcode-blank" aria-hidden="true"></div>@else
 <div class="barcode-label"><div class="barcode-label-content">
+@include('barcode.secret-code',['position'=>'top'])
 @if($c['show_shop_name'])<div class="barcode-label-shop_name">{{ $label['shop_name'] }}</div>@endif
 @if($c['show_product_name'])<div class="barcode-label-product_name barcode-name-{{ $c['product_name_overflow'] }}">{{ $label['name'] }}</div>@endif
+@include('barcode.secret-code',['position'=>'before_price'])
 @if($c['show_price'])<div class="barcode-label-price">{{ $label['currency'] }} {{ \App\Support\Money::display($label['price']) }}</div>@endif
+@include('barcode.secret-code',['position'=>'after_price'])
+@include('barcode.secret-code',['position'=>'before_barcode'])
 @if($c['show_barcode'])@php
 $svgKey=$label['barcode_type'].'|'.$label['barcode'];
 $svgCache[$svgKey]??=app(\App\Services\BarcodeService::class)->svg($label['barcode'],$label['barcode_type'],(string)\Brick\Math\BigDecimal::of($c['sticker_width'])->minus($c['padding_left'])->minus($c['padding_right']),$c['barcode_height']);
 @endphp<div class="barcode-label-graphic">{!! $svgCache[$svgKey] !!}</div>@endif
 @if($c['show_barcode_number'])<div class="barcode-label-barcode_number">{{ $label['barcode'] }}</div>@endif
-@foreach(['sku','unit','expiry','batch','custom_text','secret_code'] as $key)@continue($key==='unit' && ! \App\Support\Units::enabled())
+@foreach(['sku','unit','expiry','batch','custom_text'] as $key)@continue($key==='unit' && ! \App\Support\Units::enabled())
 @continue(!$c['show_'.$key] || (in_array($key,['expiry','batch']) && !config('features.expiry')))
 @php($value=in_array($key,['custom_text','secret_code'])?$c[$key]:($label[$key]??null))
 @if($value)<div class="barcode-label-{{ $key }}">{{ $key==='expiry'?'Exp: '.\Carbon\Carbon::parse($value)->format('d/m/Y'):($key==='batch'?'Batch: '.$value:$value) }}</div>@endif
 @endforeach
+@include('barcode.secret-code',['position'=>'bottom'])
 </div></div>
 @endif
 @endforeach</div>@endforeach

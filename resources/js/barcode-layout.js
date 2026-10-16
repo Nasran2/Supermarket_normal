@@ -31,6 +31,20 @@ export function fitAndCheckLabels(root) {
 }
 
 export function configureOrientation(root) {
+  const secretLayout = root.querySelector('[data-secret-layout]');
+  if (secretLayout) {
+    const configureSecret = () => {
+      const shared = secretLayout.querySelector('[data-config=secret_code_use_defaults]').checked;
+      secretLayout
+        .querySelectorAll('[data-secret-overrides] input, [data-secret-overrides] select')
+        .forEach((input) => {
+          input.disabled = shared;
+        });
+    };
+    root.addEventListener('change', configureSecret);
+    root.addEventListener('barcode-config-loaded', configureSecret);
+    configureSecret();
+  }
   root.querySelector('[data-config="orientation"]')?.addEventListener('change', () => {
     const width = root.querySelector('[data-config="paper_width"]');
     const height = root.querySelector('[data-config="paper_height"]');

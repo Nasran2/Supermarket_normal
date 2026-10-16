@@ -12,6 +12,7 @@ use App\Models\Purchase;
 use App\Services\BarcodePresetService;
 use App\Services\BarcodePrintService;
 use App\Services\BarcodeService;
+use App\Services\SecretCodeService;
 use App\Services\SettingsService;
 use App\Support\Audit;
 use Illuminate\Http\Request;
@@ -35,7 +36,8 @@ class BarcodeController extends Controller
         }
         $saved = BarcodeLabelPreset::orderByDesc('is_default')->orderBy('name')->get();
         $categories = Category::orderBy('name')->get();
-        $configuration = $saved->first()?->configuration ?? $presets->defaults();
+        $saved->each(fn ($preset) => $preset->configuration = $presets->forDisplay($preset->configuration));
+        $configuration = $presets->forDisplay($saved->first()?->configuration ?? []);
 
         return view('barcode.index', compact('initial', 'saved', 'categories', 'configuration'));
     }
@@ -124,7 +126,7 @@ class BarcodeController extends Controller
 
     public function settings()
     {
-        return view('barcode.settings', ['fields' => config('barcode.settings'), 'values' => app(SettingsService::class)->all()]);
+        return view('barcode.settings', ['fields' => config('barcode.settings'), 'values' => app(SettingsService::class)->all(), 'secretCode' => app(SecretCodeService::class)->settings()]);
     }
 
     public function updateSettings(BarcodeSettingsRequest $request, SettingsService $settings)
@@ -141,6 +143,9 @@ class BarcodeController extends Controller
         $c['barcode_type'] = 'CODE128';
         $c['skip_labels'] = 0;
         $label = ['name' => 'TEST PRODUCT', 'sku' => 'TEST-001', 'barcode' => '123456789012', 'barcode_type' => 'CODE128', 'price' => '100.00', 'unit' => 'pcs', 'expiry' => null, 'batch' => null, 'quantity' => 4, 'shop_name' => app(SettingsService::class)->get('business_name', ''), 'currency' => app(SettingsService::class)->get('currency_symbol', 'Rs.')];
+        if (SecretCodeService::enabled() && $c['show_secret_code']) {
+            $label['secret_code'] = app(SecretCodeService::class)->encode('85.00', $label['price']);
+        }
 
         return view('barcode.print', ['job' => null, 'labels' => [$label], 'c' => $c]);
     }

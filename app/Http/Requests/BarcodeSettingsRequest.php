@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Services\SecretCodeService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\ValidationException;
 
 class BarcodeSettingsRequest extends FormRequest
 {
@@ -18,16 +20,36 @@ class BarcodeSettingsRequest extends FormRequest
                 $this->merge([$key => $this->boolean($key)]);
             }
         }
+        $service = app(SecretCodeService::class);
+        if (SecretCodeService::enabled() && array_intersect_key($this->all(), $service->defaults())) {
+            $this->merge(array_replace($service->settings(), $this->only(array_keys($service->defaults()))));
+        }
     }
 
     public function rules(): array
     {
-        return array_map(fn ($f) => explode('|', $f[3]), config('barcode.settings'));
+        $rules = array_map(fn ($f) => explode('|', $f[3]), config('barcode.settings'));
+        foreach (app(SecretCodeService::class)->rules() as $key => $rule) {
+            $rules[$key] = SecretCodeService::enabled() ? array_merge(['sometimes'], is_array($rule) ? $rule : explode('|', $rule)) : ['prohibited'];
+        }
+
+        return $rules;
     }
 
     public function after(): array
     {
         return [function ($v) {
+            if (SecretCodeService::enabled() && array_intersect_key($this->all(), app(SecretCodeService::class)->defaults()) && ! $v->errors()->isNotEmpty()) {
+                try {
+                    app(SecretCodeService::class)->validate($this->all());
+                } catch (ValidationException $error) {
+                    foreach ($error->errors() as $key => $messages) {
+                        foreach ($messages as $message) {
+                            $v->errors()->add($key, $message);
+                        }
+                    }
+                }
+            }
             $type = $this->input('barcode_default_type', 'CODE128');
             $len = $type === 'CODE128' ? (int) $this->input('barcode_length') : ['EAN13' => 12, 'EAN8' => 7, 'UPCA' => 11][$type] ?? 0;
             if (strlen((string) $this->input('barcode_prefix')) >= $len) {

@@ -15,7 +15,7 @@ class BarcodePresetController extends Controller
 
     public function edit(BarcodePresetService $service, ?BarcodeLabelPreset $preset = null)
     {
-        $configuration = $preset?->configuration ?? $service->defaults();
+        $configuration = $service->forDisplay($preset?->configuration ?? []);
 
         return view('barcode.preset-edit', compact('preset', 'configuration'));
     }
@@ -55,6 +55,6 @@ class BarcodePresetController extends Controller
     {
         $service->delete($preset);
 
-        return back()->with('success','Preset deleted.');
+        return back()->with('success', 'Preset deleted.');
     }
 }
