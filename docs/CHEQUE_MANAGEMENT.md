@@ -100,6 +100,10 @@ The additive `2026_10_14_010000_add_cheque_return_resolutions.php` migration cre
 
 ## Management, ledgers and reports
 
+**Settings → Overview** includes a dedicated **Cheque settings & bank accounts** card within the settings grid. It is separate from Payment methods and remains fully visible. The settings and their staff guides follow `CHEQUE` and the existing permissions.
+
+The dashboard **Cheques Due Soon** panel appears only when dashboard alerts are enabled, the user has the dashboard permission, and at least one visible pending cheque is overdue or due within the configured alert period. It is hidden when no matching cheque is available.
+
 The Cheques menu provides All, Received, Issued, Third-Party, Due Soon and Returned views, plus Cheque Report. Search number, amount, bank, customer, supplier, reference, invoice or purchase. Filter type, status, bank, parties, cheque date range and recorded date range. Available Customer Cheques opens the transferable pool.
 
 Details show document links and a user/date/reason timeline. Pending instruments can have a private scanned image/PDF attached (5 MB maximum). Downloads require authorized cheque access and the enabled feature. Passed attachments cannot be replaced through the normal form.

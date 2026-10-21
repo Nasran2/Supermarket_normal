@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\DemoMode;
 use App\Models\User;
 use App\Services\DocumentationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,7 +17,7 @@ class DocumentationLanguagesTest extends TestCase
         parent::setUp();
         $this->seed();
         $this->actingAs(User::firstOrFail());
-        config(['features.expiry' => true]);
+        config(['features.expiry' => true, 'features.barcode' => true]);
     }
 
     public function test_english_always_appears_and_optional_languages_only_appear_when_enabled(): void
@@ -48,13 +49,15 @@ class DocumentationLanguagesTest extends TestCase
     public function test_every_guide_and_animation_caption_has_both_native_translations(): void
     {
         config(['documentation-languages.tamil' => true, 'documentation-languages.sinhala' => true]);
+        config(['features.unit' => true, 'features.colors' => true, 'features.cheque' => true, 'features.scode' => true, 'hr.enabled' => true, 'demo.enabled' => true]);
+        $this->withoutMiddleware(DemoMode::class);
         $service = app(DocumentationService::class);
         $strings = [];
         foreach ($service->guides() as $slug => $guide) {
             $strings = [...$strings, $guide['title'], $guide['description'], $guide['category'], $guide['path'], $guide['before'], $guide['tip']];
             $this->get('/documentation/'.$slug)->assertOk();
             foreach ($guide['steps'] as $step) {
-                $strings = [...$strings, $step['title'], $step['text'], ...array_column($step['frames'], 'caption')];
+                $strings = [...$strings, $step['title'], $step['text'], ...$step['notes'], ...array_column($step['frames'], 'caption')];
             }
         }
         foreach (glob(resource_path('views/documentation/*.blade.php')) as $view) {
@@ -90,7 +93,7 @@ class DocumentationLanguagesTest extends TestCase
         $this->assertCount(6, $steps);
         $this->assertSame('product-save', $steps[5]['frames'][0]['screen']);
         $this->get('/documentation/expiry-batches')->assertNotFound();
-        $this->get('/documentation/add-a-product')->assertOk()->assertDontSee('product-expiry.png', false)->assertSee('product-discount-percent.png', false);
+        $this->get('/documentation/add-a-product')->assertOk()->assertDontSee('product-expiry.png', false)->assertDontSee('product-discount-percent.png', false)->assertSee('Set the default discount');
         config(['features.expiry' => true]);
         $this->assertCount(7, $service->guides()['add-a-product']['steps']);
         $this->get('/documentation/expiry-batches')->assertOk()->assertSee('expiry-pos.png', false);
@@ -103,8 +106,10 @@ class DocumentationLanguagesTest extends TestCase
         foreach (config('documentation') as $slug => $guide) {
             $sequences = config('documentation-walkthroughs.guides')[$slug];
             $this->assertCount(count($guide['steps']), $sequences, $slug);
-            foreach ($sequences as $frames) {
-                $this->assertNotEmpty($frames);
+            foreach ($sequences as $index => $frames) {
+                // Written guides have complete instructions without unrelated screenshots.
+                $this->assertNotEmpty($guide['steps'][$index]['title']);
+                $this->assertNotEmpty($guide['steps'][$index]['text']);
                 foreach ($frames as $frame) {
                     $path = public_path('help-assets/screens/'.$frame['screen'].'.png');
                     $this->assertFileExists($path);

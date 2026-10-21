@@ -2,10 +2,31 @@
 
 namespace App\Services;
 
-use App\Support\Expiry;
+use App\Support\Demo;
+use App\Support\Hr;
 
 class DocumentationService
 {
+    public function featureEnabled(string $feature): bool
+    {
+        return match ($feature) {
+            'hr' => Hr::enabled(),
+            'demo' => Demo::enabled(),
+            'scode' => SecretCodeService::enabled(),
+            default => (bool) config('features.'.$feature, false),
+        };
+    }
+
+    private function available(array $content): bool
+    {
+        $features = $content['requires'] ?? [];
+        if (! empty($content['requires_expiry'])) {
+            $features[] = 'expiry';
+        }
+
+        return collect($features)->every(fn ($feature) => $this->featureEnabled($feature));
+    }
+
     public function languages(): array
     {
         return array_filter(['ta' => config('documentation-languages.tamil'), 'si' => config('documentation-languages.sinhala')]);
@@ -38,38 +59,40 @@ class DocumentationService
         $guides = [];
         $walkthroughs = config('documentation-walkthroughs.guides');
         foreach (config('documentation') as $slug => $guide) {
-            if (! empty($guide['requires_expiry']) && ! Expiry::enabled()) {
+            if (! $this->available($guide)) {
                 continue;
+            }
+            if (! $this->featureEnabled('unit')) {
+                $guide = array_replace_recursive($guide, config('documentation-quantity.'.$slug, []));
+                if ($slug === 'units-and-categories') {
+                    $guide = array_replace($guide, [
+                        'title' => 'Organize product categories',
+                        'description' => 'Group products into categories for browsing and reporting.',
+                        'path' => 'Categories',
+                        'tip' => 'Choose clear category names so staff can find products quickly.',
+                        'link' => ['permission' => 'categories.view', 'route' => 'manage.index', 'parameters' => ['resource' => 'categories']],
+                    ]);
+                    $guide['steps'] = array_slice($guide['steps'], 0, 1);
+                }
+            }
+            if (! $this->featureEnabled('barcode')) {
+                $guide = array_replace_recursive($guide, config('documentation-no-barcode.'.$slug, []));
             }
             $steps = [];
             foreach ($guide['steps'] as $index => $step) {
-                if (! empty($step['requires_expiry']) && ! Expiry::enabled()) {
+                if (! $this->available($step)) {
                     continue;
                 }
-                $step['frames'] = $walkthroughs[$slug][$index];
+                $step['notes'] = array_values(array_map(fn ($note) => $note['text'], array_filter($step['notes'] ?? [], fn ($note) => $this->available($note))));
+                $step['frames'] = $walkthroughs[$slug][$index] ?? [];
                 $steps[] = $step;
             }
-            if (! \App\Support\Units::enabled()) {
-                // Existing walkthrough screenshots include the unit sidebar and controls.
-                // Present the complete written guide without exposing those stale screens.
-                if ($slug === 'units-and-categories') {
-                    $guide['title'] = 'Organize product categories';
-                    $guide['description'] = 'Group products into categories for browsing and reporting.';
-                    $guide['path'] = 'Categories';
-                    $guide['tip'] = 'Choose clear category names so staff can find products quickly.';
-                    $steps = array_slice($steps, 0, 1);
-                    $guide['link'] = ['permission' => 'categories.view', 'route' => 'manage.index', 'parameters' => ['resource' => 'categories']];
-                }
-                $guide = array_replace_recursive($guide, config('documentation-quantity.'.$slug, []));
-                $steps = array_replace_recursive($steps, config('documentation-quantity.'.$slug.'.steps', []));
-                foreach ($steps as &$step) {
-                    $step['frames'] = [];
-                }
-                unset($step);
-            }
-            $guide['screens_enabled'] = \App\Support\Units::enabled();
+            // Recorded screens contain optional controls. Show written instructions
+            // when those controls are disabled, instead of exposing stale examples.
+            $guide['screens_enabled'] = $this->featureEnabled('unit') && $this->featureEnabled('barcode') && $this->featureEnabled('expiry')
+                && collect($steps)->every(fn ($step) => ! empty($step['frames']));
             $guide['steps'] = $steps;
-            $guide['search'] = mb_strtolower(implode(' ', array_merge(...array_map(fn ($text) => array_values($this->copies($text)), [$guide['title'], $guide['description'], $guide['category'], $guide['path'], ...array_column($steps, 'title'), ...array_column($steps, 'text')]))));
+            $guide['search'] = mb_strtolower(implode(' ', array_merge(...array_map(fn ($text) => array_values($this->copies($text)), [$guide['title'], $guide['description'], $guide['category'], $guide['path'], $guide['before'], $guide['tip'], ...array_column($steps, 'title'), ...array_column($steps, 'text'), ...array_merge(...array_column($steps, 'notes'))]))));
             $guides[$slug] = $guide;
         }
 

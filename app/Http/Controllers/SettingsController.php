@@ -23,10 +23,11 @@ class SettingsController extends Controller
     public function edit(string $group, SettingsService $service)
     {
         $fields = config('pos.'.$group);
+        abort_if($group === 'branding' && ! \App\Support\Branding::enabled(), 404);
         abort_if($group === 'expiry' && ! Expiry::enabled(), 404);
         abort_unless($fields, 404);
         abort_unless(auth()->user()->hasPermission(match ($group) {
-            'expiry' => 'expiry.manage_settings','stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$group
+            'branding' => 'settings.business','expiry' => 'expiry.manage_settings','stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$group
         }), 403);
         if (! config('features.barcode')) {
             unset($fields['barcode_enabled']);
@@ -44,7 +45,7 @@ class SettingsController extends Controller
         $paymentMethods = PaymentMethod::where('active', true)->orderBy('display_order')->get();
         $customers = Customer::where('active', true)->orderBy('name')->get();
 
-        return view('settings.form', compact('group', 'fields', 'values', 'paymentMethods', 'customers'));
+        return view($group === 'branding' ? 'settings.branding' : 'settings.form', compact('group', 'fields', 'values', 'paymentMethods', 'customers'));
     }
 
     public function update(SettingsRequest $request, string $group, SettingsService $service)

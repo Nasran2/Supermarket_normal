@@ -179,6 +179,16 @@ Laravel schedules `demo:reset` every minute and checks the ten-day deadline befo
 An overdue demo also resets on its next web request if the scheduler was missed; a submitted form that triggers reset is rejected with a reload message. A shared file-cache lock coordinates web requests and the scheduler on one application host. Restores use a database transaction, preserve foreign-key enforcement afterwards, and advance the reset date only on success. Run all demo instances against the same writable `storage/framework` directory. Dates are stored in UTC and displayed in the configured business timezone. After changing the application's database schema or its starting dataset, the installation owner must deliberately recreate the `demo_cycles` baseline in the demo database; mismatched tables/columns fail before destructive changes. `php artisan demo:reset` is safe when `DEMO=false` and never changes data in that mode.
 
 
+### Optional appearance settings
+
+Set `COLORS=true` in `.env` to show **Appearance & branding** in Settings. With `COLORS=false` or the variable absent, its links are hidden and its page and save endpoint return 404. Previously saved branding stays applied. Users still need the Business settings permission. Run `php artisan config:clear` after changing the flag (or rebuild the configuration cache when used in deployment).
+
+See [appearance and branding](docs/APPEARANCE-AND-BRANDING.md) for names, colors, login text, icons/images, preview and reset behavior.
+
+### Staff documentation
+
+The built-in **Documentation** library includes the new appearance, cheque/bank, label/cost-code, cart/discount, invoice-correction, stock-history, payment-method and account guides. Optional guides, settings notes, related links and search content follow `COLORS`, `CHEQUE`, `BARCODE`, `SCODE`, `EXPIRE`, `UNIT`, `hr_module` and `DEMO`. Disabled guides return 404. `TAMIL` and `SINHALA` independently control native copies; English remains available. See [documentation visibility and maintenance](docs/DOCUMENTATION.md).
+
 ### Optional expiry tracking
 
 Expiry tracking is off by default (`EXPIRE=false`). Set `EXPIRE=true`, run `php artisan migrate --force`, `php artisan optimize:clear`, and `npm run build`, then enable **Track expiry** for each relevant product. Batch dates extend the existing stock layers; quantities are not duplicated. Disabling the feature hides its controls and keeps all recorded dates. See [Expiry tracking](docs/EXPIRY_TRACKING.md) for staff instructions, permissions, FEFO, returns and write-offs.

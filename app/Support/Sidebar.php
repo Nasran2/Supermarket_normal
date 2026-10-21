@@ -72,7 +72,10 @@ class Sidebar
             $hr[] = $link('HR reports', 'hr.reports.index', [], [], request()->routeIs('hr.reports.*'));
         }
         $settings = [$link('Overview', 'settings.index', [], 'settings.view', request()->routeIs('settings.index'))];
-        foreach (['business' => ['Business', 'settings.business'], 'pos' => ['Point of sale', 'settings.pos'], 'receipt' => ['Receipt', 'settings.receipt'], 'stock' => ['Stock controls', 'settings.stock'], 'system' => ['System', 'settings.system']] as $key => [$title, $permission]) {
+        foreach (['branding' => ['Appearance & branding', 'settings.business'], 'business' => ['Business', 'settings.business'], 'pos' => ['Point of sale', 'settings.pos'], 'receipt' => ['Receipt', 'settings.receipt'], 'stock' => ['Stock controls', 'settings.stock'], 'system' => ['System', 'settings.system']] as $key => [$title, $permission]) {
+            if ($key === 'branding' && ! Branding::enabled()) {
+                continue;
+            }
             $settings[] = $link($title, 'settings.edit', $key, $permission, request()->route('group') === $key);
         }
         if (config('features.barcode')) {

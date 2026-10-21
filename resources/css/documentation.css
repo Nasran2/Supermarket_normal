@@ -491,6 +491,10 @@
 .documentation-written-steps {
   min-width: 0;
 }
+.documentation-guide-layout:has(> .documentation-written-steps:only-child) {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 960px;
+}
 .documentation-steps-heading {
   display: flex;
   align-items: center;

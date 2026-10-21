@@ -22,6 +22,7 @@
         <env name="CHEQUE" value="false" force="true"/>
         <env name="UNIT" value="true" force="true"/>
         <env name="SCODE" value="false" force="true"/>
+        <env name="COLORS" value="false" force="true"/>
         <env name="EXPIRE" value="false" force="true"/>
         <env name="DEMO" value="false" force="true"/>
         <env name="APP_URL" value="http://localhost"/>

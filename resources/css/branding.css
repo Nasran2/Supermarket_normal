@@ -1,0 +1,40 @@
+.brand strong { color: var(--brand-name-color, var(--ink)); overflow-wrap: anywhere; }
+.brand .brand-copy > span { color: var(--brand-subtitle-color, #96a39b); overflow-wrap: anywhere; }
+.branding-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 24px; align-items: start; }
+.branding-controls { display: grid; gap: 24px; min-width: 0; }
+.branding-section { padding: 28px; }
+.branding-section h2, .branding-preview > h2 { font-size: 20px; margin: 0 0 10px; }
+.branding-section > p { margin-bottom: 24px; font-size: 13px; }
+.branding-color-control { display: flex; gap: 10px; align-items: center; }
+.branding-color-control input[type=color] { padding: 4px; width: 52px; height: 43px; flex: none; cursor: pointer; }
+.branding-color-control input[type=text] { min-width: 0; font-family: monospace; }
+.branding-icon-field { border: 0; padding: 0; min-width: 0; }
+.branding-icon-field legend { margin-bottom: 12px; font-weight: 600; }
+.branding-icon-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.branding-icon-options label { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 15px 8px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font-size: 12px; text-align: center; }
+.branding-icon-options label:has(input:checked) { color: var(--green); border-color: var(--green); background: var(--primary-light); }
+.branding-icon-options input { width: 16px; height: 16px; min-height: 0; accent-color: var(--green); }
+.branding-preview { position: sticky; top: 100px; padding: 24px; min-width: 0; }
+.branding-preview > p { margin: 0 0 22px; font-size: 13px; }
+.branding-sidebar-preview { display: flex; align-items: center; gap: 12px; padding: 18px 0; }
+.branding-sidebar-preview > div { min-width: 0; }
+.branding-sidebar-preview strong { display: block; color: var(--brand-name-color); font-size: 18px; overflow-wrap: anywhere; }
+.branding-sidebar-preview div > span { display: block; color: var(--brand-subtitle-color); font-size: 10px; letter-spacing: 1.4px; margin-top: 6px; overflow-wrap: anywhere; }
+.branding-sidebar-preview img { width: 43px; height: 43px; object-fit: contain; background: white; }
+.branding-nav-preview { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; background: color-mix(in srgb, var(--green) 9%, white); color: var(--green); font-weight: 600; margin-bottom: 24px; }
+.branding-login-preview { background: var(--login-background); padding: 22px 15px; border-radius: 12px; }
+.branding-login-card { background: white; padding: 25px 20px; border-radius: 14px; text-align: center; box-shadow: 0 5px 20px #00000008; }
+.branding-preview-icon { display: inline-grid; place-items: center; width: 58px; height: 58px; border-radius: 17px; background: var(--login-accent); color: var(--login-foreground); margin-bottom: 18px; }
+.branding-login-card > img { max-width: 100%; height: 58px; object-fit: contain; margin: 0 auto 18px; }
+.branding-preview-heading { display: block; color: var(--login-accent); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; overflow-wrap: anywhere; }
+.branding-login-card h3 { color: var(--login-title-color); font-size: 27px; margin: 12px 0 6px; letter-spacing: -.7px; overflow-wrap: anywhere; }
+.branding-login-card p { color: var(--login-description-color); font-size: 12px; margin: 0 0 24px; overflow-wrap: anywhere; }
+.branding-preview-input { padding: 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); text-align: left; font-size: 12px; margin-bottom: 12px; }
+.branding-preview-button { display: flex; justify-content: center; align-items: center; gap: 8px; padding: 12px; border-radius: 8px; background: var(--login-accent); color: var(--login-foreground); font-weight: 700; font-size: 13px; }
+.branding-preview > button { width: 100%; margin-top: 20px; }
+.branding-preview > small { display: block; margin-top: 10px; line-height: 1.6; }
+.branding-upload-current { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.branding-save { margin-top: 24px; padding: 20px 24px; }
+.branding-preview [hidden], .branding-upload-current[hidden] { display: none !important; }
+@media (max-width: 1100px) { .branding-layout { grid-template-columns: 1fr; } .branding-preview { position: static; max-width: 500px; width: 100%; justify-self: center; } }
+@media (max-width: 600px) { .branding-section { padding: 20px; } .branding-icon-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

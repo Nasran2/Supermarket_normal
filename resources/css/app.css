@@ -1,5 +1,6 @@
 @import './returns.css';
 @import './documentation.css';
+@import './branding.css';
 @import 'tailwindcss';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../views/**/*.blade.php';
@@ -10,6 +11,7 @@
 :root {
   --green: #047857;
   --green-dark: #065f46;
+  --accent-foreground: #fff;
   --ink: #172b27;
   --muted: #72807c;
   --line: #e7ece9;
@@ -134,7 +136,7 @@ small {
 }
 .brand-mark {
   background: var(--green);
-  color: white;
+  color: var(--accent-foreground);
   border-radius: 12px;
   width: 43px;
   height: 43px;
@@ -160,7 +162,7 @@ small {
 .brand span:not(.brand-mark) {
   font-size: 8px;
   letter-spacing: 1.5px;
-  color: #96a39b;
+  color: var(--brand-subtitle-color, #96a39b);
   margin-top: 4px;
   display: block;
 }
@@ -186,7 +188,7 @@ small {
   color: #185340;
 }
 .nav-link.active {
-  background: #e9f5ee;
+  background: var(--primary-light);
   color: var(--green);
   font-weight: 650;
 }
@@ -387,7 +389,7 @@ summary::-webkit-details-marker {
 }
 .btn.primary {
   background: var(--green);
-  color: white;
+  color: var(--accent-foreground);
   box-shadow: 0 2px 4px #04785718;
 }
 .btn.primary:hover {
@@ -774,15 +776,15 @@ tbody tr:hover {
   text-decoration: none;
 }
 .pagination-control:is(a, button):hover {
-  background: #e8f5ee;
-  color: #065f46;
-  border-color: #047857;
+  background: var(--primary-light);
+  color: var(--green-dark);
+  border-color: var(--green);
 }
 .pagination-control[aria-current='page'],
 .pagination-control[aria-current='page']:hover {
-  background: #047857;
+  background: var(--green);
   color: #fff;
-  border-color: #047857;
+  border-color: var(--green);
 }
 .pagination-control[aria-disabled='true'],
 .pagination-control:disabled {
@@ -989,7 +991,7 @@ input[type='checkbox'] {
 .tile-icon {
   display: inline-flex;
   color: var(--green);
-  background: #edf7f0;
+  background: var(--primary-light);
   padding: 12px;
   border-radius: 11px;
   margin-bottom: 18px;
@@ -2243,8 +2245,8 @@ body.pos-workspace {
 }
 .category-chip.selected {
   color: white;
-  background: #047857;
-  border-color: #047857;
+  background: var(--green);
+  border-color: var(--green);
 }
 .pos-workspace .product-grid {
   grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
@@ -2335,7 +2337,7 @@ body.pos-workspace {
 }
 .payment-mode button.selected {
   background: white;
-  color: #047857;
+  color: var(--green);
   box-shadow: 0 2px 5px #203d2910;
   font-weight: 700;
 }
@@ -2365,7 +2367,7 @@ body.pos-workspace {
   right: 7px;
   top: 4px;
   visibility: hidden;
-  color: #047857;
+  color: var(--green);
   font-size: 12px;
 }
 .payment-option.selected .method-check {
@@ -2493,13 +2495,13 @@ body.pos-workspace {
   color: #b45309;
 }
 .collection-summary .balance-line strong.settled {
-  color: #047857;
+  color: var(--green);
 }
 .collection-summary .change-line {
   padding: 12px;
   background: #e2f2e8;
   border-radius: 9px;
-  color: #047857;
+  color: var(--green);
 }
 .collection-summary .change-line strong {
   font-size: 20px;
@@ -3331,7 +3333,7 @@ body.pos-workspace {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: #edf7f0;
+  background: var(--primary-light);
   color: #22794e;
 }
 .customer-edit-fields {
@@ -4659,7 +4661,7 @@ body.pos-workspace {
   color: var(--green);
 }
 .nav-child.active {
-  background: #e9f5ee;
+  background: var(--primary-light);
   color: var(--green);
   font-weight: 650;
 }
@@ -5580,7 +5582,7 @@ body.nav-collapsed .sidebar:not(.mobile-open) .nav-chevron {
 }
 .cart-item-name.has-line-discount > .cart-item-discount {
   display: block;
-  color: #047857;
+  color: var(--green);
 }
 
 /* Independent visibility controls beside editable bill details. */
@@ -5597,8 +5599,8 @@ body.nav-collapsed .sidebar:not(.mobile-open) .nav-chevron {
   align-items: center;
   gap: 10px;
   padding: 11px 20px 11px 15px;
-  background: linear-gradient(135deg, #059669 0%, #047857 55%, #064e3b 100%);
-  color: #ffffff !important;
+  background: linear-gradient(135deg, var(--green), var(--green-dark));
+  color: var(--accent-foreground) !important;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 9999px;
   font-size: 14px;
@@ -5615,8 +5617,8 @@ body.nav-collapsed .sidebar:not(.mobile-open) .nav-chevron {
 
 .floating-pos-btn:hover {
   transform: translateY(-3px) scale(1.02);
-  color: #ffffff !important;
-  background: linear-gradient(135deg, #10b981 0%, #059669 55%, #047857 100%);
+  color: var(--accent-foreground) !important;
+  background: var(--green-dark);
   box-shadow: 0 14px 30px -4px rgba(4, 120, 87, 0.58), 0 6px 14px -2px rgba(0, 0, 0, 0.18);
 }
 

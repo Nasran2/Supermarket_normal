@@ -4,7 +4,7 @@
 // Each frame references a measured control in documentation-screens.json.
 $frame = fn (string $screen, ?string $target, string $caption) => compact('screen', 'target', 'caption');
 
-return [
+$walkthroughs = [
     'screens' => json_decode(file_get_contents(__DIR__.'/documentation-screens.json'), true, 512, JSON_THROW_ON_ERROR),
     'guides' => [
         'start-your-shift' => [
@@ -171,3 +171,11 @@ return [
         ],
     ],
 ];
+
+// New written guides remain complete without borrowing unrelated screen images.
+foreach (require __DIR__.'/documentation-updates.php' as $slug => $guide) {
+    $walkthroughs['guides'][$slug] = array_fill(0, count($guide['steps']), []);
+}
+$walkthroughs['guides']['store-settings'] = array_pad($walkthroughs['guides']['store-settings'], 9, []);
+
+return $walkthroughs;

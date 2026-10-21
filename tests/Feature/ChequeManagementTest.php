@@ -260,6 +260,18 @@ class ChequeManagementTest extends TestCase
         $this->assertSame(4, Cheque::held()->count());
     }
 
+    public function test_dashboard_hides_cheque_alert_when_no_pending_instrument_is_due(): void
+    {
+        $this->get(route('dashboard'))->assertOk()->assertDontSee('Cheques Due Soon');
+        $this->account('10000', [$this->entry('10000', '2026-12-01')]);
+        $this->get(route('dashboard'))->assertOk()->assertDontSee('Cheques Due Soon');
+        $cheque = Cheque::firstOrFail();
+        $cheque->update(['cheque_date' => '2026-10-15']);
+        $this->get(route('dashboard'))->assertOk()->assertSee('Cheques Due Soon');
+        $this->post(route('cheques.action', [$cheque, 'pass']), ['confirmed' => 1])->assertRedirect()->assertSessionHasNoErrors();
+        $this->get(route('dashboard'))->assertOk()->assertDontSee('Cheques Due Soon');
+    }
+
     public function test_feature_disabled_hides_every_entry_and_preserves_role_and_data(): void
     {
         $c = $this->account('10000', [$this->entry()]);

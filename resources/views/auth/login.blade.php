@@ -1,3 +1,4 @@
+@php($branding = \App\Support\Branding::values($settings ?? []))
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,87 +6,66 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Sign in · {{ $settings['business_name'] ?? 'Twinsofte' }}</title>
     @vite(['resources/css/app.css','resources/js/app.js'])
+    @include('partials.branding-theme')
     <style>
         .supermarket-bg {
-            background-color: #e6fcf0;
-            background-image: 
-                radial-gradient(circle at 0% 0%, #d1f7e0 0%, transparent 40%),
-                radial-gradient(circle at 100% 100%, #c6f3d5 0%, transparent 50%),
-                radial-gradient(circle at 50% 50%, #effff6 0%, transparent 70%);
-            overflow: hidden;
+            background-color: var(--login-background);
+            background-image: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--login-accent) 10%, transparent), transparent 50%), radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--login-accent) 14%, transparent), transparent 55%);
             position: relative;
         }
-        /* Decorative background circles */
-        .supermarket-bg::before, .supermarket-bg::after {
-            content: '';
-            position: absolute;
-            border-radius: 50%;
-            border: 2px solid rgba(16, 185, 129, 0.03);
-        }
-        .supermarket-bg::before {
-            width: 800px;
-            height: 800px;
-            top: -200px;
-            left: -300px;
-            box-shadow: inset 0 0 100px rgba(16, 185, 129, 0.05);
-        }
-        .supermarket-bg::after {
-            width: 600px;
-            height: 600px;
-            bottom: -150px;
-            right: -150px;
-            background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%);
-        }
-        
         .login-card {
             background: #ffffff;
             border-radius: 20px;
-            box-shadow: 0 25px 60px -10px rgba(0, 160, 80, 0.1);
+            box-shadow: 0 25px 60px -10px color-mix(in srgb, var(--login-accent) 15%, transparent);
             position: relative;
             z-index: 10;
         }
-        
         .btn-green-gradient {
-            background: linear-gradient(135deg, #0ba360 0%, #0db168 100%);
-            box-shadow: 0 10px 20px -8px rgba(13, 177, 104, 0.5);
+            background: linear-gradient(135deg, var(--login-accent-dark), var(--login-accent));
+            color: var(--login-foreground);
+            box-shadow: 0 10px 20px -8px color-mix(in srgb, var(--login-accent) 50%, transparent);
         }
-        .btn-green-gradient:hover {
-            background: linear-gradient(135deg, #098f53 0%, #0a9e5b 100%);
-            box-shadow: 0 12px 25px -8px rgba(13, 177, 104, 0.6);
-        }
-
+        .btn-green-gradient:hover { background: var(--login-accent-dark); color: {{ \App\Support\Branding::foreground(\App\Support\Branding::darken($branding['login_accent_color'])) }}; }
+        .login-accent-text { color: var(--login-accent); }
+        .login-icon-tile { background: var(--login-accent); color: var(--login-foreground); box-shadow: 0 8px 16px -4px color-mix(in srgb, var(--login-accent) 40%, transparent); }
+        .login-heading { color: var(--login-title-color); overflow-wrap: anywhere; }
+        .login-description { color: var(--login-description-color); overflow-wrap: anywhere; }
+        .login-brand-heading { overflow-wrap: anywhere; }
+        .login-card input:focus { border-color: var(--login-accent); box-shadow: 0 0 0 1px var(--login-accent); }
+        .login-card input[type="checkbox"]:checked { background: var(--login-accent); border-color: var(--login-accent); }
+        .login-decoration { border-color: color-mix(in srgb, var(--login-accent) 6%, transparent); }
         .input-icon-left {
             padding-left: 2.75rem;
         }
     </style>
 </head>
 <body class="supermarket-bg min-h-screen flex items-center justify-center p-6 font-sans antialiased text-gray-800">
-    
+
     <!-- Background decorative arcs -->
     <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120vw] h-[120vw] max-w-[1200px] max-h-[1200px] rounded-full border border-green-500/5"></div>
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] h-[90vw] max-w-[900px] max-h-[900px] rounded-full border border-green-500/5"></div>
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] max-w-[600px] max-h-[600px] rounded-full border border-green-500/5 bg-white/20"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120vw] h-[120vw] max-w-[1200px] max-h-[1200px] rounded-full border login-decoration"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] h-[90vw] max-w-[900px] max-h-[900px] rounded-full border login-decoration"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] max-w-[600px] max-h-[600px] rounded-full border login-decoration bg-white/20"></div>
     </div>
 
     <main class="login-card w-full max-w-[420px] p-8 sm:p-10 transition-all duration-300">
-        
+
         <x-demo-notice/>
         <!-- Header -->
         <div class="text-center mb-8">
-            @if(!empty($settings['logo']))
-                <img src="{{ asset('storage/'.$settings['logo']) }}" alt="Business logo" class="h-16 mx-auto object-contain mb-5">
+            @if(!empty($branding['login_image']))
+                <img src="{{ asset('storage/'.$branding['login_image']) }}" alt="Login logo" class="h-16 max-w-full mx-auto object-contain mb-5">
             @else
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-[1.25rem] bg-[#0db168] text-white mb-5 shadow-[0_8px_16px_-4px_rgba(13,177,104,0.4)]">
-                    <x-icon name="shopping-basket" :size="32"/>
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-[1.25rem] login-icon-tile mb-5">
+                    <x-icon :name="$branding['login_icon']" :size="32"/>
                 </div>
             @endif
-            
-            <span class="block text-[10px] font-bold tracking-[0.15em] text-[#0db168] uppercase mb-2">
-                {{ strtoupper($settings['business_name'] ?? 'Twinsofte') }} POS
+
+            <span class="block text-[10px] font-bold tracking-[0.15em] login-brand-heading login-accent-text uppercase mb-2">
+                {{ $branding['login_brand_text'] }}
             </span>
-            <h1 class="text-[28px] font-extrabold tracking-tight text-[#111827] mb-1">Welcome back</h1>
-            <p class="text-[13px] text-gray-500 font-medium">Sign in to continue to your POS.</p>
+            <h1 class="text-[28px] font-extrabold tracking-tight login-heading mb-1">{{ $branding['login_title'] }}</h1>
+            <p class="text-[13px] login-description font-medium">{{ $branding['login_description'] }}</p>
         </div>
 
         @if($errors->any())
@@ -99,7 +79,7 @@
 
         <form action="{{ url('/login') }}" method="POST" class="space-y-5">
             @csrf
-            
+
             <!-- Username/Email Field -->
             <div>
                 <label class="block text-[13px] font-bold text-[#1f2937] mb-2">Username or email</label>
@@ -107,9 +87,9 @@
                     <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
                         <x-icon name="user" :size="18"/>
                     </div>
-                    <input type="text" name="login" value="{{ old('login', old('email')) }}" maxlength="255" autocapitalize="none" spellcheck="false" autocomplete="username" placeholder="Enter your username or email" required autofocus 
+                    <input type="text" name="login" value="{{ old('login', old('email')) }}" maxlength="255" autocapitalize="none" spellcheck="false" autocomplete="username" placeholder="Enter your username or email" required autofocus
                         style="padding-left: 2.75rem;"
-                        class="w-full pr-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0db168] focus:ring-1 focus:ring-[#0db168] transition-colors bg-white text-[13px] text-gray-900 shadow-sm outline-none placeholder:text-gray-400 placeholder:font-medium">
+                        class="w-full pr-4 py-2.5 rounded-lg border border-gray-200 transition-colors bg-white text-[13px] text-gray-900 shadow-sm outline-none placeholder:text-gray-400 placeholder:font-medium">
                 </div>
             </div>
 
@@ -120,9 +100,9 @@
                     <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
                         <x-icon name="lock" :size="18"/>
                     </div>
-                    <input type="password" id="password-input" name="password" autocomplete="current-password" placeholder="Enter your password" required 
+                    <input type="password" id="password-input" name="password" autocomplete="current-password" placeholder="Enter your password" required
                         style="padding-left: 2.75rem;"
-                        class="w-full pr-10 py-2.5 rounded-lg border border-gray-200 focus:border-[#0db168] focus:ring-1 focus:ring-[#0db168] transition-colors bg-white text-[13px] text-gray-900 shadow-sm outline-none placeholder:text-gray-400 placeholder:font-medium">
+                        class="w-full pr-10 py-2.5 rounded-lg border border-gray-200 transition-colors bg-white text-[13px] text-gray-900 shadow-sm outline-none placeholder:text-gray-400 placeholder:font-medium">
                     <button type="button" id="toggle-password" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none transition-colors" aria-label="Toggle password visibility">
                         <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
@@ -142,7 +122,7 @@
             <div class="flex items-center">
                 <label class="flex items-center gap-2 cursor-pointer group">
                     <div class="relative flex items-center justify-center">
-                        <input type="checkbox" name="remember" class="peer appearance-none w-4 h-4 rounded border-gray-300 border bg-white checked:bg-[#0db168] checked:border-[#0db168] focus:ring-2 focus:ring-[#0db168]/20 transition-all cursor-pointer shadow-sm">
+                        <input type="checkbox" name="remember" class="peer appearance-none w-4 h-4 rounded border-gray-300 border bg-white  transition-all cursor-pointer shadow-sm">
                         <svg class="absolute w-3 h-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
@@ -152,7 +132,7 @@
             </div>
 
             <button type="submit" class="w-full flex justify-center items-center gap-2 btn-green-gradient text-white font-bold text-[14px] py-3 px-4 rounded-xl transition-all active:scale-[0.98] mt-2">
-                Sign in 
+                Sign in
                 <x-icon name="arrow-right" :size="16" class="stroke-[2.5]"/>
             </button>
         </form>
@@ -163,19 +143,19 @@
                 <div class="absolute inset-0 flex items-center" aria-hidden="true">
                     <div class="w-full border-t border-gray-100"></div>
                 </div>
-                <div class="relative bg-white px-3 flex items-center gap-1.5 text-xs font-semibold text-[#0db168]">
-                    <x-icon name="shield-check" :size="14" class="fill-[#0db168] text-white"/> 
+                <div class="relative bg-white px-3 flex items-center gap-1.5 text-xs font-semibold login-accent-text">
+                    <x-icon name="shield-check" :size="14" class="login-accent-text"/>
                     <span>Secure POS Access</span>
                 </div>
             </div>
-            
+
             <p class="text-center text-[11px] text-gray-500 font-medium mt-4">
                 Fast billing. Simple stock control. Better business management.
             </p>
-            
+
             <div class="mt-4 pt-4 border-t border-gray-100/80">
                 <p class="text-center text-[10px] text-gray-400 font-medium">
-                    Powered by <span class="font-bold text-[#0db168]"><a href="https://{{ config('app.developer.web') }}" target="_blank" rel="noopener">{{ config('app.developer.name') }}</a></span>
+                    Powered by <span class="font-bold login-accent-text"><a href="https://{{ config('app.developer.web') }}" target="_blank" rel="noopener">{{ config('app.developer.name') }}</a></span>
                 </p>
             </div>
         </div>

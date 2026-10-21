@@ -1360,12 +1360,30 @@ $discount = ['title' => 'Set the default discount', 'text' => 'Choose None, Fixe
 $expiry = ['title' => 'Enter expiry dates when needed', 'text' => 'When expiry tracking is enabled by your server administrator, keep Maintain stock on and tick Track expiry for dated products. Enter the date printed on each opening batch. Add a separate row for a different date. Expired or unknown-date batches cannot normally be sold. Leave Track expiry off for products that do not need it.', 'requires_expiry' => true];
 array_splice($product['steps'], 4, 0, [$discount, $expiry]);
 unset($product);
-$guides['make-a-sale']['steps'][1]['text'] .= ' For expiry-tracked products, choose the selling price and expiry date together. In earliest-expiry mode, the system uses valid batches at the selected price. Expired stock is blocked by default.';
+$guides['make-a-sale']['steps'][1]['notes'][] = ['requires' => ['expiry'], 'text' => 'For expiry-tracked products, choose the selling price and expiry date together. In earliest-expiry mode, the system uses valid batches at the selected price. Expired stock is blocked by default.'];
 $guides['make-a-sale']['steps'][2]['text'] .= ' A product default discount is added automatically. Check any line discount under that item; a fixed amount is for the whole line, not each unit.';
-$guides['receive-a-purchase']['steps'][2]['text'] .= ' For expiry-tracked products, enter the date on the received batch and the batch number when used. A different date creates a separate stock batch.';
-$guides['return-with-bill']['steps'][2]['text'] .= ' A dated return uses its original batch. If it is now expired, choose the approved write-off or supplier-return action instead of Restock.';
-$guides['return-without-bill']['steps'][3]['text'] .= ' If the product tracks expiry, read and enter its packaging date before restocking. An unknown expiry normally cannot be restocked.';
-$guides['read-reports']['steps'][2]['text'] .= ' The Audit log shows readable Before and After values. Expiry reports show batch dates and remaining stock when enabled.';
-$guides['store-settings']['tip'] .= ' In DEMO mode, business information and important settings are locked. DEMO labels appear on screens and printed documents, and sample data resets every 10 days.';
+$guides['receive-a-purchase']['steps'][2]['notes'][] = ['requires' => ['expiry'], 'text' => 'For expiry-tracked products, enter the date on the received batch and the batch number when used. A different date creates a separate stock batch.'];
+$guides['return-with-bill']['steps'][2]['notes'][] = ['requires' => ['expiry'], 'text' => 'A dated return uses its original batch. If it is now expired, choose the approved write-off or supplier-return action instead of Restock.'];
+$guides['return-without-bill']['steps'][3]['notes'][] = ['requires' => ['expiry'], 'text' => 'If the product tracks expiry, read and enter its packaging date before restocking. An unknown expiry normally cannot be restocked.' ];
+$guides['read-reports']['steps'][2]['notes'][] = ['requires' => ['expiry'], 'text' => 'Expiry reports show batch dates and remaining stock.'];
+$guides['read-reports']['steps'][2]['notes'][] = ['text' => 'The Audit log shows readable Before and After values.'];
+$guides['staff-and-payroll']['requires'] = ['hr'];
+foreach ([1, 2, 3] as $index) {
+    $guides['units-and-categories']['steps'][$index]['requires'] = ['unit'];
+}
+$guides = array_merge($guides, require __DIR__.'/documentation-extra.php', require __DIR__.'/documentation-updates.php');
+$guides['maintain-product-stock']['steps'][2]['text'] = 'Check the price and discount, then save. Do not switch off stock maintenance just to hide a wrong quantity. Correct counted goods through a stock adjustment.';
+$guides['maintain-product-stock']['steps'][2]['notes'][] = ['requires' => ['expiry'], 'text' => 'Expiry tracking requires stock maintenance.'];
+$guides['store-settings']['steps'][] = ['requires' => ['colors'], 'title' => 'Personalize appearance and login', 'text' => 'Open Settings → Appearance & branding to change colors, main and second names, login text and the login icon or image. Use the live preview, then Save changes.'];
+$guides['store-settings']['steps'][] = ['requires' => ['cheque'], 'title' => 'Find cheque settings and bank accounts', 'text' => 'Open Settings → Overview and choose the separate Cheque settings & bank accounts card. Set the cheque rules and maintain your bank account references there.'];
+$guides['store-settings']['steps'][] = ['requires' => ['barcode'], 'title' => 'Set label printing preferences', 'text' => 'Use Settings → Barcode for generation, scanning and label defaults. Choose a saved preset or adjust the label setup before printing.'];
+$guides['store-settings']['steps'][] = ['requires' => ['demo'], 'title' => 'Recognize demonstration mode', 'text' => 'In DEMO mode, business information and important settings are locked. DEMO labels appear on screens and printed documents, and sample data resets every 10 days.'];
 
-return array_merge($guides, require __DIR__.'/documentation-extra.php');
+$guides['print-barcode-labels']['steps'][2]['notes'][] = ['requires' => ['unit'], 'text' => 'Show the selling unit when your label needs it.'];
+$guides['print-barcode-labels']['steps'][0]['notes'][] = ['requires' => ['expiry'], 'text' => 'For dated products, choose the exact stock batch. Show expiry and batch details only for that selected stock.'];
+$guides['print-barcode-labels']['steps'][2]['notes'][] = ['requires' => ['scode'], 'text' => 'Secret cost code visibility and placement can follow Barcode settings or be overridden for this label layout.'];
+$guides['customer-and-supplier-accounts']['steps'][3]['notes'][] = ['requires' => ['cheque'], 'text' => 'Review Cheque Hold separately from Due and check each instrument before treating it as cleared money.'];
+$guides['saved-carts-and-discounts']['steps'][1]['notes'][] = ['requires' => ['unit'], 'text' => 'The item popup also lets you choose an available selling unit and its conversion.'];
+$guides['manage-cheques']['steps'][3]['notes'][] = ['text' => 'The dashboard shows Cheques Due Soon only when there are visible pending cheques due within the alert period or already overdue. With no matching cheques, the panel is hidden.'];
+
+return $guides;

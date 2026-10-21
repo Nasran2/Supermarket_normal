@@ -1,14 +1,15 @@
+@php($branding = \App\Support\Branding::values($settings ?? []))
 <!DOCTYPE html>
-<html lang="en" data-units="{{ config('features.unit')?'1':'0' }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('title','Dashboard') · {{ $settings['business_name'] ?? 'Twinsofte' }}</title>@vite(['resources/css/app.css','resources/js/app.js'])@stack('head')</head>
+<html lang="en" data-units="{{ config('features.unit')?'1':'0' }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('title','Dashboard') · {{ $settings['business_name'] ?? 'Twinsofte' }}</title>@vite(['resources/css/app.css','resources/js/app.js'])@include('partials.branding-theme')@stack('head')</head>
 <body class="@yield('body-class')">
 <x-demo-watermark/>
 @php($currentRegister = app(\App\Services\RegisterService::class)->current(auth()->id()))
 <div class="nav-overlay" id="nav-overlay"></div>
 <aside class="sidebar" id="sidebar">
- <a class="brand" href="{{ \App\Support\Navigation::home(auth()->user()) }}">@if(!empty($settings['logo']))<img src="{{ asset('storage/'.$settings['logo']) }}" alt="Business logo">@else<span class="brand-mark"><x-icon name="shopping-basket" :size="23"/></span>@endif<div class="brand-copy"><strong>{{ $settings['business_name'] ?? 'Twinsofte' }}</strong><span>SUPERMARKET POS</span></div></a>
+ <a class="brand" href="{{ \App\Support\Navigation::home(auth()->user()) }}">@if(!empty($settings['logo']))<img src="{{ asset('storage/'.$settings['logo']) }}" alt="Business logo">@else<span class="brand-mark"><x-icon name="shopping-basket" :size="23"/></span>@endif<div class="brand-copy"><strong>{{ $branding['brand_name'] }}</strong><span>{{ $branding['brand_subtitle'] }}</span></div></a>
  <nav class="nav-links" aria-label="Main navigation">
  @include('layouts.sidebar-links')
- </nav><div class="sidebar-footer"><span class="status-dot"></span><span class="brand-copy">Twinsofte · Store workspace</span></div>
+ </nav><div class="sidebar-footer"><span class="status-dot"></span><span class="brand-copy">{{ $branding['brand_name'] }} · Store workspace</span></div>
 </aside>
 <div class="app-shell"><header class="topbar"><div class="flex items-center gap-3 min-w-0"><button class="icon-button" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="{{ request()->routeIs('pos.index','sales.edit')?'false':'true' }}" aria-controls="sidebar"><x-icon :name="request()->routeIs('pos.index','sales.edit')?'menu':'panel-left'"/></button><div class="breadcrumb"><span>{{ request()->routeIs('pos.index','sales.edit')?($settings['business_name']??'Twinsofte'):'Workspace' }}</span><x-icon name="chevron-right" :size="14"/><strong>@yield('title','Dashboard')</strong></div></div><div class="topbar-actions">
  @if($demoMode ?? false)<span class="badge amber" title="Sample data resets every 10 days">DEMO</span>@endif

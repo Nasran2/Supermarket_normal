@@ -3,6 +3,7 @@
 @section('content')<div class="page-heading"><div><span class="eyebrow">SETTINGS</span><h1>{{ ucfirst($group) }} settings</h1><p>Changes apply throughout your store.</p></div><a class="btn secondary" href="{{ route('settings.index') }}"><x-icon name="arrow-left"/>All settings</a></div>
 @if($group==='expiry')<div class="notice info"><x-icon name="info"/><span>Expiry tracking is controlled by the EXPIRE setting in your server environment. Expiry dates are tracked separately for each stock batch.</span></div>@endif
 @if($group==='business')<div class="notice info"><x-icon name="info"/><span>Tick “Show on bill” beside each detail you want customers to see. Untick it to hide that detail on sales bills and return slips. Your saved business details stay available in the store.</span></div>@endif
+@if($group==='business' && \App\Support\Branding::enabled())<p class="mb-6"><a class="text-link" href="{{ route('settings.edit','branding') }}">Change app colors, sidebar names and login text or icon <x-icon name="arrow-right"/></a></p>@endif
 @if($group==='stock')<div class="notice info"><x-icon name="info"/><span>Selling at zero stock also requires negative stock to be enabled when the sale will take stock below zero.</span></div>@endif
 <form class="card form-card wide" method="POST" enctype="multipart/form-data" action="{{ route('settings.update',$group) }}">@csrf @method('PUT')<div class="form-grid">
 @foreach($fields as $key=>$f)@php([$label,$type,$default]=$f)@php($value=old($key,$values[$key]??$default))

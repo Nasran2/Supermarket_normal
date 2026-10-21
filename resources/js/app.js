@@ -1,3 +1,4 @@
+import './branding.js';
 import './cheques.js';
 import './expiry.js';
 import './expense-category.js';
@@ -5,6 +6,8 @@ import './register.js';
 import {
   createIcons,
   ShoppingBasket,
+  Store,
+  ShoppingCart,
   LayoutDashboard,
   ScanLine,
   ReceiptText,
@@ -75,6 +78,8 @@ const icons = {
   Receipt: ReceiptText,
   AlertCircle: CircleAlert,
   ShoppingBasket,
+  Store,
+  ShoppingCart,
   LayoutDashboard,
   ScanLine,
   ReceiptText,

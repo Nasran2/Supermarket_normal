@@ -11,10 +11,11 @@ class SettingsRequest extends FormRequest
     public function authorize(): bool
     {
         $g = $this->route('group');
+        abort_if($g === 'branding' && ! \App\Support\Branding::enabled(), 404);
         abort_if($g === 'expiry' && ! Expiry::enabled(), 404);
 
         return $this->user()?->hasPermission(match ($g) {
-            'expiry' => 'expiry.manage_settings','stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$g
+            'branding' => 'settings.business','expiry' => 'expiry.manage_settings','stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$g
         });
     }
 
