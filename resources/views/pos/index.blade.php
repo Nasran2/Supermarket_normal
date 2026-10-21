@@ -78,7 +78,8 @@
         </aside>
     </div>
 </dialog>
-<dialog id="receipt-dialog" class="receipt-dialog"><div class="modal-heading"><div><span class="eyebrow">SALE COMPLETE</span><h2 id="receipt-invoice">Receipt</h2></div><button class="icon-button" id="close-receipt" type="button" aria-label="Close receipt"><x-icon name="x"/></button></div><iframe id="receipt-frame" title="Sale receipt"></iframe><div class="receipt-actions"><a id="receipt-external" class="btn secondary" target="_blank">Open receipt</a><button class="btn secondary" id="print-receipt" type="button" disabled><x-icon name="printer"/>Print</button><button class="btn primary" id="next-sale" type="button">Next sale</button></div></dialog>
+@include('sms.receipt-dialog')
+<dialog id="receipt-dialog" class="receipt-dialog"><div class="modal-heading"><div><span class="eyebrow">SALE COMPLETE</span><h2 id="receipt-invoice">Receipt</h2></div><button class="icon-button" id="close-receipt" type="button" aria-label="Close receipt"><x-icon name="x"/></button></div><iframe id="receipt-frame" title="Sale receipt"></iframe>@can('sms.receipt')<p id="receipt-sms-status" class="notice success receipt-sms-status" role="status" aria-live="polite" hidden></p>@endcan<div class="receipt-actions"><a id="receipt-external" class="btn secondary" target="_blank">Open receipt</a><button class="btn secondary" id="print-receipt" type="button" disabled><x-icon name="printer"/>Print</button>@can('sms.receipt')<button type="button" class="btn secondary" id="sms-receipt" hidden>Send SMS</button>@endcan<button class="btn primary" id="next-sale" type="button">Next sale</button></div></dialog>
 </div>
 @endif
 @endsection

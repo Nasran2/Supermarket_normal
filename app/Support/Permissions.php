@@ -28,6 +28,9 @@ class Permissions
                 $add($module.'.'.$action, $definition['title'], ucfirst($action), (in_array($module, ['sales', 'purchases', 'expenses']) && $action === 'delete' ? 'Reverse the transaction and retain its audit history.' : $description.'.'), $legacy);
             }
         }
+        $add('sms.receipt', 'SMS', 'Send receipt SMS', 'Send a public receipt link to the invoice customer.', ['sales.receipt']);
+        $add('sms.settings', 'SMS', 'Manage SMS settings', 'Change Textit credentials and admin cheque reminder preferences.', ['settings.system']);
+        $add('sms.manage', 'SMS', 'Send messages and reminders', 'Preview and send individual or bulk customer SMS; view SMS history.');
         $add('dashboard.view', 'Dashboard', 'Open dashboard', 'Allow access to the dashboard page. Select its cards separately.');
         foreach (['sales' => 'Sales total', 'profit' => 'Net profit', 'expenses' => 'Expenses total', 'transactions' => 'Transaction count', 'collections' => 'Collections by payment method', 'sales_overview' => 'Sales overview chart', 'register' => 'Register status & opening cash', 'recent_sales' => 'Recent sales', 'low_stock' => 'Low stock alerts', 'top_products' => 'Top product sales', 'recent_expenses' => 'Recent expenses'] as $card => $label) {
             $add('dashboard.'.$card, 'Dashboard', $label, 'Show this dashboard card.'.($card === 'profit' ? ' Also requires View product costs.' : ''), ['dashboard.view']);
@@ -124,7 +127,7 @@ class Permissions
 
     public static function visible(): array
     {
-        return array_filter(self::all(), fn ($info, $name) => (Units::enabled() || ! Units::permission($name)) && (config('features.cheque') || ! str_starts_with($name, 'cheques.')) && (config('features.barcode') || ! str_starts_with($name, 'barcode.')) && (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
+        return array_filter(self::all(), fn ($info, $name) => (config('sms.enabled') || ! str_starts_with($name, 'sms.')) && (Units::enabled() || ! Units::permission($name)) && (config('features.cheque') || ! str_starts_with($name, 'cheques.')) && (config('features.barcode') || ! str_starts_with($name, 'barcode.')) && (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
     }
 
     public static function info(string $name): array

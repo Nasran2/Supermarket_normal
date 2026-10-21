@@ -1,3 +1,5 @@
+import './sms-templates.js';
+import './sms.js';
 import './branding.js';
 import './cheques.js';
 import './expiry.js';
@@ -73,6 +75,8 @@ import {
   Calculator,
   Barcode,
   ScanBarcode,
+  Send,
+  Link,
 } from 'lucide';
 const icons = {
   Receipt: ReceiptText,
@@ -145,6 +149,8 @@ const icons = {
   Calculator,
   Barcode,
   ScanBarcode,
+  Send,
+  Link,
 };
 window.refreshIcons = () => createIcons({ icons });
 window.refreshIcons();

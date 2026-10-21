@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Services\SmsSettingsService;
 use App\Support\Hr;
 use App\Support\Permissions;
+use App\Support\Units;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -37,7 +39,13 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
-        if (\App\Support\Units::permission($permission) && ! \App\Support\Units::enabled()) {
+        if (Units::permission($permission) && ! Units::enabled()) {
+            return false;
+        }
+        if (str_starts_with($permission, 'sms.') && ! config('sms.enabled')) {
+            return false;
+        }
+        if ($permission === 'sms.receipt' && ! app(SmsSettingsService::class)->allows('RECEIPT')) {
             return false;
         }
         if (str_starts_with($permission, 'cheques.') && ! config('features.cheque')) {

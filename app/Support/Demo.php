@@ -20,7 +20,7 @@ class Demo
 
     public static function readOnlyForm(Request $request): bool
     {
-        return self::protectedPage($request) && $request->routeIs('settings.edit', 'barcode.settings', 'barcode.presets.edit', 'barcode.presets.create', 'profile', 'manage.create', 'manage.edit', 'hr.setup', 'hr.staff.create', 'hr.staff.edit');
+        return self::protectedPage($request) && $request->routeIs('settings.edit', 'settings.sms', 'barcode.settings', 'barcode.presets.edit', 'barcode.presets.create', 'profile', 'manage.create', 'manage.edit', 'hr.setup', 'hr.staff.create', 'hr.staff.edit');
     }
 
     public static function watermarkPdf(Dompdf $pdf): void

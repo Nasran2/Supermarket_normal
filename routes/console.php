@@ -1,12 +1,17 @@
 <?php
 
 use App\Models\Role;
+use App\Models\SmsMessage;
 use App\Models\User;
+use App\Services\ChequeSmsReminderService;
 use App\Services\DemoDataService;
+use App\Services\SmsService;
+use App\Services\SmsSettingsService;
 use App\Support\Demo;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 Artisan::command('pos:admin {email} {--name=Administrator} {--username= : Login username}', function () {
     $email = $this->argument('email');
@@ -61,3 +66,40 @@ Artisan::command('demo:reset', function (DemoDataService $service) {
 })->purpose('Initialize the demo baseline or restore it when the ten-day cycle expires');
 
 Schedule::command('demo:reset')->everyMinute()->withoutOverlapping();
+
+Artisan::command('sms:send-pending {--limit=100}', function (SmsService $sms) {
+    if (! config('sms.enabled')) {
+        $this->info('SMS is disabled.');
+
+        return 0;
+    }
+    try {
+        $count = 0;
+        foreach (SmsMessage::where('status', 'PENDING')->orderBy('id')->limit(max(1, min(1000, (int) $this->option('limit'))))->get() as $message) {
+            $sms->deliver($message);
+            $count++;
+        }
+        $this->info($count.' pending messages processed. Check SMS history for results.');
+
+        return 0;
+    } catch (ValidationException $exception) {
+        $this->error($exception->validator->errors()->first());
+
+        return 1;
+    }
+})->purpose('Send queued SMS messages once, without retrying uncertain results');
+
+Artisan::command('sms:cheque-reminders', function (ChequeSmsReminderService $reminders, SmsService $sms) {
+    try {
+        $this->info($reminders->queue($sms).' cheque reminders queued.');
+
+        return 0;
+    } catch (ValidationException $exception) {
+        $this->error($exception->validator->errors()->first());
+
+        return 1;
+    }
+})->purpose('Queue daily admin reminders for due-soon and overdue cheques');
+
+Schedule::command('sms:cheque-reminders')->everyMinute()->withoutOverlapping()->when(fn () => config('sms.enabled') && config('features.cheque') && app(SmsSettingsService::class)->reminderDue());
+Schedule::command('sms:send-pending')->everyMinute()->withoutOverlapping()->when(fn () => config('sms.enabled'));

@@ -19,6 +19,8 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ResourceController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SmsController;
+use App\Http\Controllers\SmsSettingsController;
 use App\Http\Controllers\StockBatchController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockPriceController;
@@ -32,7 +34,19 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/login', [AuthController::class, 'authenticate'])->middleware('throttle:20,1');
 });
+Route::get('/r/{token}', [SmsController::class, 'publicReceipt'])
+    ->where('token', '[A-Za-z0-9]{64}')->middleware(['sms-feature', 'throttle:60,1'])->name('receipts.public');
+
 Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(function () {
+    Route::middleware('sms-feature')->group(function () {
+        Route::get('/sms', [SmsController::class, 'index'])->middleware('permission:sms.manage')->name('sms.index');
+        Route::get('/sms/customers', [SmsController::class, 'customers'])->middleware('permission:sms.receipt')->name('sms.customers');
+        Route::get('/sms/receipts/{sale}', [SmsController::class, 'receiptContext'])->middleware(['permission:sms.receipt', 'permission:sales.receipt'])->name('sms.receipt.context');
+        Route::post('/sms/receipts/{sale}', [SmsController::class, 'receipt'])->middleware(['permission:sms.receipt', 'permission:sales.receipt', 'throttle:20,1'])->name('sms.receipt');
+        Route::post('/sms/preview', [SmsController::class, 'preview'])->middleware('permission:sms.manage')->name('sms.preview');
+        Route::post('/sms/send', [SmsController::class, 'send'])->middleware(['permission:sms.manage', 'throttle:5,1'])->name('sms.send');
+    });
+
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/documentation', [DocumentationController::class, 'index'])->name('documentation.index');
     Route::get('/documentation/{slug}', [DocumentationController::class, 'show'])->name('documentation.show');
@@ -142,6 +156,9 @@ Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(functi
             Route::delete('/{preset}', [BarcodePresetController::class, 'destroy'])->name('destroy');
         });
     });
+    Route::get('/settings/sms', [SmsSettingsController::class, 'edit'])->middleware(['sms-feature', 'permission:sms.settings'])->name('settings.sms');
+    Route::post('/settings/sms/test', [SmsSettingsController::class, 'test'])->middleware(['sms-feature', 'permission:sms.settings', 'throttle:5,1'])->name('settings.sms.test');
+    Route::put('/settings/sms', [SmsSettingsController::class, 'update'])->middleware(['sms-feature', 'permission:sms.settings'])->name('settings.sms.update');
     Route::get('/settings', [SettingsController::class, 'index'])->middleware('permission:settings.view')->name('settings.index');
     Route::get('/settings/{group}', [SettingsController::class, 'edit'])->name('settings.edit');
     Route::put('/settings/{group}', [SettingsController::class, 'update'])->name('settings.update');

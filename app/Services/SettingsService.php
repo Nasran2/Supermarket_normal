@@ -10,7 +10,7 @@ class SettingsService
 {
     public function all(): array
     {
-        return Cache::remember('business_settings', 3600, fn () => Setting::pluck('value', 'key')->map(fn ($v) => json_decode($v, true))->all());
+        return Cache::remember('business_settings', 3600, fn () => Setting::where('group', '!=', 'sms')->pluck('value', 'key')->map(fn ($v) => json_decode($v, true))->all());
     }
 
     public function get(string $key, mixed $default = null): mixed

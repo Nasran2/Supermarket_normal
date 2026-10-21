@@ -49,6 +49,7 @@ class CustomerPaymentService
                 $entries = [['amount' => $amount]];
             }
             $targets = $request->input('allocations', []);
+            $firstPayment = null;
             foreach ($entries as $entry) {
                 $cheque = $paymentMethod->type === 'CHEQUE' ? $chequeService->create($entry, 'CUSTOMER_RECEIVED', $customer->id, $userId) : null;
                 $customerPayment = $customer->customerPayments()->create([
@@ -56,6 +57,7 @@ class CustomerPaymentService
                     'amount' => $entry['amount'], 'payment_date' => $request->input('payment_date'), 'notes' => $request->input('notes'),
                     'cheque_id' => $cheque?->id, 'settlement_status' => $cheque ? 'PENDING' : 'PASSED',
                 ]);
+                $firstPayment ??= $customerPayment;
                 if ($request->mode === 'auto') {
                     $this->autoAllocate($customerPayment, $customer, $entry['amount'], $paymentMethod);
                 } else {
@@ -75,6 +77,9 @@ class CustomerPaymentService
                     $this->manualAllocate($customerPayment, $customer, $part, $paymentMethod);
                 }
                 Audit::record('customer.payment', $customerPayment, [], $customerPayment->toArray());
+            }
+            if ($firstPayment) {
+                app(PaymentSmsService::class)->queue($customer->id, $userId, (string) $amount, $paymentMethod->name, 'account:'.$firstPayment->id, null, $paymentMethod->type === 'CHEQUE');
             }
         });
 

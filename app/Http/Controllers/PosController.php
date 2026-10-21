@@ -17,6 +17,7 @@ use App\Services\StockLayerService;
 use App\Support\Audit;
 use App\Support\Expiry;
 use App\Support\Money;
+use App\Support\Units;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -110,7 +111,7 @@ class PosController extends Controller
         $transform = function ($p) {
             $groups = app(StockLayerService::class)->choices($p, request()->route('sale'));
 
-            return ['track_expiry' => Expiry::tracks($p), 'show_expiry' => Expiry::enabled() && Expiry::setting('expiry_show_pos'), 'track_stock' => $p->track_stock, 'default_discount_type' => $p->default_discount_type, 'default_discount_value' => $p->default_discount_value, 'price_options' => $groups, 'units' => array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->publicOptions($p)), 'unit_id' => $p->unit_id, 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => config('features.barcode') ? $p->barcode : null, 'price' => $p->price, 'stock' => Expiry::tracks($p) ? Money::quantity('0', (string) collect($groups)->sum('quantity')) : $p->stock, 'unit' => \App\Support\Units::label($p->unit), 'decimal' => $p->unit->allow_decimal, 'category' => $p->categories->pluck('name')->join(', '), 'image' => $p->image ? asset('storage/'.$p->image) : null];
+            return ['track_expiry' => Expiry::tracks($p), 'show_expiry' => Expiry::enabled() && Expiry::setting('expiry_show_pos'), 'track_stock' => $p->track_stock, 'default_discount_type' => $p->default_discount_type, 'default_discount_value' => $p->default_discount_value, 'price_options' => $groups, 'units' => array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->publicOptions($p)), 'unit_id' => $p->unit_id, 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => config('features.barcode') ? $p->barcode : null, 'price' => $p->price, 'stock' => Expiry::tracks($p) ? Money::quantity('0', (string) collect($groups)->sum('quantity')) : $p->stock, 'unit' => Units::label($p->unit), 'decimal' => $p->unit->allow_decimal, 'category' => $p->categories->pluck('name')->join(', '), 'image' => $p->image ? asset('storage/'.$p->image) : null];
         };
 
         return $products instanceof LengthAwarePaginator ? $products->through($transform) : $products->map($transform);
@@ -137,7 +138,7 @@ class PosController extends Controller
         $data = $request->validate(['checkout_token' => 'required|uuid']);
         $sale = Sale::where('user_id', $request->user()->id)->where('checkout_token', $data['checkout_token'])->first();
 
-        return response()->json(['completed' => (bool) $sale, 'invoice' => $sale?->invoice, 'receipt_url' => $sale && $request->user()->hasPermission('sales.receipt') ? route('sales.receipt', $sale) : null]);
+        return response()->json(['completed' => (bool) $sale, 'invoice' => $sale?->invoice, 'sms_receipt_url' => $sale && $request->user()->hasPermission('sms.receipt') ? route('sms.receipt', $sale) : null, 'receipt_url' => $sale && $request->user()->hasPermission('sales.receipt') ? route('sales.receipt', $sale) : null]);
     }
 
     public function quote(CheckoutRequest $request, SaleService $service, RegisterService $registers)
@@ -160,6 +161,6 @@ class PosController extends Controller
 
         $canReceipt = $request->user()->hasPermission('sales.receipt');
 
-        return response()->json(['invoice' => $sale->invoice, 'receipt_url' => $canReceipt ? route('sales.receipt', $sale) : null, 'sale_url' => route('sales.show', $sale), 'due_balance' => $sale->due_balance, 'customer_id' => $sale->customer_id, 'customer_balance' => $sale->customer?->due_balance, 'auto_print' => $canReceipt && $settings->get('auto_print', false), 'show_receipt' => $canReceipt && $settings->get('show_receipt', true)]);
+        return response()->json(['invoice' => $sale->invoice, 'sms_receipt_url' => $request->user()->hasPermission('sms.receipt') ? route('sms.receipt', $sale) : null, 'receipt_url' => $canReceipt ? route('sales.receipt', $sale) : null, 'sale_url' => route('sales.show', $sale), 'due_balance' => $sale->due_balance, 'customer_id' => $sale->customer_id, 'customer_balance' => $sale->customer?->due_balance, 'auto_print' => $canReceipt && $settings->get('auto_print', false), 'show_receipt' => $canReceipt && $settings->get('show_receipt', true)]);
     }
 }

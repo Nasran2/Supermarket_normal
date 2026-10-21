@@ -1761,6 +1761,14 @@ function showReceipt(result) {
   if (result.show_receipt) {
     $('receipt-invoice').textContent = result.invoice;
     $('receipt-external').href = result.receipt_url;
+    if ($('sms-receipt')) {
+      $('sms-receipt').hidden = !result.sms_receipt_url;
+      $('sms-receipt').disabled = false;
+      $('sms-receipt').textContent = 'Send SMS';
+      $('receipt-sms-status').hidden = true;
+      $('receipt-sms-status').textContent = '';
+      $('sms-receipt').dataset.smsReceiptUrl = result.sms_receipt_url || '';
+    }
     $('print-receipt').disabled = true;
     frame = $('receipt-frame');
     $('receipt-dialog').showModal();
@@ -1790,6 +1798,14 @@ function showReceipt(result) {
 $('print-receipt').addEventListener('click', () => {
   $('receipt-frame').contentWindow.focus();
   $('receipt-frame').contentWindow.print();
+});
+$('receipt-dialog').addEventListener('sms:receipt-sent', (event) => {
+  if (event.target !== $('sms-receipt')) return;
+  $('receipt-sms-status').textContent = event.detail.message;
+  $('receipt-sms-status').hidden = false;
+  $('sms-receipt').textContent = 'SMS submitted';
+  $('sms-receipt').disabled = true;
+  $('next-sale').focus();
 });
 $('close-receipt').addEventListener('click', () => $('receipt-dialog').close());
 $('next-sale').addEventListener('click', () => {

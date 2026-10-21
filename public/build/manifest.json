@@ -16,7 +16,7 @@
     "name": "units"
   },
   "resources/css/app.css": {
-    "file": "assets/app-B0vnQvHU.css",
+    "file": "assets/app-hI3Jjntm.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -25,7 +25,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DlWpYpH3.js",
+    "file": "assets/app-DNwYtuUs.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -70,7 +70,7 @@
     ]
   },
   "resources/js/pos.js": {
-    "file": "assets/pos-njLpZQMI.js",
+    "file": "assets/pos-v8CayN74.js",
     "name": "pos",
     "src": "resources/js/pos.js",
     "isEntry": true,

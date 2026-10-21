@@ -103,6 +103,8 @@ class SaleAftercareService
                     $first ??= $p;
                 }
 
+                app(PaymentSmsService::class)->queue($sale->customer_id, $userId, $amount, $method->name, 'collection:'.$first->id, $sale, true);
+
                 return $first;
             }
             if (! empty($data['cheques'])) {
@@ -110,6 +112,7 @@ class SaleAftercareService
             }
             $collection = SaleCollection::create(['sale_id' => $sale->id, 'register_id' => $register->id, 'user_id' => $userId, 'payment_method_id' => $method->id, 'token' => $data['token'], 'method_name' => $method->name, 'method_type' => $method->type, 'amount' => $amount, 'amount_paid' => $paid, 'change' => Money::sub($paid, $amount), 'reference' => $data['reference'] ?? null, 'collected_at' => now()]);
             Audit::record('sale.collect', $collection, [], $collection->toArray());
+            app(PaymentSmsService::class)->queue($sale->customer_id, $userId, $amount, $method->name, 'collection:'.$collection->id, $sale);
 
             return $collection;
         }, 3);

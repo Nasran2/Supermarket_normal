@@ -19,6 +19,7 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <env name="SMS" value="false" force="true"/>
         <env name="CHEQUE" value="false" force="true"/>
         <env name="UNIT" value="true" force="true"/>
         <env name="SCODE" value="false" force="true"/>

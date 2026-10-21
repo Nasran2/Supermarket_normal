@@ -78,6 +78,9 @@ class Sidebar
             }
             $settings[] = $link($title, 'settings.edit', $key, $permission, request()->route('group') === $key);
         }
+        if (config('sms.enabled')) {
+            $settings[] = $link('SMS', 'settings.sms', [], 'sms.settings', request()->routeIs('settings.sms*'));
+        }
         if (config('features.barcode')) {
             $settings[] = $link('Barcode', 'barcode.settings', [], 'barcode.manage_settings', request()->routeIs('barcode.settings*'));
         }

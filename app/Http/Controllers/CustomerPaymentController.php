@@ -13,15 +13,17 @@ class CustomerPaymentController extends Controller
     public function store(Request $request, Customer $customer)
     {
         abort_unless($request->user()->hasPermission('customers.collect_payment'), 403);
-        $request->validate(Cheques::rules() + ['token' => 'nullable|uuid', 'notes' => 'nullable|string|max:2000',
+        $data = $request->validate(Cheques::rules() + ['token' => 'nullable|uuid', 'notes' => 'nullable|string|max:2000',
             'amount' => 'required|numeric|min:0.01',
             'payment_method_id' => 'required|exists:payment_methods,id',
             'payment_date' => 'required|date',
             'mode' => 'required|in:auto,manual',
-            'allocations' => 'array', 'allocations.opening_balance' => 'nullable|numeric|min:0|decimal:0,2', 'allocations.sales' => 'nullable|array|max:100', 'allocations.sales.*' => 'numeric|min:0|decimal:0,2',
+            'allocations' => 'array', 'allocations.opening_balance' => 'nullable|numeric|min:0|decimal:0,2', 'allocations.sales' => 'nullable|array|max:100', 'allocations.sales.*' => 'nullable|numeric|min:0|decimal:0,2',
         ]);
 
-        app(CustomerPaymentService::class)->record($customer, $request->all(), $request->user()->id);
+        $data['allocations']['opening_balance'] = $data['allocations']['opening_balance'] ?? '0';
+        $data['allocations']['sales'] = array_filter($data['allocations']['sales'] ?? [], fn ($amount) => $amount !== null && $amount !== '');
+        app(CustomerPaymentService::class)->record($customer, $data, $request->user()->id);
 
         return back()->with('success', 'Payment recorded successfully.');
     }
