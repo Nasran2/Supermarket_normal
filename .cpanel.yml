@@ -1,0 +1,8 @@
+---
+# This checkout is already inside the hosting document root.
+# Preserve the hosting .htaccess, .env, uploads and database.
+deployment:
+  tasks:
+    - /opt/cpanel/ea-php83/root/usr/bin/php artisan config:clear
+    - /opt/cpanel/ea-php83/root/usr/bin/php artisan route:clear
+    - /opt/cpanel/ea-php83/root/usr/bin/php artisan view:clear
