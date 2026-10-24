@@ -1,0 +1,27 @@
+# cPanel domain-root deployment only; local XAMPP uses the project .htaccess.
+<IfModule mod_rewrite.c>
+    Options -Indexes
+    RewriteEngine On
+    RewriteBase /
+
+    RewriteRule ^(?:app|bootstrap|config|database|docs|node_modules|resources|routes|tests|vendor)(?:/|$) - [F,L,NC]
+    RewriteRule ^(?:artisan|composer\.(?:json|lock)|package(?:-lock)?\.json|phpunit\.xml|README\.md|vite\.config\.js)$ - [F,L,NC]
+
+    # /storage is the public uploads URL. Always resolve it through public/,
+    # never serve the project's private storage directory directly.
+    RewriteRule ^$ public/ [L]
+    RewriteRule ^(?!public(?:/|$))(.*)$ public/$1 [L]
+</IfModule>
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Handler copied from the supplied hosting screenshot. Preserve the current
+# cPanel-generated block on the server if cPanel has subsequently changed it.
+# php -- BEGIN cPanel-generated handler, do not edit
+# Set the “ea-php83” package as the default “PHP” programming language.
+<IfModule mime_module>
+    AddHandler application/x-httpd-ea-php83___lsphp .php .php8 .phtml
+</IfModule>
+# php -- END cPanel-generated handler, do not edit

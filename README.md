@@ -53,6 +53,8 @@ Run `npm run dev` in a second terminal only when developing frontend assets. The
 
 For deployment set `APP_ENV=production`, `APP_DEBUG=false`, the correct `APP_URL`, dedicated database credentials, and HTTPS. Back up the database and uploaded files before upgrading. Never regenerate an established application's key during an upgrade.
 
+For the cPanel domain-root setup, follow [the separate hosting configuration](docs/deployment/README.md). Preserve its internal rewrites and cPanel PHP handler; the project-root `.htaccess` is for local XAMPP.
+
 ## Verify
 
 ```sh
