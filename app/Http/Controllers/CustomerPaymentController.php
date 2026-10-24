@@ -42,7 +42,7 @@ class CustomerPaymentController extends Controller
         }
 
         if ($request->input('export') === 'csv') {
-            $filename = "ledger_{$customer->name}.csv";
+            $filename = 'ledger_'.$customer->id.'.csv';
             $headers = [
                 'Content-type' => 'text/csv',
                 'Content-Disposition' => "attachment; filename=$filename",
@@ -54,14 +54,14 @@ class CustomerPaymentController extends Controller
                 $file = fopen('php://output', 'w');
                 fputcsv($file, ['Date', 'Type', 'Description', 'Debit', 'Credit', 'Balance']);
                 foreach ($ledger as $row) {
-                    fputcsv($file, [
+                    fputcsv($file, array_map(fn ($value) => is_string($value) && preg_match('/^[\x00-\x20]*[=+@\-]/', $value) ? "'".$value : $value, [
                         $row['date']->format('Y-m-d H:i'),
                         $row['type'],
                         $row['description'],
                         $row['debit'],
                         $row['credit'],
                         $row['balance'],
-                    ]);
+                    ]));
                 }
                 fclose($file);
             };

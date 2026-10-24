@@ -1,6 +1,9 @@
 <IfModule mod_rewrite.c>
     Options -Indexes
     RewriteEngine On
+    # Keep application sources and operational files outside HTTP access.
+    RewriteRule ^(?:app|bootstrap|config|database|docs|node_modules|resources|routes|storage|tests|vendor)(?:/|$) - [F,L,NC]
+    RewriteRule ^(?:artisan|composer\.(?:json|lock)|package(?:-lock)?\.json|phpunit\.xml|README\.md|vite\.config\.js)$ - [F,L,NC]
     RewriteBase "/Super market/"
     RewriteRule ^(?!public(?:/|$))(.*)$ public/$1 [R=302,L]
 </IfModule>

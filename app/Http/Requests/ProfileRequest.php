@@ -13,6 +13,6 @@ class ProfileRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['current_password' => 'required|current_password', 'password' => 'required|string|max:128|confirmed'];
+        return ['current_password' => 'required|current_password', 'password' => 'required|string|min:10|max:128|confirmed'];
     }
 }

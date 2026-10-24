@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureSmsEnabled;
 use App\Http\Middleware\EnsureUnitFeatureEnabled;
 use App\Http\Middleware\GuardUnitResources;
 use App\Http\Middleware\PermissionMiddleware;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(SecurityHeaders::class);
         $middleware->alias(['sms-feature' => EnsureSmsEnabled::class, 'permission' => PermissionMiddleware::class, 'barcode-feature' => EnsureBarcodeFeatureEnabled::class, 'cheque-feature' => EnsureChequeFeatureEnabled::class, 'unit-feature' => EnsureUnitFeatureEnabled::class, 'unit-resources' => GuardUnitResources::class]);
         $middleware->appendToGroup('web', [DemoMode::class, BusinessContext::class]);
         // Acquire the demo lock and restore overdue data before binding records.

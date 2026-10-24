@@ -34,8 +34,8 @@ class DatabaseSeeder extends Seeder
         }
         Role::where('name', 'Administrator')->firstOrFail()->permissions()->syncWithoutDetaching(Permission::whereIn('name', $names)->pluck('id'));
 
-        // 2. Admin User
-        if (! \App\Models\User::exists()) {
+        // Fixtures only. Real installations create an account with pos:admin.
+        if (app()->runningUnitTests() && ! \App\Models\User::exists()) {
             \App\Models\User::create([
                 'name' => 'Admin User',
                 'username' => 'admin',

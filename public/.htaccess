@@ -5,6 +5,10 @@
 
     RewriteEngine On
 
+    # Only the front controller may execute PHP; uploads must remain static.
+    RewriteRule ^(?!index\.php$).*\.(?:php[0-9]*|phtml|phar|cgi|pl|py|sh)(?:[./]|$) - [F,L,NC]
+    RewriteRule (^|/)\. - [F,L]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
@@ -23,3 +27,7 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
