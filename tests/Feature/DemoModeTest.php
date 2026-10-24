@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Category;
+use App\Exceptions\DemoBaselineMismatchException;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Sale;
@@ -189,6 +190,43 @@ class DemoModeTest extends TestCase
         }
         DB::table('demo_cycles')->update(['baseline' => $state->baseline]);
         $this->assertTrue($this->refreshDemo()['reset']);
+    }
+
+    public function test_schema_changes_pause_only_the_reset_and_keep_the_demo_usable(): void
+    {
+        config(['demo.enabled' => true]);
+        $this->refreshDemo();
+        $state = DB::table('demo_cycles')->first();
+        $baseline = json_decode($state->baseline, true);
+        $keep = Category::create(['name' => 'Preserve current demo records']);
+        $this->travel(10)->days();
+        $missingTable = $baseline;
+        unset($missingTable['categories']);
+        $obsoleteColumn = $baseline;
+        $obsoleteColumn['categories'][0]['removed_column'] = 'old snapshot';
+        auth()->logout();
+        $this->flushSession();
+        foreach ([$missingTable, $obsoleteColumn] as $index => $snapshot) {
+            DB::table('demo_cycles')->update(['baseline' => json_encode($snapshot)]);
+            try {
+                $this->refreshDemo();
+                $this->fail('The reset service must still reject an incompatible baseline.');
+            } catch (DemoBaselineMismatchException $exception) {
+                $this->assertFalse($exception->state['reset']);
+            }
+            $this->get('/login')->assertOk()->assertSee('Automatic reset is temporarily paused.');
+            $this->post('/login', ['login' => 'admin', 'password' => 'password'])->assertRedirect();
+            $this->assertAuthenticatedAs($this->admin);
+            $this->get('/')->assertOk()->assertSee('Automatic reset is temporarily paused.');
+            $this->post(route('manage.store', 'categories'), ['name' => 'New demo category '.$index])->assertRedirect();
+            $this->putJson(route('settings.update', 'business'), [])->assertForbidden();
+            $this->assertDatabaseHas('categories', ['id' => $keep->id]);
+            $this->assertSame(1, DB::table('demo_cycles')->value('cycle'));
+            $this->assertSame($snapshot, json_decode(DB::table('demo_cycles')->value('baseline'), true));
+            $this->assertSame([], DB::select('PRAGMA foreign_key_check'));
+            auth()->logout();
+            $this->flushSession();
+        }
     }
 
     public function test_both_pdf_renderers_generate_valid_demo_reports(): void

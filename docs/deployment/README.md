@@ -9,7 +9,13 @@ The template matches the domain-root setup in the supplied screenshot. It is pre
 
 ## Git updates on the existing hosting checkout
 
-The repository is already at `/home/twinsoft/public_html/shopdemo.twinsofte.com`, so pulling changes updates the application files directly. The root `.cpanel.yml` makes **Deploy HEAD Commit** clear Laravel's generated configuration, route and view caches; it does not copy files, change the hosting PHP handler, run migrations or reset application data. It requires the cPanel PHP 8.3 CLI at `/opt/cpanel/ea-php83/root/usr/bin/php` and must be committed and pushed before cPanel can see it.
+The repository is already at `/home/twinsoft/public_html/shopdemo.twinsofte.com`, so pulling changes updates the application files directly. The root `.cpanel.yml` makes **Deploy HEAD Commit** run `scripts/cpanel-repair.php` and clear Laravel's generated configuration, route and view caches. The repair backs up changed configuration outside the web root, adds a direct front-controller fallback for clean URLs, preserves the existing cPanel PHP handler and disables `APP_DEBUG`. It refuses the local XAMPP configuration. It does not change credentials, application keys, uploads or database records. It requires the cPanel PHP 8.3 CLI at `/opt/cpanel/ea-php83/root/usr/bin/php` and must be committed and pushed before cPanel can see it.
+
+If needed, run the same repair manually from the hosting checkout: `/opt/cpanel/ea-php83/root/usr/bin/php scripts/cpanel-repair.php`, then `/opt/cpanel/ea-php83/root/usr/bin/php artisan config:clear`.
+
+A second observed hosting failure was an overdue demo snapshot with a table set that differs from the current schema. Web requests now pause that incompatible automatic reset and retain the current cycle and business data; login and normal demo actions continue, and demo restrictions stay active. The reset service and scheduled command still reject the incompatible snapshot. The installation owner must review and deliberately rebuild the demo baseline before automatic resets can resume. Do not delete `demo_cycles`, recapture the baseline automatically, or run `migrate:fresh` to fix availability.
+
+The hosting PHP web runtime was observed as **8.3.36** on its Laravel error page during the 25 October investigation. This is separate from local XAMPP's 8.2.4 runtime.
 
 Before updating, back up the hosting root `.htaccess` outside the web root. Fetch before temporarily restoring Git's tracked `.htaccess`. Restore the missing `storage/framework/cache/.gitignore`, `storage/framework/cache/data/.gitignore`, `storage/framework/sessions/.gitignore` and `storage/framework/views/.gitignore`; their normal ignore rules hide generated files without deleting them. Fast-forward to `origin/main`, then restore the saved hosting `.htaccess` even if the update fails.
 

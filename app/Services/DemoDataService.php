@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\DemoBaselineMismatchException;
 use App\Support\Demo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -66,19 +67,20 @@ class DemoDataService
         }
         $reset = Carbon::parse($state->next_reset_at, 'UTC')->lte(now('UTC'));
         if ($reset) {
+            $unchanged = ['reset' => false, 'cycle' => $state->cycle, 'next_reset_at' => Carbon::parse($state->next_reset_at, 'UTC')];
             $baseline = json_decode($state->baseline, true, flags: JSON_THROW_ON_ERROR);
             $tables = array_values(array_filter(self::TABLES, fn ($table) => Schema::hasTable($table)));
             if (array_diff($tables, array_keys($baseline)) || array_diff(array_keys($baseline), $tables)) {
-                throw new RuntimeException('Demo baseline tables do not match the installed schema.');
+                throw new DemoBaselineMismatchException('Demo baseline tables do not match the installed schema.', $unchanged);
             }
             // Validate everything before deleting. Schema changes require a
             // deliberately recreated baseline by the installation owner.
             foreach ($baseline as $table => $rows) {
                 if (! in_array($table, self::TABLES, true) || ! Schema::hasTable($table)) {
-                    throw new RuntimeException('Demo baseline does not match the installed schema.');
+                    throw new DemoBaselineMismatchException('Demo baseline does not match the installed schema.', $unchanged);
                 }
                 if ($rows && array_diff(array_keys($rows[0]), Schema::getColumnListing($table))) {
-                    throw new RuntimeException('Demo baseline columns do not match the installed schema.');
+                    throw new DemoBaselineMismatchException('Demo baseline columns do not match the installed schema.', $unchanged);
                 }
             }
             Schema::withoutForeignKeyConstraints(function () use ($baseline, $state) {
