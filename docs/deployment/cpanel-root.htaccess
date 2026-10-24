@@ -10,11 +10,6 @@
     # /storage is the public uploads URL. Always resolve it through public/,
     # never serve the project's private storage directory directly.
     RewriteRule ^$ public/ [L]
-    # Resolve routes directly instead of relying on an inherited RewriteBase
-    # when LiteSpeed processes the nested public/.htaccess.
-    RewriteCond %{DOCUMENT_ROOT}/public/$1 !-f
-    RewriteCond %{DOCUMENT_ROOT}/public/$1 !-d
-    RewriteRule ^(?!public(?:/|$))(.*)$ public/index.php [L]
     RewriteRule ^(?!public(?:/|$))(.*)$ public/$1 [L]
 </IfModule>
 

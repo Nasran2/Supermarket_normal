@@ -3,7 +3,8 @@
 # Preserve hosting PHP selection, credentials, uploads and database.
 deployment:
   tasks:
-    - /opt/cpanel/ea-php83/root/usr/bin/php scripts/cpanel-repair.php
+    - /bin/chmod 755 public
+    - /bin/chmod 644 .htaccess public/.htaccess storage/app/public/.htaccess
     - /opt/cpanel/ea-php83/root/usr/bin/php artisan config:clear
     - /opt/cpanel/ea-php83/root/usr/bin/php artisan route:clear
     - /opt/cpanel/ea-php83/root/usr/bin/php artisan view:clear
