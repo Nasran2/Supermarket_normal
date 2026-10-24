@@ -476,6 +476,15 @@ class ExpiryTrackingTest extends TestCase
         $this->put(route('expiry.layer', 1), [])->assertNotFound();
     }
 
+    public function test_expiry_csv_neutralizes_control_prefixed_product_names(): void
+    {
+        $p = $this->product();
+        $p->update(['name' => "\t=1+1"]);
+        $this->layer($p);
+        $csv = $this->get(route('expiry.export', ['tab' => 'all']))->assertOk()->streamedContent();
+        $this->assertStringContainsString("'\t=1+1", $csv);
+    }
+
     public function test_manager_can_identify_undated_remaining_stock_and_known_sale_dates_are_protected(): void
     {
         $p = $this->product();

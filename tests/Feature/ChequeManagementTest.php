@@ -76,6 +76,14 @@ class ChequeManagementTest extends TestCase
         return ['amount' => $amount, 'cheque_date' => $date, 'cheque_number' => 'CHQ-'.Str::random(10), 'bank_name' => 'Commercial Bank'];
     }
 
+    public function test_cheque_csv_neutralizes_control_prefixed_customer_names(): void
+    {
+        $this->customer->update(['name' => "\t=1+1"]);
+        $this->sale([$this->entry('25000')]);
+        $csv = $this->get(route('cheques.export', ['format' => 'csv']))->assertOk()->streamedContent();
+        $this->assertStringContainsString("'\t=1+1", $csv);
+    }
+
     private function sale(array $cheques, string $total = '25000', ?string $cash = null): Sale
     {
         $this->product->update(['price' => $total]);

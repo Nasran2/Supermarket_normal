@@ -69,7 +69,7 @@ class RolePermissionsTest extends TestCase
         $role = Role::where('name', 'Administrator')->firstOrFail();
         $role->permissions()->detach();
         $user = $this->user([], $role);
-        foreach (array_keys(Permissions::all()) as $name) {
+        foreach (array_keys(Permissions::visible()) as $name) {
             $this->assertTrue($user->hasPermission($name), $name);
         }
         $this->get(route('manage.index', 'roles'))->assertOk()->assertSee('Administrator always has full access');

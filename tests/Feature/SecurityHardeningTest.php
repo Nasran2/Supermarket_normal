@@ -69,4 +69,23 @@ class SecurityHardeningTest extends TestCase
         $response->assertHeader('Content-Disposition', 'attachment; filename=ledger_'.$customer->id.'.csv');
         $this->assertStringContainsString("'\t=HYPERLINK", $response->streamedContent());
     }
+
+    public function test_security_check_reports_unsafe_hosting_settings_without_modifying_accounts(): void
+    {
+        $this->seed();
+        config(['app.url' => 'https://example.test', 'app.debug' => true, 'session.secure' => false]);
+        $before = \Illuminate\Support\Facades\DB::table('users')->get()->toJson();
+        $this->artisan('security:check')->expectsOutputToContain('Active seeded-password accounts: 1')->assertExitCode(1);
+        $this->assertSame($before, \Illuminate\Support\Facades\DB::table('users')->get()->toJson());
+    }
+
+    public function test_security_check_passes_for_safe_application_settings_and_strong_accounts(): void
+    {
+        $this->seed();
+        User::where('username', 'admin')->firstOrFail()->update(['password' => 'a-strong-test-password']);
+        config(['app.url' => 'https://example.test', 'app.debug' => false, 'session.secure' => true, 'session.http_only' => true, 'session.same_site' => 'lax']);
+        $before = \Illuminate\Support\Facades\DB::table('users')->get()->toJson();
+        $this->artisan('security:check')->expectsOutputToContain('Active seeded-password accounts: 0')->assertSuccessful();
+        $this->assertSame($before, \Illuminate\Support\Facades\DB::table('users')->get()->toJson());
+    }
 }

@@ -45,7 +45,7 @@ class ExpiryController extends Controller
                     fputcsv($out, $headers);
                     foreach ($query->lazy(300) as $layer) {
                         $row = $service->exportRow($layer, $canCost);
-                        fputcsv($out, array_map(fn ($v) => preg_match('/^[=+@\-]/', (string) $v) ? "'".$v : $v, $row));
+                        fputcsv($out, \App\Support\Csv::row($row));
                     }
                     fclose($out);
                 }, 'expiry-stock.csv', ['Content-Type' => 'text/csv']);

@@ -126,7 +126,7 @@ class ReportController extends Controller
                 if ($record instanceof AuditLog) {
                     $cells = AuditPresentation::formatRow($cells, app(SettingsService::class)->all());
                 }
-                $cells = array_map(fn ($v) => is_string($v) && preg_match('/^[=+@\-\t\r]/', $v) ? "'".$v : $v, $cells);
+                $cells = \App\Support\Csv::row($cells);
                 fputcsv($out, $cells);
             }fclose($out);
         }, $report.'-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);

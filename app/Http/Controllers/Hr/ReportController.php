@@ -97,7 +97,7 @@ class ReportController extends Controller
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, $headers);
             foreach ($rows as $row) {
-                fputcsv($out, array_map(fn ($v) => is_string($v) && preg_match('/^[=+@\-\t\r]/', $v) ? "'".$v : $v, $row));
+                fputcsv($out, \App\Support\Csv::row($row));
             }fclose($out);
         }, $name.'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }

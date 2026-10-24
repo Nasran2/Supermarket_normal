@@ -256,7 +256,7 @@ class ChequeController extends Controller
                 $out = fopen('php://output', 'w');
                 fputcsv($out, $headers);
                 foreach ($query->lazy(500) as $c) {
-                    fputcsv($out, array_map(fn ($v) => preg_match('/^[=+@-]/', (string) $v) ? "'".$v : $v, $map($c)));
+                    fputcsv($out, \App\Support\Csv::row($map($c)));
                 }fclose($out);
             }, 'cheques.csv', ['Content-Type' => 'text/csv']);
         }

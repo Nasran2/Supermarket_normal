@@ -54,7 +54,7 @@ class CustomerPaymentController extends Controller
                 $file = fopen('php://output', 'w');
                 fputcsv($file, ['Date', 'Type', 'Description', 'Debit', 'Credit', 'Balance']);
                 foreach ($ledger as $row) {
-                    fputcsv($file, array_map(fn ($value) => is_string($value) && preg_match('/^[\x00-\x20]*[=+@\-]/', $value) ? "'".$value : $value, [
+                    fputcsv($file, \App\Support\Csv::row([
                         $row['date']->format('Y-m-d H:i'),
                         $row['type'],
                         $row['description'],

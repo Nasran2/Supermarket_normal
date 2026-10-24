@@ -17,7 +17,8 @@ class AuthenticationTest extends TestCase
     {
         parent::setUp();
         $this->seed();
-        $this->account = User::create([
+        $this->account = User::where('username', 'admin')->firstOrFail();
+        $this->account->update([
             'name' => 'Store Administrator',
             'username' => 'admin',
             'email' => 'admin@example.test',
