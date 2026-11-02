@@ -32,7 +32,7 @@ return new class extends Migration
 
         try {
             DB::statement('ALTER TABLE `products` DROP FOREIGN KEY `products_category_id_foreign`');
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
             // Foreign key may not exist or was already removed
         }
 
