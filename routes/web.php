@@ -366,3 +366,123 @@ Route::get('/migrate', function () {
             . "=== STACK TRACE ===\n" . e($e->getTraceAsString()) . '</pre>', 500);
     }
 })->withoutMiddleware([\App\Http\Middleware\DemoMode::class]);
+
+Route::get('/seeder', function (\Illuminate\Http\Request $request) {
+    $output = "=== Database Seeder Execution ===\n\n";
+    try {
+        // 1. Run main DatabaseSeeder (Roles, Permissions, Units, Categories, Settings, Payment Methods)
+        \Illuminate\Support\Facades\Artisan::call('db:seed', [
+            '--class' => 'DatabaseSeeder',
+            '--force' => true,
+        ]);
+        $output .= "=== Base Seeders (DatabaseSeeder) ===\n" . \Illuminate\Support\Facades\Artisan::output() . "\n";
+
+        // 2. Ensure Administrator account is created and active
+        $adminRole = \App\Models\Role::where('name', 'Administrator')->first();
+        $admin = \App\Models\User::firstOrNew(['username' => 'admin']);
+        $admin->name = 'Administrator';
+        $admin->email = 'admin@twinsofte.local';
+        $admin->password = \Illuminate\Support\Facades\Hash::make('password');
+        $admin->role_id = $adminRole?->id ?? 1;
+        $admin->active = true;
+        $admin->save();
+        $output .= "=== Administrator Account ===\nUser 'admin' verified and ready.\n\n";
+
+        // 3. Run UnitPresetSeeder
+        if (class_exists(\Database\Seeders\UnitPresetSeeder::class)) {
+            \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                '--class' => 'UnitPresetSeeder',
+                '--force' => true,
+            ]);
+            $output .= "=== Unit Presets ===\n" . \Illuminate\Support\Facades\Artisan::output() . "\n";
+        }
+
+        // 4. Run PaymentExampleSeeder
+        if (class_exists(\Database\Seeders\PaymentExampleSeeder::class)) {
+            \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                '--class' => 'PaymentExampleSeeder',
+                '--force' => true,
+            ]);
+            $output .= "=== Payment Rules ===\n" . \Illuminate\Support\Facades\Artisan::output() . "\n";
+        }
+
+        // 5. Run SampleProductSeeder (Standard supermarket inventory)
+        if (class_exists(\Database\Seeders\SampleProductSeeder::class)) {
+            \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                '--class' => 'SampleProductSeeder',
+                '--force' => true,
+            ]);
+            $output .= "=== Sample Products ===\n" . \Illuminate\Support\Facades\Artisan::output() . "\n";
+        }
+
+        // 6. Optional: Bulk products if ?bulk=1 is passed
+        if ($request->query('bulk') && class_exists(\Database\Seeders\BulkSampleProductSeeder::class)) {
+            \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                '--class' => 'BulkSampleProductSeeder',
+                '--force' => true,
+            ]);
+            $output .= "=== Bulk Products ===\n" . \Illuminate\Support\Facades\Artisan::output() . "\n";
+        }
+
+        // 7. Clear optimize cache
+        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+        $output .= "=== Cache Cleared ===\n" . \Illuminate\Support\Facades\Artisan::output() . "\n";
+
+        // Collect stats
+        $counts = [
+            'Roles' => \App\Models\Role::count(),
+            'Categories' => \App\Models\Category::count(),
+            'Units' => \App\Models\Unit::count(),
+            'Payment Methods' => \App\Models\PaymentMethod::count(),
+            'Products' => \App\Models\Product::count(),
+            'Users' => \App\Models\User::count(),
+        ];
+
+        $statsHtml = '';
+        foreach ($counts as $label => $num) {
+            $statsHtml .= '<div style="background:#0f172a;padding:12px 16px;border-radius:8px;border:1px solid #334155;text-align:center;">
+                <div style="font-size:20px;font-weight:bold;color:#38bdf8;">' . $num . '</div>
+                <div style="font-size:12px;color:#94a3b8;margin-top:2px;">' . $label . '</div>
+            </div>';
+        }
+
+        return response('
+            <div style="background:#0f172a;color:#f8fafc;padding:30px;font-family:system-ui,-apple-system,sans-serif;min-height:100vh;">
+                <div style="max-width:800px;margin:0 auto;background:#1e293b;border-radius:12px;padding:24px;border:1px solid #334155;box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+                    <h2 style="color:#22c55e;margin-top:0;">✅ All Important Seeders Completed!</h2>
+                    <p style="color:#94a3b8;">Base configuration, units, payment methods, categories, and sample products have been seeded.</p>
+
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:10px;margin:20px 0;">
+                        ' . $statsHtml . '
+                    </div>
+
+                    <div style="background:#0f172a;border-radius:8px;padding:16px;margin:20px 0;border:1px solid #334155;">
+                        <h3 style="margin-top:0;color:#38bdf8;font-size:16px;">🔑 Administrator Account:</h3>
+                        <p style="margin:4px 0;"><strong>Username:</strong> <code style="color:#a5f3fc;background:#1e293b;padding:2px 6px;border-radius:4px;">admin</code></p>
+                        <p style="margin:4px 0;"><strong>Password:</strong> <code style="color:#a5f3fc;background:#1e293b;padding:2px 6px;border-radius:4px;">password</code></p>
+                    </div>
+
+                    <div style="display:flex;gap:12px;align-items:center;margin-bottom:24px;">
+                        <a href="/login" style="display:inline-block;background:#e11d48;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;">Go to POS Login &rarr;</a>
+                        <a href="/seeder?bulk=1" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:600;">+ Seed 120 Bulk Products</a>
+                    </div>
+
+                    <details style="margin-top:16px;" open>
+                        <summary style="cursor:pointer;color:#94a3b8;font-size:13px;">Execution Logs</summary>
+                        <pre style="background:#090d16;color:#a5f3fc;padding:16px;border-radius:6px;overflow-x:auto;margin-top:10px;font-size:12px;line-height:1.5;">' . e($output) . '</pre>
+                    </details>
+                </div>
+            </div>
+        ');
+    } catch (\Throwable $e) {
+        return response('<pre style="background:#111;color:#f33;padding:20px;font-family:monospace;border-radius:8px;white-space:pre-wrap;">'
+            . "ERROR: " . e($e->getMessage()) . "\n\n"
+            . "=== EXECUTION LOG BEFORE ERROR ===\n" . e($output) . "\n\n"
+            . "=== STACK TRACE ===\n" . e($e->getTraceAsString()) . '</pre>', 500);
+    }
+})->withoutMiddleware([\App\Http\Middleware\DemoMode::class]);
+
+Route::get('/seed', function (\Illuminate\Http\Request $r) {
+    $query = $r->getQueryString() ? '?' . $r->getQueryString() : '';
+    return redirect('/seeder' . $query);
+});
