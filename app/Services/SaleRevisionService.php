@@ -9,6 +9,7 @@ use App\Models\Sale;
 use App\Models\SaleReturn;
 use App\Models\SaleReturnItem;
 use App\Models\SaleRevision;
+use App\Models\TaxInvoice;
 use App\Models\User;
 use App\Support\Audit;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,9 @@ class SaleRevisionService
     public function assertEditable(Sale $sale, int $userId): void
     {
         app(ChequeService::class)->assertDocumentSafe($sale, true);
+        if (TaxInvoice::where('sale_id', $sale->id)->exists()) {
+            throw ValidationException::withMessages(['sale' => 'A tax invoice has been issued. Use returns for corrections.']);
+        }
         $register = $sale->register;
         $user = User::find($userId);
 
@@ -74,7 +78,7 @@ class SaleRevisionService
             foreach ($sale->items as $item) {
                 app(StockLayerService::class)->restore($products[$item->product_id], $item, $item->base_quantity ?? $item->quantity, 'SALE EDIT RESTORE', $sale->invoice, $user->id);
             }
-            $quote = $this->sales->quote($data, $user, true);
+            $quote = $this->sales->quote($data, $user, true, taxSettings: $sale->tax);
             if (! hash_equals($quote['quote_hash'], $data['quote_hash'])) {
                 throw ValidationException::withMessages(['payment' => 'Prices, stock or payment rules changed. Review payment again before saving.']);
             }
@@ -86,7 +90,7 @@ class SaleRevisionService
             Expense::where('sale_id', $sale->id)->where('type', 'AUTOMATIC')->update(['status' => 'REVERSED', 'sale_payment_id' => null]);
             $sale->items()->delete();
             $sale->payments()->delete();
-            $sale->update(['customer_id' => $data['customer_id'] ?? null, 'notes' => $data['notes'] ?? null, 'subtotal' => $quote['subtotal'], 'discount' => $quote['discount'], 'sale_amount' => $quote['sale_amount'], 'processing_charge' => $quote['processing_charge'], 'customer_payable' => $quote['customer_payable'], 'cost_total' => $quote['cost_total']]);
+            $sale->update(['tax' => $quote['tax'] ?? null, 'customer_id' => $data['customer_id'] ?? null, 'notes' => $data['notes'] ?? null, 'subtotal' => $quote['subtotal'], 'discount' => $quote['discount'], 'sale_amount' => $quote['sale_amount'], 'processing_charge' => $quote['processing_charge'], 'customer_payable' => $quote['customer_payable'], 'cost_total' => $quote['cost_total']]);
             foreach ($quote['items'] as $line) {
                 $item = $sale->items()->create(array_diff_key($line, ['allocations' => true]));
                 $product = $products[$line['product_id']]->refresh();

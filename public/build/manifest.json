@@ -7,6 +7,10 @@
     "file": "assets/pos-price-options-BXcz7Ggt.js",
     "name": "pos-price-options"
   },
+  "_pos-tax-bills-CtkVSWt9.js": {
+    "file": "assets/pos-tax-bills-CtkVSWt9.js",
+    "name": "pos-tax-bills"
+  },
   "_purchase-totals-Bp1k2QOT.js": {
     "file": "assets/purchase-totals-Bp1k2QOT.js",
     "name": "purchase-totals"
@@ -16,7 +20,7 @@
     "name": "units"
   },
   "resources/css/app.css": {
-    "file": "assets/app-hI3Jjntm.css",
+    "file": "assets/app-Bi4FWqvN.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -70,12 +74,13 @@
     ]
   },
   "resources/js/pos.js": {
-    "file": "assets/pos-v8CayN74.js",
+    "file": "assets/pos-BQ5d4svr.js",
     "name": "pos",
     "src": "resources/js/pos.js",
     "isEntry": true,
     "imports": [
       "_units-BWArtpcn.js",
+      "_pos-tax-bills-CtkVSWt9.js",
       "_pos-price-options-BXcz7Ggt.js"
     ]
   },
@@ -99,10 +104,13 @@
     ]
   },
   "resources/js/sales.js": {
-    "file": "assets/sales-CPJKppA4.js",
+    "file": "assets/sales-f__gPOwu.js",
     "name": "sales",
     "src": "resources/js/sales.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_pos-tax-bills-CtkVSWt9.js"
+    ]
   },
   "resources/js/stock-adjustments.js": {
     "file": "assets/stock-adjustments-D8753fUn.js",

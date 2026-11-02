@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class Customer extends Model
 {
-    protected $fillable = ['name', 'phone', 'email', 'address', 'active', 'opening_due', 'opening_due_paid'];
+    protected $fillable = ['tax_number', 'name', 'phone', 'email', 'address', 'active', 'opening_due', 'opening_due_paid'];
 
     protected $casts = ['active' => 'boolean', 'opening_due' => 'decimal:2', 'opening_due_paid' => 'decimal:2'];
 

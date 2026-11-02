@@ -17,7 +17,7 @@ class DemoDataService
     private const TABLES = [
         'categories', 'customers', 'suppliers', 'expense_categories', 'products',
         'product_units', 'category_product', 'registers', 'register_movements',
-        'sales', 'sale_items', 'sale_payments', 'sale_revisions', 'sale_returns',
+        'sales', 'tax_invoices', 'sale_items', 'sale_payments', 'sale_revisions', 'sale_returns',
         'sale_return_items', 'sale_collections', 'customer_payments', 'customer_payment_allocations',
         'purchases', 'purchase_items', 'purchase_payments', 'purchase_charges',
         'purchase_returns', 'purchase_return_items', 'supplier_returns',

@@ -138,7 +138,7 @@ class PosController extends Controller
         $data = $request->validate(['checkout_token' => 'required|uuid']);
         $sale = Sale::where('user_id', $request->user()->id)->where('checkout_token', $data['checkout_token'])->first();
 
-        return response()->json(['completed' => (bool) $sale, 'invoice' => $sale?->invoice, 'sms_receipt_url' => $sale && $request->user()->hasPermission('sms.receipt') ? route('sms.receipt', $sale) : null, 'receipt_url' => $sale && $request->user()->hasPermission('sales.receipt') ? route('sales.receipt', $sale) : null]);
+        return response()->json(['tax_context_url' => config('features.customer_tax') && $sale?->tax && $request->user()->hasPermission('sales.receipt') ? route('sales.tax.context', $sale) : null, 'tax_store_url' => config('features.customer_tax') && $sale?->tax && $request->user()->hasPermission('sales.receipt') ? route('sales.tax.store', $sale) : null, 'completed' => (bool) $sale, 'invoice' => $sale?->invoice, 'sms_receipt_url' => $sale && $request->user()->hasPermission('sms.receipt') ? route('sms.receipt', $sale) : null, 'receipt_url' => $sale && $request->user()->hasPermission('sales.receipt') ? route('sales.receipt', $sale) : null]);
     }
 
     public function quote(CheckoutRequest $request, SaleService $service, RegisterService $registers)
@@ -161,6 +161,6 @@ class PosController extends Controller
 
         $canReceipt = $request->user()->hasPermission('sales.receipt');
 
-        return response()->json(['invoice' => $sale->invoice, 'sms_receipt_url' => $request->user()->hasPermission('sms.receipt') ? route('sms.receipt', $sale) : null, 'receipt_url' => $canReceipt ? route('sales.receipt', $sale) : null, 'sale_url' => route('sales.show', $sale), 'due_balance' => $sale->due_balance, 'customer_id' => $sale->customer_id, 'customer_balance' => $sale->customer?->due_balance, 'auto_print' => $canReceipt && $settings->get('auto_print', false), 'show_receipt' => $canReceipt && $settings->get('show_receipt', true)]);
+        return response()->json(['invoice' => $sale->invoice, 'sms_receipt_url' => $request->user()->hasPermission('sms.receipt') ? route('sms.receipt', $sale) : null, 'receipt_url' => $canReceipt ? route('sales.receipt', $sale) : null, 'sale_url' => route('sales.show', $sale), 'due_balance' => $sale->due_balance, 'customer_id' => $sale->customer_id, 'customer_balance' => $sale->customer?->due_balance, 'tax_context_url' => config('features.customer_tax') && $canReceipt && $sale->tax ? route('sales.tax.context', $sale) : null, 'tax_store_url' => config('features.customer_tax') && $canReceipt && $sale->tax ? route('sales.tax.store', $sale) : null, 'auto_print' => $canReceipt && $settings->get('auto_print', false), 'show_receipt' => $canReceipt && $settings->get('show_receipt', true)]);
     }
 }

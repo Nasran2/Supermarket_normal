@@ -1,5 +1,6 @@
 const lineUnit = document.getElementById('line-unit') || document.createElement('select');
 import { unitsEnabled, unitLabel, quantityText } from './units.js';
+import { setupTaxBills } from './pos-tax-bills.js';
 import { draftStore } from './pos-draft.js';
 import { sellingPriceOptions, priceOptionForItem, stockChoiceKey } from './pos-price-options.js';
 import { createProductScanner, exactProductMatch } from './pos-scanner.js';
@@ -183,6 +184,7 @@ async function restoreDraft() {
         orderLoading = false;
         resetOrder();
         message.textContent = `Sale ${result.invoice} was completed. Your cart has been cleared.`;
+        if (result.tax_context_url) taxBills.open(result);
         return;
       }
       checkoutAttempted = false;
@@ -255,11 +257,28 @@ const billDiscountCents = (discount = billDiscount) =>
   discount.type === 'PERCENT'
     ? (subtotalCents() * scaled(discount.value, 2) + 5000n) / 10000n
     : scaled(discount.value, 2);
-const cartTotal = () => Math.max(0, Number(subtotalCents() - billDiscountCents()) / 100);
+const cartNetCents = () => {
+  const value = subtotalCents() - billDiscountCents();
+  return value > 0n ? value : 0n;
+};
+const cartVatCents = () => {
+  const rate = scaled(pos.dataset.taxRate, 2);
+  const denominator = pos.dataset.taxMode === 'EXCLUSIVE' ? 10000n : 10000n + rate;
+  return pos.dataset.taxMode === 'EXCLUSIVE'
+    ? (cartNetCents() * rate + denominator / 2n) / denominator
+    : cartNetCents() - (cartNetCents() * 10000n + denominator / 2n) / denominator;
+};
+const cartTotal = () =>
+  Number(cartNetCents() + (pos.dataset.taxMode === 'EXCLUSIVE' ? cartVatCents() : 0n)) / 100;
 const invalidBillDiscount = () => billDiscountCents() > subtotalCents();
 function renderSummary() {
   $('cart-subtotal').textContent = money(subtotal());
   $('cart-total').textContent = money(cartTotal());
+  if ($('cart-vat')) {
+    $('cart-vat').textContent = money(Number(cartVatCents()) / 100);
+    $('cart-vat-label').textContent =
+      `VAT ${Number(pos.dataset.taxRate)}% (${pos.dataset.taxMode === 'EXCLUSIVE' ? 'added' : 'included'})`;
+  }
   const amount = billDiscountCents();
   $('discount').value = (Number(amount) / 100).toFixed(2);
   if ($('edit-bill-discount')) {
@@ -1335,6 +1354,10 @@ async function getQuote() {
     if (current !== quoteNumber || !dialog.open) return;
     quote = result;
     $('payment-base').textContent = money(quote.sale_amount);
+    if ($('payment-tax-summary'))
+      $('payment-tax-summary').textContent = quote.tax
+        ? `VAT ${Number(quote.tax.rate)}% ${quote.tax.mode === 'EXCLUSIVE' ? 'added' : 'included'}: ${money(quote.tax.vat)}`
+        : '';
     $('payment-payable').textContent = money(quote.customer_payable);
     $('payment-fees').textContent = money(quote.customer_processing_charge);
     payments.forEach((p) => {
@@ -1722,7 +1745,15 @@ async function completeCheckout(mode) {
       link.textContent = 'Open receipt';
       message.append(link);
     }
-    if (result.show_receipt || result.auto_print) showReceipt(result);
+    if (result.tax_context_url) {
+      const chooseBill = document.createElement('button');
+      chooseBill.className = 'text-link';
+      chooseBill.type = 'button';
+      chooseBill.textContent = 'Choose bill';
+      chooseBill.addEventListener('click', () => taxBills.open(result));
+      message.append(chooseBill);
+      taxBills.open(result);
+    } else if (result.show_receipt || result.auto_print) showReceipt(result);
   } catch (e) {
     if (e.validationErrors) {
       checkoutAttempted = false;
@@ -1754,6 +1785,23 @@ async function completeCheckout(mode) {
     }
   }
 }
+
+const taxBills = setupTaxBills({
+  showReceipt,
+  onCustomerSaved(customer) {
+    const select = $('customer');
+    let option = [...select.options].find((option) => option.value === String(customer.id));
+    if (!option) {
+      option = new Option(customer.name, String(customer.id));
+      option.dataset.due = '0';
+      select.add(option);
+    } else option.textContent = customer.name;
+    [...select.options]
+      .slice(1)
+      .sort((a, b) => a.text.localeCompare(b.text))
+      .forEach((option) => select.append(option));
+  },
+});
 
 function showReceipt(result) {
   if (!result.receipt_url) return;

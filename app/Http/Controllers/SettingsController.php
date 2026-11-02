@@ -8,7 +8,9 @@ use App\Models\PaymentMethod;
 use App\Models\Setting;
 use App\Services\SettingsService;
 use App\Support\Audit;
+use App\Support\Branding;
 use App\Support\Expiry;
+use App\Support\Units;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -23,11 +25,12 @@ class SettingsController extends Controller
     public function edit(string $group, SettingsService $service)
     {
         $fields = config('pos.'.$group);
-        abort_if($group === 'branding' && ! \App\Support\Branding::enabled(), 404);
+        abort_if($group === 'customer_tax' && ! config('features.customer_tax'), 404);
+        abort_if($group === 'branding' && ! Branding::enabled(), 404);
         abort_if($group === 'expiry' && ! Expiry::enabled(), 404);
         abort_unless($fields, 404);
         abort_unless(auth()->user()->hasPermission(match ($group) {
-            'branding' => 'settings.business','expiry' => 'expiry.manage_settings','stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$group
+            'customer_tax' => 'settings.business','branding' => 'settings.business','expiry' => 'expiry.manage_settings','stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$group
         }), 403);
         if (! config('features.barcode')) {
             unset($fields['barcode_enabled']);
@@ -35,7 +38,7 @@ class SettingsController extends Controller
                 $fields['show_sku'][0] = 'Show SKU';
             }
         }
-        if (! \App\Support\Units::enabled()) {
+        if (! Units::enabled()) {
             unset($fields['show_unit']);
         }
         $values = $service->all();
@@ -77,8 +80,16 @@ class SettingsController extends Controller
                 unset($data['remove_'.$key]);
             }
             DB::transaction(function () use ($data, $group, $service) {
-                $before = Setting::where('group', $group)->lockForUpdate()->pluck('value', 'key')->all();
-                $service->put($group, $data);
+                $before = ($group === 'customer_tax' ? Setting::whereIn('key', array_keys($data)) : Setting::where('group', $group))->lockForUpdate()->pluck('value', 'key')->all();
+                if ($group === 'customer_tax') {
+                    $business = array_intersect_key($data, config('pos.business'));
+                    if ($business) {
+                        $service->put('business', $business);
+                    }
+                    $service->put($group, array_diff_key($data, $business));
+                } else {
+                    $service->put($group, $data);
+                }
                 $subject = Setting::where('group', $group)->firstOrFail();
                 Audit::record('settings.'.$group, $subject, $before, $data);
             });

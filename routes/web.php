@@ -25,6 +25,7 @@ use App\Http\Controllers\StockBatchController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockPriceController;
 use App\Http\Controllers\SupplierAccountController;
+use App\Http\Controllers\TaxInvoiceController;
 use App\Http\Controllers\TransactionReturnController;
 use App\Http\Middleware\HrEnabled;
 use App\Http\Middleware\SaleVisibility;
@@ -81,6 +82,10 @@ Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(functi
         });
     });
     Route::get('/sales', [SaleController::class, 'index'])->middleware('permission:sales.view')->name('sales.index');
+    Route::get('/sales/{sale}/tax-invoice/print', [TaxInvoiceController::class, 'preview'])->name('sales.tax.preview');
+    Route::get('/sales/{sale}/tax-invoice/context', [TaxInvoiceController::class, 'context'])->name('sales.tax.context');
+    Route::post('/sales/{sale}/tax-invoice', [TaxInvoiceController::class, 'store'])->name('sales.tax.store');
+    Route::get('/sales/{sale}/tax-invoice', [TaxInvoiceController::class, 'download'])->name('sales.tax.download');
     Route::get('/sales/{sale}/receipt', [SaleController::class, 'receipt'])->middleware('permission:sales.receipt')->name('sales.receipt');
     Route::get('/sales/{sale}/edit', [SaleController::class, 'edit'])->middleware(['permission:sales.edit', 'permission:pos.access'])->name('sales.edit');
     Route::get('/sales/{sale}/edit/products', [SaleController::class, 'editProducts'])->middleware(['permission:sales.edit', 'permission:pos.access'])->name('sales.edit.products');

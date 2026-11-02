@@ -23,6 +23,9 @@ class Resources
             'users' => ['title' => 'Users', 'model' => Models\User::class, 'permission' => 'users', 'search' => ['name', 'username', 'email'], 'relations' => ['role'], 'columns' => ['name' => 'Name', 'username' => 'Username', 'email' => 'Email', 'role.name' => 'Role', 'active' => 'Active'], 'fields' => ['name' => ['Name', 'text'], 'username' => ['Username', 'text'], 'email' => ['Email', 'email'], 'role_id' => ['Role', 'select', true, Models\Role::class], 'password' => ['Password (leave blank to keep)', 'password', false], 'active' => ['Active', 'checkbox']]],
             'roles' => ['title' => 'Roles & permissions', 'model' => Models\Role::class, 'permission' => 'roles', 'search' => ['name'], 'relations' => ['permissions'], 'columns' => ['name' => 'Role', 'system' => 'System role'], 'fields' => ['name' => ['Role name', 'text'], 'sales_visibility' => ['Sales visibility', 'sales_visibility', false], 'permissions' => ['Permissions', 'permissions']]],
         ];
+        if (config('features.customer_tax')) {
+            $definitions['customers']['fields']['tax_number'] = ['TIN / VAT number', 'text', false];
+        }
         if (! config('features.barcode')) {
             unset($definitions['products']['fields']['barcode'], $definitions['products']['columns']['barcode']);
             $definitions['products']['search'] = ['name', 'sku'];

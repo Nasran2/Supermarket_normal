@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Support\Branding;
 use App\Support\Expiry;
+use App\Support\Units;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -11,11 +13,12 @@ class SettingsRequest extends FormRequest
     public function authorize(): bool
     {
         $g = $this->route('group');
-        abort_if($g === 'branding' && ! \App\Support\Branding::enabled(), 404);
+        abort_if($g === 'customer_tax' && ! config('features.customer_tax'), 404);
+        abort_if($g === 'branding' && ! Branding::enabled(), 404);
         abort_if($g === 'expiry' && ! Expiry::enabled(), 404);
 
         return $this->user()?->hasPermission(match ($g) {
-            'branding' => 'settings.business','expiry' => 'expiry.manage_settings','stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$g
+            'customer_tax' => 'settings.business','branding' => 'settings.business','expiry' => 'expiry.manage_settings','stock' => 'settings.stock','system' => 'settings.system',default => 'settings.'.$g
         });
     }
 
@@ -45,7 +48,7 @@ class SettingsRequest extends FormRequest
             }
         }
 
-        if (! \App\Support\Units::enabled()) {
+        if (! Units::enabled()) {
             unset($r['show_unit']);
         }
 

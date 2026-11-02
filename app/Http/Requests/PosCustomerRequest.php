@@ -14,6 +14,7 @@ class PosCustomerRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'tax_number' => [config('features.customer_tax') ? 'nullable' : 'exclude', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'string', 'email', 'max:255'],

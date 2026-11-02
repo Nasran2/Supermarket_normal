@@ -72,7 +72,10 @@ class Sidebar
             $hr[] = $link('HR reports', 'hr.reports.index', [], [], request()->routeIs('hr.reports.*'));
         }
         $settings = [$link('Overview', 'settings.index', [], 'settings.view', request()->routeIs('settings.index'))];
-        foreach (['branding' => ['Appearance & branding', 'settings.business'], 'business' => ['Business', 'settings.business'], 'pos' => ['Point of sale', 'settings.pos'], 'receipt' => ['Receipt', 'settings.receipt'], 'stock' => ['Stock controls', 'settings.stock'], 'system' => ['System', 'settings.system']] as $key => [$title, $permission]) {
+        foreach (['branding' => ['Appearance & branding', 'settings.business'], 'business' => ['Business', 'settings.business'], 'pos' => ['Point of sale', 'settings.pos'], 'customer_tax' => ['Tax settings', 'settings.business'], 'receipt' => ['Receipt', 'settings.receipt'], 'stock' => ['Stock controls', 'settings.stock'], 'system' => ['System', 'settings.system']] as $key => [$title, $permission]) {
+            if ($key === 'customer_tax' && ! config('features.customer_tax')) {
+                continue;
+            }
             if ($key === 'branding' && ! Branding::enabled()) {
                 continue;
             }

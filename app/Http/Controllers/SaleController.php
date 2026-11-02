@@ -13,6 +13,7 @@ use App\Models\PaymentMethod;
 use App\Models\Register;
 use App\Models\Sale;
 use App\Models\SaleReturn;
+use App\Models\TaxInvoice;
 use App\Services\ProductUnitService;
 use App\Services\RegisterService;
 use App\Services\SaleAftercareService;
@@ -21,6 +22,7 @@ use App\Services\SaleService;
 use App\Services\SettingsService;
 use App\Support\Audit;
 use App\Support\Money;
+use App\Support\Units;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -76,14 +78,14 @@ class SaleController extends Controller
             'items' => $sale->items->map(function ($i) {
                 $stockPrice = $i->stock_price ?? app(ProductUnitService::class)->rate($i->catalog_price ?? $i->price, $i->quantity, $i->base_quantity ?? $i->quantity);
                 $options = array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->publicOptions($i->product, $stockPrice));
-                $id = \App\Support\Units::enabled() ? ($i->unit_id ?? $i->product->unit_id) : $i->product->unit_id;
-                $quantity = \App\Support\Units::enabled() ? $i->quantity : ($i->base_quantity ?? $i->quantity);
-                $price = \App\Support\Units::enabled() ? $i->price : app(ProductUnitService::class)->rate($i->price, $i->quantity, $quantity);
+                $id = Units::enabled() ? ($i->unit_id ?? $i->product->unit_id) : $i->product->unit_id;
+                $quantity = Units::enabled() ? $i->quantity : ($i->base_quantity ?? $i->quantity);
+                $price = Units::enabled() ? $i->price : app(ProductUnitService::class)->rate($i->price, $i->quantity, $quantity);
                 $selected = collect($options)->firstWhere('id', $id);
 
                 $allocation = $i->allocations->count() === 1 ? $i->allocations->first() : null;
 
-                return ['expires_at' => $allocation?->expires_at, 'use_default_discount' => false, 'track_stock' => $i->track_stock, 'stock_layer_id' => $allocation?->stock_layer_id, 'stock_reference' => $allocation?->layer?->source_reference ?? '', 'stock_price' => $stockPrice, 'line_key' => (string) Str::uuid(), 'id' => $i->product_id, 'name' => $i->name, 'units' => $options, 'unit_id' => $id, 'unit' => \App\Support\Units::label($i->unit), 'decimal' => $selected['decimal'] ?? false, 'price' => \App\Support\Units::enabled() ? ($i->catalog_price ?? $i->price) : $stockPrice, 'unit_price' => $price, 'quantity' => $quantity, 'discount_type' => $i->discount_type ?? 'AMOUNT', 'discount_value' => $i->discount_value ?? '0', 'unavailable' => ! $selected || ! $i->product->active || ! $i->product->unit->active];
+                return ['expires_at' => $allocation?->expires_at, 'use_default_discount' => false, 'track_stock' => $i->track_stock, 'stock_layer_id' => $allocation?->stock_layer_id, 'stock_reference' => $allocation?->layer?->source_reference ?? '', 'stock_price' => $stockPrice, 'line_key' => (string) Str::uuid(), 'id' => $i->product_id, 'name' => $i->name, 'units' => $options, 'unit_id' => $id, 'unit' => Units::label($i->unit), 'decimal' => $selected['decimal'] ?? false, 'price' => Units::enabled() ? ($i->catalog_price ?? $i->price) : $stockPrice, 'unit_price' => $price, 'quantity' => $quantity, 'discount_type' => $i->discount_type ?? 'AMOUNT', 'discount_value' => $i->discount_value ?? '0', 'unavailable' => ! $selected || ! $i->product->active || ! $i->product->unit->active];
             })->all()];
 
         return view('pos.index', compact('register', 'methods', 'customers', 'categories', 'editingSale', 'editSeed'));
@@ -159,6 +161,9 @@ class SaleController extends Controller
             }
             if (SaleReturn::where('sale_id', $sale->id)->orWhere('replacement_sale_id', $sale->id)->exists()) {
                 throw ValidationException::withMessages(['sale' => 'Invoices linked to returns retain their original customer and details.']);
+            }
+            if (TaxInvoice::where('sale_id', $sale->id)->exists()) {
+                throw ValidationException::withMessages(['sale' => 'A tax invoice has been issued. Use returns for corrections.']);
             }
             $before = $sale->load('payments')->toArray();
             $data = $request->validated();

@@ -13,6 +13,7 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\Money;
+use App\Support\Units;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -20,7 +21,7 @@ class SaleService
 {
     public function __construct(private SettingsService $settings, private SplitPaymentService $payments, private StockService $stock, private RegisterService $registers) {}
 
-    public function quote(array $data, User $user, bool $lock = false, ?Sale $editing = null, bool $historicalExchange = false, array $returnCredits = []): array
+    public function quote(array $data, User $user, bool $lock = false, ?Sale $editing = null, bool $historicalExchange = false, array $returnCredits = [], ?array $taxSettings = null): array
     {
         abort_if(count($data['payments'] ?? []) > 1 && ! $user->hasPermission('pos.split_payment'), 403);
         abort_if(! empty($data['allow_due']) && ! $user->hasPermission('pos.due_sale'), 403);
@@ -99,13 +100,15 @@ class SaleService
             throw ValidationException::withMessages(['discount' => 'Discount cannot exceed subtotal.']);
         }
         $amount = Money::sub($subtotal, $discount);
+        $tax = app(TaxInvoiceService::class)->calculate($amount, $taxSettings ?? $editing?->tax);
+        $amount = $tax['total'] ?? $amount;
         $charge = $this->payments->quote($data, $amount, $lock);
         foreach ([$subtotal, $cost, $charge['customer_payable'], $charge['processing_charge']] as $total) {
             if (Money::compare($total, '9999999999999.99') > 0) {
                 throw ValidationException::withMessages(['items' => 'The order total exceeds the supported range.']);
             }
         }
-        $quote = ['items' => $lines, 'subtotal' => $subtotal, 'discount' => $discount, 'line_discounts' => $lineDiscounts, 'invoice_discount' => $invoiceDiscount, 'sale_amount' => $amount, 'cost_total' => $cost] + $charge;
+        $quote = ['tax' => $tax, 'items' => $lines, 'subtotal' => $subtotal, 'discount' => $discount, 'line_discounts' => $lineDiscounts, 'invoice_discount' => $invoiceDiscount, 'sale_amount' => $amount, 'cost_total' => $cost] + $charge;
         $quote['quote_hash'] = hash_hmac('sha256', json_encode($quote), config('app.key'));
 
         return $quote;
@@ -120,7 +123,7 @@ class SaleService
             }
         }
 
-        return \App\Support\Units::payload($quote);
+        return Units::payload($quote);
     }
 
     public function complete(array $data, User $user): Sale
@@ -150,7 +153,7 @@ class SaleService
             }
             $payments = $this->payments->settle($data, $quote);
             $invoice = app(DocumentNumberService::class)->next('SALE', now());
-            $sale = Sale::create(['invoice' => $invoice, 'checkout_token' => $data['checkout_token'], 'user_id' => $user->id, 'register_id' => $register->id, 'customer_id' => $data['customer_id'] ?? null, 'sold_at' => now(), 'subtotal' => $quote['subtotal'], 'discount' => $quote['discount'], 'sale_amount' => $quote['sale_amount'], 'processing_charge' => $quote['processing_charge'], 'customer_payable' => $quote['customer_payable'], 'cost_total' => $quote['cost_total'], 'notes' => $data['notes'] ?? null]);
+            $sale = Sale::create(['tax' => $quote['tax'] ?? null, 'invoice' => $invoice, 'checkout_token' => $data['checkout_token'], 'user_id' => $user->id, 'register_id' => $register->id, 'customer_id' => $data['customer_id'] ?? null, 'sold_at' => now(), 'subtotal' => $quote['subtotal'], 'discount' => $quote['discount'], 'sale_amount' => $quote['sale_amount'], 'processing_charge' => $quote['processing_charge'], 'customer_payable' => $quote['customer_payable'], 'cost_total' => $quote['cost_total'], 'notes' => $data['notes'] ?? null]);
             foreach ($quote['items'] as $line) {
                 $item = $sale->items()->create(array_diff_key($line, ['allocations' => true]));
                 $p = Product::findOrFail($line['product_id']);
@@ -185,7 +188,7 @@ class SaleService
         if (! $register) {
             throw ValidationException::withMessages(['register' => 'Open your register before issuing replacement products.']);
         }
-        $sale = Sale::create(['invoice' => app(DocumentNumberService::class)->next('SALE', now()), 'checkout_token' => $token, 'user_id' => $user->id, 'customer_id' => $customerId, 'register_id' => $register->id, 'subtotal' => $quote['subtotal'], 'discount' => $quote['discount'], 'sale_amount' => $quote['sale_amount'], 'processing_charge' => '0.00', 'customer_payable' => $quote['sale_amount'], 'cost_total' => $quote['cost_total'], 'sold_at' => now(), 'notes' => 'Exchange for '.$reference]);
+        $sale = Sale::create(['tax' => $quote['tax'] ?? null, 'invoice' => app(DocumentNumberService::class)->next('SALE', now()), 'checkout_token' => $token, 'user_id' => $user->id, 'customer_id' => $customerId, 'register_id' => $register->id, 'subtotal' => $quote['subtotal'], 'discount' => $quote['discount'], 'sale_amount' => $quote['sale_amount'], 'processing_charge' => '0.00', 'customer_payable' => $quote['sale_amount'], 'cost_total' => $quote['cost_total'], 'sold_at' => now(), 'notes' => 'Exchange for '.$reference]);
         foreach ($quote['items'] as $line) {
             $item = $sale->items()->create(array_diff_key($line, ['allocations' => true]));
             $product = Product::findOrFail($line['product_id']);

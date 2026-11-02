@@ -1,3 +1,4 @@
+import { setupTaxBills } from './pos-tax-bills.js';
 const workspace = document.getElementById('sale-workspace');
 if (workspace) {
   const $ = (id) => document.getElementById(id);
@@ -128,4 +129,21 @@ if (workspace) {
   });
   updateCollection();
   open(workspace.dataset.openAction);
+}
+
+const taxButton = document.getElementById('sale-tax-bill');
+if (taxButton) {
+  const bills = setupTaxBills({
+    showReceipt(result) {
+      window.open(result.receipt_url + '?print=1', '_blank');
+    },
+  });
+  taxButton.addEventListener('click', () =>
+    bills.open({
+      invoice: taxButton.dataset.invoice,
+      receipt_url: taxButton.dataset.receiptUrl,
+      tax_context_url: taxButton.dataset.contextUrl,
+      tax_store_url: taxButton.dataset.storeUrl,
+    }),
+  );
 }
