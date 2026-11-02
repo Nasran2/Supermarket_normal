@@ -317,4 +317,3 @@ Route::get('/migrate', function () {
         return response('<pre style="background:#111;color:#f33;padding:20px;font-family:monospace;border-radius:8px;">Error: ' . e($e->getMessage()) . "\n\n" . e($e->getTraceAsString()) . '</pre>', 500);
     }
 })->withoutMiddleware([\App\Http\Middleware\DemoMode::class]);
-
