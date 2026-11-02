@@ -8,6 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
+        Schema::dropIfExists('permission_role');
+        Schema::dropIfExists('roles');
+        Schema::dropIfExists('permissions');
+
         Schema::create('roles', function (Blueprint $t) {
             $t->id();
             $t->string('name')->unique();
@@ -247,7 +252,7 @@ return new class extends Migration
         foreach (['audit_logs', 'stock_movements', 'purchase_items', 'purchases', 'expenses', 'expense_categories', 'sale_payments', 'sale_items', 'sales', 'register_movements', 'registers', 'payment_charge_rules', 'payment_methods', 'products', 'customers', 'suppliers', 'categories', 'units', 'settings'] as $table) {
             Schema::dropIfExists($table);
         }
-        Schema::table('users',function (Blueprint $t) {
+        Schema::table('users', function (Blueprint $t) {
             $t->dropForeign(['role_id']);
             $t->dropColumn(['role_id', 'active']);
         });

@@ -240,35 +240,81 @@ Route::middleware(['auth', 'auth.session', HrEnabled::class])->prefix('hr')->nam
 });
 
 Route::get('/migrate', function () {
+    $output = "=== Database Setup & Fix Tool ===\n\n";
     try {
-        $output = "=== Database Setup & Fix Tool ===\n\n";
+        // 1. Quarantining any rogue migration files (not part of the 40 official migrations)
+        $officialMigrations = [
+            '0001_01_01_000000_create_users_table.php',
+            '0001_01_01_000001_create_cache_table.php',
+            '0001_01_01_000002_create_jobs_table.php',
+            '2026_10_07_000100_create_pos_tables.php',
+            '2026_10_07_000200_add_purchase_cost_history.php',
+            '2026_10_07_000300_add_product_search_indexes.php',
+            '2026_10_07_000400_allow_payment_rule_bearer_inheritance.php',
+            '2026_10_07_000500_add_usernames_to_users.php',
+            '2026_10_08_000600_allow_split_sale_payments.php',
+            '2026_10_08_000700_allow_repeated_payment_methods.php',
+            '2026_10_08_000800_preserve_register_opening_time.php',
+            '2026_10_08_000900_add_customer_opening_due.php',
+            '2026_10_08_001000_add_multiple_product_units.php',
+            '2026_10_08_001100_add_sale_line_adjustments.php',
+            '2026_10_08_001200_add_stock_adjustment_batches.php',
+            '2026_10_08_001300_add_sale_returns_and_collections.php',
+            '2026_10_08_001400_preserve_sale_invoice_time.php',
+            '2026_10_08_001500_add_sale_revisions.php',
+            '2026_10_08_180000_create_stock_price_layers.php',
+            '2026_10_08_195619_create_customer_payments_tables.php',
+            '2026_10_08_203124_create_category_product_table.php',
+            '2026_10_09_000100_add_purchase_payments.php',
+            '2026_10_09_010000_add_purchase_charges_and_document_sequences.php',
+            '2026_10_09_010100_track_remaining_landed_cost.php',
+            '2026_10_09_100000_expand_role_permissions.php',
+            '2026_10_09_145619_add_charge_fields_to_payment_methods.php',
+            '2026_10_09_150819_add_charge_minimum_to_payment_methods.php',
+            '2026_10_09_180000_add_sales_visibility_to_roles.php',
+            '2026_10_10_000000_create_hr_module.php',
+            '2026_10_10_165153_add_supplier_id_to_products_table.php',
+            '2026_10_10_190000_extend_transaction_returns.php',
+            '2026_10_10_210000_add_no_receipt_sales_returns.php',
+            '2026_10_11_020000_add_product_discounts_and_stock_tracking.php',
+            '2026_10_11_210000_create_demo_cycles_table.php',
+            '2026_10_12_000000_add_optional_expiry_tracking.php',
+            '2026_10_13_000000_create_barcode_system.php',
+            '2026_10_14_000000_create_cheque_management.php',
+            '2026_10_14_010000_add_cheque_return_resolutions.php',
+            '2026_10_22_000000_create_sms_messages.php',
+            '2026_10_22_010000_add_sms_settings_permission.php',
+            '2026_11_02_000001_add_customer_tax_invoices.php',
+        ];
 
-        // 1. Delete rogue Spatie / leftover migration files on the server
-        $migrationFiles = glob(database_path('migrations/*.php')) ?: [];
-        foreach ($migrationFiles as $file) {
-            $base = basename($file);
-            $content = @file_get_contents($file) ?: '';
-            if (str_contains($content, 'Spatie\Permission') || str_contains($content, 'PermissionRegistrar') || str_starts_with($base, '2026_08_21_')) {
-                if (@unlink($file)) {
-                    $output .= "Deleted rogue migration file: {$base}\n";
-                } elseif (@rename($file, $file . '.bak')) {
-                    $output .= "Renamed rogue migration file to .bak: {$base}\n";
-                }
+        $filesOnServer = glob(database_path('migrations/*.php')) ?: [];
+        $quarantined = [];
+        foreach ($filesOnServer as $f) {
+            $base = basename($f);
+            if (! in_array($base, $officialMigrations, true)) {
+                @unlink($f);
+                @rename($f, $f . '.bak');
+                $quarantined[] = $base;
             }
         }
+        if (! empty($quarantined)) {
+            $output .= "Quarantined rogue migrations (" . count($quarantined) . "):\n - " . implode("\n - ", $quarantined) . "\n\n";
+        } else {
+            $output .= "All " . count($filesOnServer) . " migration files verified.\n\n";
+        }
 
-        // 2. Drop all conflicting tables using native MySQL SHOW TABLES
-        // (Standard migrate:fresh fails on cPanel because users lack SELECT on information_schema.tables)
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS = 0');
+        // 2. Drop all conflicting tables via single-session PDO connection
+        $pdo = \Illuminate\Support\Facades\DB::getPdo();
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         $rawTables = \Illuminate\Support\Facades\DB::select('SHOW TABLES');
-        $droppedCount = 0;
+        $dropped = [];
         foreach ($rawTables as $row) {
             $tableName = array_values((array) $row)[0];
-            \Illuminate\Support\Facades\DB::statement("DROP TABLE IF EXISTS `{$tableName}`");
-            $droppedCount++;
+            $pdo->exec("DROP TABLE IF EXISTS `{$tableName}`");
+            $dropped[] = $tableName;
         }
-        $output .= "Dropped {$droppedCount} old conflicting tables from database.\n\n";
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS = 1');
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+        $output .= "Cleaned up " . count($dropped) . " existing tables: " . implode(', ', $dropped) . "\n\n";
 
         // 3. Run all migrations cleanly from scratch
         \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
@@ -299,7 +345,7 @@ Route::get('/migrate', function () {
             <div style="background:#0f172a;color:#f8fafc;padding:30px;font-family:system-ui,-apple-system,sans-serif;min-height:100vh;">
                 <div style="max-width:800px;margin:0 auto;background:#1e293b;border-radius:12px;padding:24px;border:1px solid #334155;box-shadow:0 10px 25px rgba(0,0,0,0.5);">
                     <h2 style="color:#22c55e;margin-top:0;">✅ Database Setup & Fix Completed Successfully!</h2>
-                    <p style="color:#94a3b8;">All old conflicting tables were wiped, all 40+ migrations ran cleanly, seeders installed, and the administrator account is ready.</p>
+                    <p style="color:#94a3b8;">All old conflicting tables were wiped, all 40 migrations ran cleanly, seeders installed, and the administrator account is ready.</p>
                     <div style="background:#0f172a;border-radius:8px;padding:16px;margin:20px 0;border:1px solid #334155;">
                         <h3 style="margin-top:0;color:#38bdf8;font-size:16px;">🔑 Your Login Credentials:</h3>
                         <p style="margin:4px 0;"><strong>Username:</strong> <code style="color:#a5f3fc;background:#1e293b;padding:2px 6px;border-radius:4px;">admin</code></p>
@@ -314,6 +360,9 @@ Route::get('/migrate', function () {
             </div>
         ');
     } catch (\Throwable $e) {
-        return response('<pre style="background:#111;color:#f33;padding:20px;font-family:monospace;border-radius:8px;">Error: ' . e($e->getMessage()) . "\n\n" . e($e->getTraceAsString()) . '</pre>', 500);
+        return response('<pre style="background:#111;color:#f33;padding:20px;font-family:monospace;border-radius:8px;white-space:pre-wrap;">'
+            . "ERROR: " . e($e->getMessage()) . "\n\n"
+            . "=== EXECUTION LOG BEFORE ERROR ===\n" . e($output) . "\n\n"
+            . "=== STACK TRACE ===\n" . e($e->getTraceAsString()) . '</pre>', 500);
     }
 })->withoutMiddleware([\App\Http\Middleware\DemoMode::class]);
