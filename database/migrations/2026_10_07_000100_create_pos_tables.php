@@ -12,6 +12,7 @@ return new class extends Migration
         Schema::dropIfExists('permission_role');
         Schema::dropIfExists('roles');
         Schema::dropIfExists('permissions');
+        Schema::enableForeignKeyConstraints();
 
         Schema::create('roles', function (Blueprint $t) {
             $t->id();

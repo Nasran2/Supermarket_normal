@@ -365,7 +365,13 @@ Route::get('/migrate', function () {
             . "=== EXECUTION LOG BEFORE ERROR ===\n" . e($output) . "\n\n"
             . "=== STACK TRACE ===\n" . e($e->getTraceAsString()) . '</pre>', 500);
     }
-})->withoutMiddleware([\App\Http\Middleware\DemoMode::class]);
+})->withoutMiddleware([
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
+    \App\Http\Middleware\DemoMode::class,
+    \App\Http\Middleware\BusinessContext::class,
+]);
 
 Route::get('/seeder', function (\Illuminate\Http\Request $request) {
     $output = "=== Database Seeder Execution ===\n\n";
@@ -480,7 +486,13 @@ Route::get('/seeder', function (\Illuminate\Http\Request $request) {
             . "=== EXECUTION LOG BEFORE ERROR ===\n" . e($output) . "\n\n"
             . "=== STACK TRACE ===\n" . e($e->getTraceAsString()) . '</pre>', 500);
     }
-})->withoutMiddleware([\App\Http\Middleware\DemoMode::class]);
+})->withoutMiddleware([
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
+    \App\Http\Middleware\DemoMode::class,
+    \App\Http\Middleware\BusinessContext::class,
+]);
 
 Route::get('/seed', function (\Illuminate\Http\Request $r) {
     $query = $r->getQueryString() ? '?' . $r->getQueryString() : '';

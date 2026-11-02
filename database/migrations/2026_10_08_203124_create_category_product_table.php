@@ -30,10 +30,17 @@ return new class extends Migration
             DB::table('category_product')->insert($inserts);
         });
 
-        Schema::table('products', function (Blueprint $table) {
-            $table->dropForeign(['category_id']);
-            $table->dropColumn('category_id');
-        });
+        try {
+            DB::statement('ALTER TABLE `products` DROP FOREIGN KEY `products_category_id_foreign`');
+        } catch (\Throwable) {
+            // Foreign key may not exist or was already removed
+        }
+
+        if (Schema::hasColumn('products', 'category_id')) {
+            Schema::table('products', function (Blueprint $table) {
+                $table->dropColumn('category_id');
+            });
+        }
     }
 
     public function down(): void
