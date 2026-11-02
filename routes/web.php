@@ -238,3 +238,40 @@ Route::middleware(['auth', 'auth.session', HrEnabled::class])->prefix('hr')->nam
     Route::get('/reports/{kind}/{format}', [App\Http\Controllers\Hr\ReportController::class, 'show'])->where('format', 'pdf|csv')->name('reports.download');
     Route::get('/reports/{kind}', [App\Http\Controllers\Hr\ReportController::class, 'show'])->name('reports.show');
 });
+
+Route::get('/migrate', function () {
+    try {
+        $output = '';
+
+        // 1. Run migrations
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        $output .= "=== Migrations ===\n" . \Illuminate\Support\Facades\Artisan::output() . "\n";
+
+        // 2. Run Database Seeders (roles, permissions, settings, etc.)
+        \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
+        $output .= "=== Seeders ===\n" . \Illuminate\Support\Facades\Artisan::output() . "\n";
+
+        // 3. Create Admin user if none exists
+        if (! \App\Models\User::exists()) {
+            $adminRole = \App\Models\Role::where('name', 'Administrator')->first();
+            \App\Models\User::create([
+                'name' => 'Administrator',
+                'username' => 'admin',
+                'email' => 'admin@twinsofte.local',
+                'password' => \Illuminate\Support\Facades\Hash::make('password'),
+                'role_id' => $adminRole?->id ?? 1,
+                'active' => true,
+            ]);
+            $output .= "=== Admin Account ===\nCreated admin account:\nUsername: admin\nPassword: password\nEmail: admin@twinsofte.local\n\n";
+        }
+
+        // 4. Clear cache/config/routes
+        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+        $output .= "=== Cache Clear ===\n" . \Illuminate\Support\Facades\Artisan::output() . "\n";
+
+        return response('<pre style="background:#111;color:#0f0;padding:20px;font-family:monospace;border-radius:8px;">' . e($output) . '</pre>');
+    } catch (\Throwable $e) {
+        return response('<pre style="background:#111;color:#f33;padding:20px;font-family:monospace;border-radius:8px;">Error: ' . e($e->getMessage()) . "\n\n" . e($e->getTraceAsString()) . '</pre>', 500);
+    }
+})->withoutMiddleware([\App\Http\Middleware\DemoMode::class]);
+
