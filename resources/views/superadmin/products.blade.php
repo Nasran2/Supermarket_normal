@@ -4,8 +4,9 @@
 
 @section('content')
 @php
-    $settings = app(\App\Services\SettingsService::class)->all();
-    $currency = $settings['currency_symbol'] ?? 'Rs.';
+$settings = app(\App\Services\SettingsService::class)->all();
+$currency = $settings['currency_symbol'] ?? 'Rs.';
+
 @endphp
 
 <div class="page-heading">
@@ -16,7 +17,7 @@
     </div>
     <div style="display:flex;gap:0.75rem;align-items:center;">
         <a href="{{ route('superadmin.controls') }}" class="btn secondary">
-            <x-icon name="sliders-horizontal"/>
+            <x-icon name="sliders-horizontal" />
             Controls ({{ $percentage }}%)
         </a>
     </div>
@@ -47,7 +48,7 @@
             <p>{{ $products->total() }} products found</p>
         </div>
         <span class="secret-badge">
-            <x-icon name="shield-check" :size="14"/>
+            <x-icon name="shield-check" :size="14" />
             Super Admin View (Real 100%)
         </span>
     </div>
@@ -56,7 +57,7 @@
         <label class="field">
             Search product or SKU
             <div class="search-field">
-                <x-icon name="search"/>
+                <x-icon name="search" />
                 <input type="search" name="q" value="{{ request('q') }}" placeholder="Product name, barcode or SKU">
             </div>
         </label>
@@ -79,32 +80,32 @@
             </thead>
             <tbody>
                 @forelse($products as $p)
-                    <tr>
-                        <td>
-                            <strong>{{ $p->name }}</strong>
-                            <small class="cell-note">{{ $p->sku }}</small>
-                        </td>
-                        <td>{{ $p->categories->pluck('name')->join(', ') ?: 'General' }}</td>
-                        <td>
-                            <strong>{{ (float)$p->stock }} {{ $p->unit?->short_name }}</strong>
-                        </td>
-                        <td class="text-right">
-                            <strong>{{ $currency }} {{ \App\Support\Money::display($p->cost) }}</strong>
-                        </td>
-                        <td class="text-right">
-                            <strong>{{ $currency }} {{ \App\Support\Money::display($p->price) }}</strong>
-                        </td>
-                        <td class="text-right" style="color:#4f46e5;font-weight:600;">
-                            {{ $currency }} {{ \App\Support\Money::display((float)$p->price * ($pricePercentage/100)) }}
-                        </td>
-                        <td class="text-right" style="color:#4f46e5;font-weight:600;">
-                            {{ $currency }} {{ \App\Support\Money::display((float)$p->cost * ($percentage/100)) }}
-                        </td>
-                    </tr>
+                <tr>
+                    <td>
+                        <strong>{{ $p->name }}</strong>
+                        <small class="cell-note">{{ $p->sku }}</small>
+                    </td>
+                    <td>{{ $p->categories->pluck('name')->join(', ') ?: 'General' }}</td>
+                    <td>
+                        <strong>{{ (float)$p->stock }} {{ $p->unit?->short_name }}</strong>
+                    </td>
+                    <td class="text-right">
+                        <strong>{{ $currency }} {{ \App\Support\Money::display($p->cost) }}</strong>
+                    </td>
+                    <td class="text-right">
+                        <strong>{{ $currency }} {{ \App\Support\Money::display($p->price) }}</strong>
+                    </td>
+                    <td class="text-right" style="color:#4f46e5;font-weight:600;">
+                        {{ $currency }} {{ \App\Support\Money::display((float)$p->price * ($pricePercentage/100)) }}
+                    </td>
+                    <td class="text-right" style="color:#4f46e5;font-weight:600;">
+                        {{ $currency }} {{ \App\Support\Money::display((float)$p->cost * ($percentage/100)) }}
+                    </td>
+                </tr>
                 @empty
-                    <tr>
-                        <td colspan="7" class="empty-cell">No products found.</td>
-                    </tr>
+                <tr>
+                    <td colspan="7" class="empty-cell">No products found.</td>
+                </tr>
                 @endforelse
             </tbody>
         </table>
@@ -113,4 +114,3 @@
     <div class="pagination">{{ $products->links() }}</div>
 </section>
 @endsection
-
