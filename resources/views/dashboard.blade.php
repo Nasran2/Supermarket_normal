@@ -2,10 +2,10 @@
 @section('title','Dashboard')
 @section('content')
 @php
-    $periodLabels = ['today' => 'day', 'yesterday' => 'day', 'this_week' => 'week', 'last_week' => 'week', 'this_month' => 'month', 'last_month' => 'month', 'this_year' => 'year', 'last_year' => 'year', 'custom' => 'period'];
-    $periodText = $periodLabels[$period] ?? 'day';
-    $dateDisplay = \Carbon\Carbon::parse($from)->format('d M Y');
-    if ($from !== $to) $dateDisplay .= ' - ' . \Carbon\Carbon::parse($to)->format('d M Y');
+$periodLabels = ['today' => 'day', 'yesterday' => 'day', 'this_week' => 'week', 'last_week' => 'week', 'this_month' => 'month', 'last_month' => 'month', 'this_year' => 'year', 'last_year' => 'year', 'custom' => 'period'];
+$periodText = $periodLabels[$period] ?? 'day';
+$dateDisplay = \Carbon\Carbon::parse($from)->format('d M Y');
+if ($from !== $to) $dateDisplay .= ' - ' . \Carbon\Carbon::parse($to)->format('d M Y');
 @endphp
 <div class="page-heading">
     <div>
@@ -16,15 +16,15 @@
     <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
         <form method="GET" id="dashboard-filter-form" style="display:flex; gap:0.5rem; align-items:center; background:var(--card-bg); padding:0.25rem 0.5rem; border-radius:var(--radius-md); border:1px solid var(--border);">
             <select name="period" onchange="if(this.value !== 'custom') this.form.submit(); else document.getElementById('custom-dates').style.display='flex';" style="background:transparent; border:none; outline:none; cursor:pointer; font-size:0.875rem;">
-                <option value="today" @selected($period === 'today')>Today</option>
-                <option value="yesterday" @selected($period === 'yesterday')>Yesterday</option>
-                <option value="this_week" @selected($period === 'this_week')>This week</option>
-                <option value="last_week" @selected($period === 'last_week')>Last week</option>
-                <option value="this_month" @selected($period === 'this_month')>This month</option>
-                <option value="last_month" @selected($period === 'last_month')>Last month</option>
-                <option value="this_year" @selected($period === 'this_year')>This year</option>
-                <option value="last_year" @selected($period === 'last_year')>Last year</option>
-                <option value="custom" @selected($period === 'custom')>Custom dates...</option>
+                <option value="today" @selected($period==='today' )>Today</option>
+                <option value="yesterday" @selected($period==='yesterday' )>Yesterday</option>
+                <option value="this_week" @selected($period==='this_week' )>This week</option>
+                <option value="last_week" @selected($period==='last_week' )>Last week</option>
+                <option value="this_month" @selected($period==='this_month' )>This month</option>
+                <option value="last_month" @selected($period==='last_month' )>Last month</option>
+                <option value="this_year" @selected($period==='this_year' )>This year</option>
+                <option value="last_year" @selected($period==='last_year' )>Last year</option>
+                <option value="custom" @selected($period==='custom' )>Custom dates...</option>
             </select>
             <div id="custom-dates" style="display: {{ $period === 'custom' ? 'flex' : 'none' }}; gap:0.5rem; align-items:center; padding-left:0.5rem; border-left:1px solid var(--border);">
                 <input type="date" name="from" value="{{ $from }}" max="{{ today()->toDateString() }}" style="border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.1rem 0.25rem; font-size:0.875rem;">
@@ -33,39 +33,137 @@
             </div>
             @if(request('chart_days')) <input type="hidden" name="chart_days" value="{{ request('chart_days') }}"> @endif
         </form>
-        @can('pos.access')<a class="btn primary" href="{{ route('pos.index') }}"><x-icon name="scan-line"/>Open POS</a>@endcan
+        @can('pos.access')<a class="btn primary" href="{{ route('pos.index') }}"><x-icon name="scan-line" />Open POS</a>@endcan
     </div>
 </div>
-<x-sales-visibility-note/>
+<x-sales-visibility-note />
 @if(!\App\Support\SecretControl::isHidden('hide_top_summary'))
 <div class="stat-grid">
-@foreach([['Sales',$summary['revenue'],'sales','shopping-bag','green'],['Profit',$summary['net'],'profit','trending-up','blue'],['Expenses',$summary['expenses'],'expenses','wallet','amber'],['Transactions',$transactions,'sales','receipt-text','purple']] as [$label,$value,$report,$icon,$color])
-@if(($label!=='Profit' || !\App\Support\SecretControl::isHidden('hide_profit')) && ($label!=='Sales' || !\App\Support\SecretControl::isHidden('hide_sales_value')) && auth()->user()->hasPermission('dashboard.'.($label==='Transactions'?'transactions':$report)) && ($report!=='profit' || auth()->user()->hasPermission('products.view_cost')))
-@php($cardUrl=auth()->user()->hasPermission('reports.'.$report)?route('reports.show',['report'=>$report,'from'=>$from,'to'=>$to]):($report==='sales' && auth()->user()->hasPermission('sales.view')?route('sales.index',['from'=>$from,'to'=>$to]):null)) @if($cardUrl)<a class="card stat-card" href="{{ $cardUrl }}">@else<div class="card stat-card">@endif<div class="stat-top"><span>{{ $label }}</span><span class="stat-icon {{ $color }}"><x-icon :name="$icon"/></span></div><strong>{{ $report==='sales' && $label==='Transactions'?$value:($settings['currency_symbol']??'Rs.').' '.\App\Support\Money::display($value) }}</strong><small>{{ $label==='Profit'?'After cost and expenses':'From real transactions' }}</small>@if($cardUrl)</a>@else</div>@endif @endif @endforeach</div>
+    @foreach([['Sales',$summary['revenue'],'sales','shopping-bag','green'],['Profit',$summary['net'],'profit','trending-up','blue'],['Expenses',$summary['expenses'],'expenses','wallet','amber'],['Transactions',$transactions,'sales','receipt-text','purple']] as [$label,$value,$report,$icon,$color])
+    @if(($label!=='Profit' || !\App\Support\SecretControl::isHidden('hide_profit')) && ($label!=='Sales' || !\App\Support\SecretControl::isHidden('hide_sales_value')) && auth()->user()->hasPermission('dashboard.'.($label==='Transactions'?'transactions':$report)) && ($report!=='profit' || auth()->user()->hasPermission('products.view_cost')))
+    @php($cardUrl=auth()->user()->hasPermission('reports.'.$report)?route('reports.show',['report'=>$report,'from'=>$from,'to'=>$to]):($report==='sales' && auth()->user()->hasPermission('sales.view')?route('sales.index',['from'=>$from,'to'=>$to]):null)) @if($cardUrl)<a class="card stat-card" href="{{ $cardUrl }}">@else<div class="card stat-card">@endif<div class="stat-top"><span>{{ $label }}</span><span class="stat-icon {{ $color }}"><x-icon :name="$icon" /></span></div><strong>{{ $report==='sales' && $label==='Transactions'?$value:($settings['currency_symbol']??'Rs.').' '.\App\Support\Money::display($value) }}</strong><small>{{ $label==='Profit'?'After cost and expenses':'From real transactions' }}</small>@if($cardUrl)</a>@else</div>@endif @endif @endforeach</div>
 @endif
 @if(!\App\Support\SecretControl::isHidden('hide_small_widgets'))
-@can('dashboard.collections')<div class="payment-strip card"><span class="payment-strip-title"><x-icon name="credit-card"/> Collections</span>@forelse($payments as $p)@can('reports.payments')<a href="{{ route('reports.show',['report'=>'payments','from'=>$from,'to'=>$to,'payment_method_id'=>$p->payment_method_id]) }}">@else<div class="payment-readonly">@endcan<span>{{ $p->method_name }}</span><strong>{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($p->collections) }}</strong>@can('reports.payments')</a>@else</div>@endcan @empty<span class="muted">No collections in this period.</span>@endforelse</div>@endcan
+@can('dashboard.collections')<div class="payment-strip card"><span class="payment-strip-title"><x-icon name="credit-card" /> Collections</span>@forelse($payments as $p)@can('reports.payments')<a href="{{ route('reports.show',['report'=>'payments','from'=>$from,'to'=>$to,'payment_method_id'=>$p->payment_method_id]) }}">@else<div class="payment-readonly">@endcan<span>{{ $p->method_name }}</span><strong>{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($p->collections) }}</strong>@can('reports.payments')</a>@else</div>@endcan @empty<span class="muted">No collections in this period.</span>@endforelse</div>@endcan
 @endif
-@can('cheques.dashboard')@if(\App\Support\Cheques::setting('cheque_dashboard') && $chequeAlerts->isNotEmpty())<section class="card cheque-card cheque-due-alert"><div class="card-heading"><h2><x-icon name="circle-alert" :size="22"/>Cheques Due Soon</h2>@can('cheques.view')<a class="text-link" href="{{ route('cheques.tab','due-soon') }}">View all →</a>@endcan</div>@include('cheques.table',['rows'=>$chequeAlerts])</section>@endif @endcan
-<div class="dashboard-grid">@if(!\App\Support\SecretControl::isHidden('hide_charts'))@can('dashboard.sales_overview')<section class="card chart-card"><div class="card-heading"><div><h2>Sales overview</h2><p>Daily revenue after returns</p></div><div class="segmented"><a href="{{ request()->fullUrlWithQuery(['chart_days'=>7]) }}" class="{{ $days===7?'selected':'' }}">7 days</a><a href="{{ request()->fullUrlWithQuery(['chart_days'=>30]) }}" class="{{ $days===30?'selected':'' }}">30 days</a></div></div>@php($max=max(1,...array_map(fn($d)=>abs((float)$d['amount']),$overview)))<div class="bar-chart" role="img" aria-label="Daily sales for the last {{ $days }} days">@foreach($overview as $day)<div class="bar-column" title="{{ $day['label'] }}: {{ \App\Support\Money::display($day['amount']) }}"><div class="bar-track"><div class="bar" style="height:{{ abs((float)$day['amount'])/$max*100 }}%;{{ (float)$day['amount']<0?'background:#c24646':'' }}"></div></div><span>{{ $loop->index%($days===30?5:1)===0?$day['label']:'' }}</span></div>@endforeach</div>@if(array_sum(array_column($overview,'amount'))==0)<p class="chart-note">Net sales are zero for this period.</p>@endif</section>@endcan @endif
-@if(!\App\Support\SecretControl::isHidden('hide_small_widgets'))
-@can('dashboard.register')<section class="card"><div class="card-heading"><div><h2>Register status</h2><p>Your current shift</p></div><x-icon name="wallet"/></div><div class="register-widget"><span class="large-status {{ $register?'green':'slate' }}"><span class="status-dot"></span> {{ $register?'Register is open':'Register is closed' }}</span><p>{{ $register?'Opened '.$register->opened_at->format('h:i A'):'Open a register to start selling.' }}</p>@if($register)<dl><dt>Opening cash</dt><dd>{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($register->opening_cash) }}</dd></dl>@endif @can('register.view')<a class="btn secondary w-full" href="{{ route('register.index') }}">{{ $register?'Manage register':'Open register' }}<x-icon name="arrow-right"/></a>@endcan</div></section>@endcan
-@endif
-@if(!\App\Support\SecretControl::isHidden('hide_tables'))@can('dashboard.recent_sales')<section class="card"><div class="card-heading"><h2>Recent sales</h2>@can('sales.view')<a class="text-link" href="{{ route('sales.index') }}">View all<x-icon name="arrow-right" :size="14"/></a>@endcan</div><div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Cashier</th><th>Payment</th><th class="text-right">Amount</th></tr></thead><tbody>@forelse($recentSales as $sale)<tr><td>@can('sales.view')<a class="text-link" href="{{ route('sales.show',$sale) }}">{{ $sale->invoice }}</a>@else {{ $sale->invoice }} @endcan<small class="cell-note">{{ $sale->sold_at->format('d M, h:i A') }} · {{ $sale->status }}</small></td><td>{{ $sale->user->name }}</td><td><span class="badge slate">{{ $sale->payment_names }}</span></td><td class="text-right font-semibold">{{ \App\Support\Money::display($sale->customer_payable) }}</td></tr>@empty<tr><td colspan="4" class="empty-cell">No sales yet. Your first sale will appear here.</td></tr>@endforelse</tbody></table></div></section>@endcan @endif
-@if(!\App\Support\SecretControl::isHidden('hide_small_widgets'))
-@can('dashboard.low_stock')<section class="card"><div class="card-heading"><h2>Low stock</h2>@can('products.view')<a class="text-link" href="{{ route('manage.index',['resource'=>'products','low_stock'=>1]) }}">Review <x-icon name="arrow-right" :size="14"/></a>@endcan</div><div class="widget-list">@forelse($lowStock as $p)<div><span class="list-icon amber"><x-icon name="package"/></span><span><strong>{{ $p->name }}</strong><small>Alert below {{ \App\Support\Units::quantity($p->low_stock, $p->unit->short_name) }}</small></span><span class="badge amber">{{ \App\Support\Units::quantity(rtrim(rtrim($p->stock,'0'),'.'), $p->unit->short_name) }}</span></div>@empty<p class="empty-cell">No low stock alerts.</p>@endforelse</div></section>@endcan
-@endif
-@if(!\App\Support\SecretControl::isHidden('hide_tables') && !\App\Support\SecretControl::isHidden('hide_small_widgets'))
-@can('dashboard.top_products')<section class="card"><div class="card-heading"><h2>Original product sales</h2><span class="muted text-sm">Last {{ $days }} days</span></div><div class="widget-list">@forelse($topProducts as $p)<div><span class="rank">{{ $loop->iteration }}</span><span><strong>{{ $p->name }}</strong><small>{{ \App\Support\Units::quantity($p->quantity, $p->unit) }} sold before returns</small></span><strong>{{ \App\Support\Money::display($p->total) }}</strong></div>@empty<p class="empty-cell">No product sales yet.</p>@endforelse</div></section>@endcan
-@endif
-@if(!\App\Support\SecretControl::isHidden('hide_small_widgets'))
-@can('dashboard.recent_expenses')<section class="card"><div class="card-heading"><h2>Recent expenses</h2>@can('expenses.view')<a class="text-link" href="{{ route('manage.index','expenses') }}">View all<x-icon name="arrow-right" :size="14"/></a>@endcan</div><div class="widget-list">@forelse($recentExpenses as $e)<div><span class="list-icon slate"><x-icon name="circle-dollar-sign"/></span><span><strong>{{ $e->category->name }}</strong><small>{{ $e->expense_date->format('d M') }} · {{ $e->reference??'EXP-'.$e->id }}</small></span><strong>{{ \App\Support\Money::display($e->amount) }}</strong></div>@empty<p class="empty-cell">No expenses recorded.</p>@endforelse</div></section>@endcan
-@endif
+@can('cheques.dashboard')@if(\App\Support\Cheques::setting('cheque_dashboard') && $chequeAlerts->isNotEmpty())<section class="card cheque-card cheque-due-alert">
+    <div class="card-heading">
+        <h2><x-icon name="circle-alert" :size="22" />Cheques Due Soon</h2>@can('cheques.view')<a class="text-link" href="{{ route('cheques.tab','due-soon') }}">View all →</a>@endcan
+    </div>@include('cheques.table',['rows'=>$chequeAlerts])
+</section>@endif @endcan
+<div class="dashboard-grid">@if(!\App\Support\SecretControl::isHidden('hide_charts'))@can('dashboard.sales_overview')<section class="card chart-card">
+        <div class="card-heading">
+            <div>
+                <h2>Sales overview</h2>
+                <p>Daily revenue after returns</p>
+            </div>
+            <div class="segmented"><a href="{{ request()->fullUrlWithQuery(['chart_days'=>7]) }}" class="{{ $days===7?'selected':'' }}">7 days</a><a href="{{ request()->fullUrlWithQuery(['chart_days'=>30]) }}" class="{{ $days===30?'selected':'' }}">30 days</a></div>
+        </div>@php($max=max(1,...array_map(fn($d)=>abs((float)$d['amount']),$overview)))<div class="bar-chart" role="img" aria-label="Daily sales for the last {{ $days }} days">@foreach($overview as $day)<div class="bar-column" title="{{ $day['label'] }}: {{ \App\Support\Money::display($day['amount']) }}">
+                <div class="bar-track">
+                    <div class="bar" style="height:{{ abs((float)$day['amount'])/$max*100 }}%;{{ (float)$day['amount']<0?'background:#c24646':'' }}"></div>
+                </div><span>{{ $loop->index%($days===30?5:1)===0?$day['label']:'' }}</span>
+            </div>@endforeach</div>@if(array_sum(array_column($overview,'amount'))==0)<p class="chart-note">Net sales are zero for this period.</p>@endif
+    </section>@endcan @endif
+    @if(!\App\Support\SecretControl::isHidden('hide_small_widgets'))
+    @can('dashboard.register')<section class="card">
+        <div class="card-heading">
+            <div>
+                <h2>Register status</h2>
+                <p>Your current shift</p>
+            </div><x-icon name="wallet" />
+        </div>
+        <div class="register-widget"><span class="large-status {{ $register?'green':'slate' }}"><span class="status-dot"></span> {{ $register?'Register is open':'Register is closed' }}</span>
+            <p>{{ $register?'Opened '.$register->opened_at->format('h:i A'):'Open a register to start selling.' }}</p>@if($register)<dl>
+                <dt>Opening cash</dt>
+                <dd>{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($register->opening_cash) }}</dd>
+            </dl>@endif @can('register.view')<a class="btn secondary w-full" href="{{ route('register.index') }}">{{ $register?'Manage register':'Open register' }}<x-icon name="arrow-right" /></a>@endcan
+        </div>
+    </section>@endcan
+    @endif
+    @if(!\App\Support\SecretControl::isHidden('hide_tables'))@can('dashboard.recent_sales')<section class="card">
+        <div class="card-heading">
+            <h2>Recent sales</h2>@can('sales.view')<a class="text-link" href="{{ route('sales.index') }}">View all<x-icon name="arrow-right" :size="14" /></a>@endcan
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Invoice</th>
+                        <th>Cashier</th>
+                        <th>Payment</th>
+                        <th class="text-right">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>@forelse($recentSales as $sale)<tr>
+                        <td>@can('sales.view')<a class="text-link" href="{{ route('sales.show',$sale) }}">{{ $sale->invoice }}</a>@else {{ $sale->invoice }} @endcan<small class="cell-note">{{ $sale->sold_at->format('d M, h:i A') }} · {{ $sale->status }}</small></td>
+                        <td>{{ $sale->user->name }}</td>
+                        <td><span class="badge slate">{{ $sale->payment_names }}</span></td>
+                        <td class="text-right font-semibold">{{ \App\Support\Money::display($sale->customer_payable) }}</td>
+                    </tr>@empty<tr>
+                        <td colspan="4" class="empty-cell">No sales yet. Your first sale will appear here.</td>
+                    </tr>@endforelse</tbody>
+            </table>
+        </div>
+    </section>@endcan @endif
+    @if(!\App\Support\SecretControl::isHidden('hide_small_widgets'))
+    @can('dashboard.low_stock')<section class="card">
+        <div class="card-heading">
+            <h2>Low stock</h2>@can('products.view')<a class="text-link" href="{{ route('manage.index',['resource'=>'products','low_stock'=>1]) }}">Review <x-icon name="arrow-right" :size="14" /></a>@endcan
+        </div>
+        <div class="widget-list">@forelse($lowStock as $p)<div><span class="list-icon amber"><x-icon name="package" /></span><span><strong>{{ $p->name }}</strong><small>Alert below {{ \App\Support\Units::quantity($p->low_stock, $p->unit->short_name) }}</small></span><span class="badge amber">{{ \App\Support\Units::quantity(rtrim(rtrim($p->stock,'0'),'.'), $p->unit->short_name) }}</span></div>@empty<p class="empty-cell">No low stock alerts.</p>@endforelse</div>
+    </section>@endcan
+    @endif
+    @if(!\App\Support\SecretControl::isHidden('hide_tables') && !\App\Support\SecretControl::isHidden('hide_small_widgets'))
+    @can('dashboard.top_products')<section class="card">
+        <div class="card-heading">
+            <h2>Original product sales</h2><span class="muted text-sm">Last {{ $days }} days</span>
+        </div>
+        <div class="widget-list">@forelse($topProducts as $p)<div><span class="rank">{{ $loop->iteration }}</span><span><strong>{{ $p->name }}</strong><small>{{ \App\Support\Units::quantity($p->quantity, $p->unit) }} sold before returns</small></span><strong>{{ \App\Support\Money::display($p->total) }}</strong></div>@empty<p class="empty-cell">No product sales yet.</p>@endforelse</div>
+    </section>@endcan
+    @endif
+    @if(!\App\Support\SecretControl::isHidden('hide_small_widgets'))
+    @can('dashboard.recent_expenses')<section class="card">
+        <div class="card-heading">
+            <h2>Recent expenses</h2>@can('expenses.view')<a class="text-link" href="{{ route('manage.index','expenses') }}">View all<x-icon name="arrow-right" :size="14" /></a>@endcan
+        </div>
+        <div class="widget-list">@forelse($recentExpenses as $e)<div><span class="list-icon slate"><x-icon name="circle-dollar-sign" /></span><span><strong>{{ $e->category->name }}</strong><small>{{ $e->expense_date->format('d M') }} · {{ $e->reference??'EXP-'.$e->id }}</small></span><strong>{{ \App\Support\Money::display($e->amount) }}</strong></div>@empty<p class="empty-cell">No expenses recorded.</p>@endforelse</div>
+    </section>@endcan
+    @endif
 </div>
-@if(!collect(array_keys(\App\Support\Permissions::all()))->filter(fn($p)=>str_starts_with($p,'dashboard.') && $p!=='dashboard.view')->contains(fn($p)=>auth()->user()->hasPermission($p)))<div class="card empty-state"><x-icon name="layout-dashboard" :size="36"/><h2>Your dashboard is ready</h2><p>Your role has no dashboard cards enabled. Ask an administrator to choose the cards you need.</p></div>@endif
+@if(!collect(array_keys(\App\Support\Permissions::all()))->filter(fn($p)=>str_starts_with($p,'dashboard.') && $p!=='dashboard.view')->contains(fn($p)=>auth()->user()->hasPermission($p)))<div class="card empty-state"><x-icon name="layout-dashboard" :size="36" />
+    <h2>Your dashboard is ready</h2>
+    <p>Your role has no dashboard cards enabled. Ask an administrator to choose the cards you need.</p>
+</div>@endif
 @if(!\App\Support\SecretControl::isHidden('hide_tables'))
 @if(\App\Support\Expiry::enabled() && auth()->user()->hasPermission('expiry.view') && \App\Support\Expiry::setting('expiry_dashboard'))
-<section class="card mt-6"><div class="card-heading"><div><h2>Expiring soon</h2><p>Within {{ \App\Support\Expiry::setting('expiry_alert_days') }} days. Check the batch dates before selling.</p></div><a class="text-link" href="{{ route('expiry.index') }}">View all</a></div><div class="table-scroll"><table><thead><tr><th>Product</th><th>Expiry date</th><th>Remaining stock</th><th>Status</th></tr></thead><tbody>@forelse($expiryRows as $layer)<tr><td>{{ $layer->product->name }}</td><td>{{ $layer->expires_at->format('d M Y') }}</td><td>{{ \App\Support\Units::quantity((float)$layer->remaining_quantity, $layer->product->unit->short_name) }}</td><td><span class="badge {{ \App\Support\Expiry::status($layer->expires_at)==='Urgent'?'red':'amber' }}">{{ \App\Support\Expiry::status($layer->expires_at) }}</span></td></tr>@empty<tr><td colspan="4" class="empty-cell">No batches are expiring within this alert window.</td></tr>@endforelse</tbody></table></div>@if($expiredBatches)<p class="p-6"><a class="text-link" href="{{ route('expiry.index',['tab'=>'expired']) }}">{{ $expiredBatches }} expired batches need attention</a></p>@endif</section>
+<section class="card mt-6">
+    <div class="card-heading">
+        <div>
+            <h2>Expiring soon</h2>
+            <p>Within {{ \App\Support\Expiry::setting('expiry_alert_days') }} days. Check the batch dates before selling.</p>
+        </div><a class="text-link" href="{{ route('expiry.index') }}">View all</a>
+    </div>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Expiry date</th>
+                    <th>Remaining stock</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>@forelse($expiryRows as $layer)<tr>
+                    <td>{{ $layer->product->name }}</td>
+                    <td>{{ $layer->expires_at->format('d M Y') }}</td>
+                    <td>{{ \App\Support\Units::quantity((float)$layer->remaining_quantity, $layer->product->unit->short_name) }}</td>
+                    <td><span class="badge {{ \App\Support\Expiry::status($layer->expires_at)==='Urgent'?'red':'amber' }}">{{ \App\Support\Expiry::status($layer->expires_at) }}</span></td>
+                </tr>@empty<tr>
+                    <td colspan="4" class="empty-cell">No batches are expiring within this alert window.</td>
+                </tr>@endforelse</tbody>
+        </table>
+    </div>@if($expiredBatches)<p class="p-6"><a class="text-link" href="{{ route('expiry.index',['tab'=>'expired']) }}">{{ $expiredBatches }} expired batches need attention</a></p>@endif
+</section>
 @endif
 @endif
 @endsection
