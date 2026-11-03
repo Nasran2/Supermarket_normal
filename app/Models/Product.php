@@ -13,6 +13,18 @@ class Product extends Model
 
     protected $casts = ['track_expiry' => 'boolean', 'track_stock' => 'boolean', 'default_discount_value' => 'decimal:2', 'active' => 'boolean', 'cost' => 'decimal:2', 'price' => 'decimal:2', 'stock' => 'decimal:3', 'low_stock' => 'decimal:3'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_products', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
+                if (! empty($hiddenIds)) {
+                    $builder->whereNotIn('products.id', $hiddenIds);
+                }
+            }
+        });
+    }
+
     protected function getArrayableAttributes()
     {
         $attributes = parent::getArrayableAttributes();
@@ -31,6 +43,22 @@ class Product extends Model
         }
 
         return $relations;
+    }
+
+    public function getNameAttribute($value)
+    {
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isHidden('hide_product_level_data')) {
+            return 'Item #' . ($this->attributes['id'] ?? 'item');
+        }
+        return $value;
+    }
+
+    public function getSkuAttribute($value)
+    {
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isHidden('hide_product_level_data')) {
+            return 'SKU-' . ($this->attributes['id'] ?? 'item');
+        }
+        return $value;
     }
 
     public static function sellableStockSql(): string

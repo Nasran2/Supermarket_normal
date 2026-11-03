@@ -23,10 +23,27 @@ class Sidebar
                 $link('Add '.$singular, 'manage.create', $key, Resources::permission($key, 'create'), $active && request()->routeIs('manage.create')),
             ]);
         };
+        $reportsHidden = class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('disable_reports');
+        $salesLinks = [$link('All sales', 'sales.index', [], 'sales.view', request()->is('sales*')), $link('New sale', 'pos.index', [], ['pos.access', 'sales.create']), $link('Sales Return', 'returns.create', 'sales', 'sales_returns.create', request()->routeIs('returns.create') && request()->route('kind') === 'sales'), $link('Sales Returns Report', 'returns.index', 'sales', 'sales_returns.view', request()->routeIs('returns.index') && request()->route('kind') === 'sales')];
+        if (! $reportsHidden) {
+            $salesLinks[] = $link('Sales report', 'reports.show', 'sales', 'reports.sales');
+        }
+
+        $purchaseLinks = [$link('All purchases', 'purchases.index', [], 'purchases.view', request()->is('purchases*') && ! request()->routeIs('purchases.create')), $link('Add purchase', 'purchases.create', [], 'purchases.create', request()->routeIs('purchases.create')), $link('Purchase Return', 'returns.create', 'purchase', 'purchase_returns.create', request()->routeIs('returns.create') && request()->route('kind') === 'purchase'), $link('Purchase Returns Report', 'returns.index', 'purchase', 'purchase_returns.view', request()->routeIs('returns.index') && request()->route('kind') === 'purchase')];
+        if (! $reportsHidden) {
+            $purchaseLinks[] = $link('Purchase report', 'reports.show', 'purchases', 'reports.purchases');
+        }
+
+        $registerLinks = [$link('Register & history', 'register.index', [], 'register.view', request()->is('register*'))];
+        if (! $reportsHidden) {
+            $registerLinks[] = $link('Register report', 'reports.show', 'register', 'reports.register');
+            $registerLinks[] = $link('Cash summary', 'reports.show', 'cash', 'reports.cash');
+        }
+
         $workspace = [
-            $group('Sales', 'receipt-text', [$link('All sales', 'sales.index', [], 'sales.view', request()->is('sales*')), $link('New sale', 'pos.index', [], ['pos.access', 'sales.create']), $link('Sales Return', 'returns.create', 'sales', 'sales_returns.create', request()->routeIs('returns.create') && request()->route('kind') === 'sales'), $link('Sales Returns Report', 'returns.index', 'sales', 'sales_returns.view', request()->routeIs('returns.index') && request()->route('kind') === 'sales'), $link('Sales report', 'reports.show', 'sales', 'reports.sales')]),
-            $group('Purchases', 'package-open', [$link('All purchases', 'purchases.index', [], 'purchases.view', request()->is('purchases*') && ! request()->routeIs('purchases.create')), $link('Add purchase', 'purchases.create', [], 'purchases.create', request()->routeIs('purchases.create')), $link('Purchase Return', 'returns.create', 'purchase', 'purchase_returns.create', request()->routeIs('returns.create') && request()->route('kind') === 'purchase'), $link('Purchase Returns Report', 'returns.index', 'purchase', 'purchase_returns.view', request()->routeIs('returns.index') && request()->route('kind') === 'purchase'), $link('Purchase report', 'reports.show', 'purchases', 'reports.purchases')]),
-            $group('Daily register', 'wallet', [$link('Register & history', 'register.index', [], 'register.view', request()->is('register*')), $link('Register report', 'reports.show', 'register', 'reports.register'), $link('Cash summary', 'reports.show', 'cash', 'reports.cash')]),
+            $group('Sales', 'receipt-text', $salesLinks),
+            $group('Purchases', 'package-open', $purchaseLinks),
+            $group('Daily register', 'wallet', $registerLinks),
         ];
         $products = $resource('products', 'Products', 'package', 'product');
         foreach ([$link('Stock adjustments', 'adjustments.index', [], 'stock-adjustments.view', request()->is('stock-adjustments*') && ! request()->routeIs('adjustments.create')), $link('New adjustment', 'adjustments.create', [], 'stock-adjustments.create', request()->routeIs('adjustments.create')), $link('Low stock', 'manage.index', ['resource' => 'products', 'low_stock' => 1], 'products.view')] as $child) {
@@ -49,18 +66,23 @@ class Sidebar
         if (config('features.barcode')) {
             $inventory[] = $group('Barcode Labels', 'barcode', [$link('Print Labels', 'barcode.index', [], 'barcode.view', request()->routeIs('barcode.index', 'barcode.print')), $link('Presets', 'barcode.presets.index', [], 'barcode.manage_presets', request()->routeIs('barcode.presets.*')), $link('Print history', 'barcode.history', [], 'barcode.view_history', request()->routeIs('barcode.history'))]);
         }
-        $reports = [$link('All reports', 'reports.index', [], [], request()->routeIs('reports.index'))];
-        foreach (ReportService::TITLES as $key => $title) {
-            $reports[] = $link($title, 'reports.show', $key, ReportService::permission($key), request()->route('report') === $key);
-        }
-        if (! collect(array_keys(ReportService::TITLES))->contains(fn ($kind) => $user->hasPermission(ReportService::permission($kind)))) {
+        if ($reportsHidden) {
             $reports = [];
-        }
-        if (Expiry::enabled()) {
-            $reports[] = $link('Expiry report', 'expiry.index', [], 'expiry.view', request()->routeIs('expiry.*'));
-        }
-        if (config('features.cheque')) {
-            $reports[] = $link('Cheques', 'cheques.report', [], 'cheques.view_reports', request()->routeIs('cheques.report'));
+        } else {
+            $titles = ReportService::titles();
+            $reports = [$link('All reports', 'reports.index', [], [], request()->routeIs('reports.index'))];
+            foreach ($titles as $key => $title) {
+                $reports[] = $link($title, 'reports.show', $key, ReportService::permission($key), request()->route('report') === $key);
+            }
+            if (! collect(array_keys($titles))->contains(fn ($kind) => $user->hasPermission(ReportService::permission($kind)))) {
+                $reports = [];
+            }
+            if (Expiry::enabled()) {
+                $reports[] = $link('Expiry report', 'expiry.index', [], 'expiry.view', request()->routeIs('expiry.*'));
+            }
+            if (config('features.cheque')) {
+                $reports[] = $link('Cheques', 'cheques.report', [], 'cheques.view_reports', request()->routeIs('cheques.report'));
+            }
         }
         $hr = [];
         if (Hr::enabled()) {

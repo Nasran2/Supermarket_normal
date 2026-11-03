@@ -9,6 +9,8 @@ use App\Http\Middleware\EnsureUnitFeatureEnabled;
 use App\Http\Middleware\GuardUnitResources;
 use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\SuperAdminEnabled;
+use App\Http\Middleware\SystemActive;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,10 +24,13 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(SecurityHeaders::class);
-        $middleware->alias(['sms-feature' => EnsureSmsEnabled::class, 'permission' => PermissionMiddleware::class, 'barcode-feature' => EnsureBarcodeFeatureEnabled::class, 'cheque-feature' => EnsureChequeFeatureEnabled::class, 'unit-feature' => EnsureUnitFeatureEnabled::class, 'unit-resources' => GuardUnitResources::class]);
-        $middleware->appendToGroup('web', [DemoMode::class, BusinessContext::class]);
+        $middleware->alias(['sms-feature' => EnsureSmsEnabled::class, 'permission' => PermissionMiddleware::class, 'barcode-feature' => EnsureBarcodeFeatureEnabled::class, 'cheque-feature' => EnsureChequeFeatureEnabled::class, 'unit-feature' => EnsureUnitFeatureEnabled::class, 'unit-resources' => GuardUnitResources::class, 'superadmin.enabled' => SuperAdminEnabled::class, 'system.active' => SystemActive::class]);
+        $middleware->appendToGroup('web', [DemoMode::class, BusinessContext::class, SystemActive::class]);
         // Acquire the demo lock and restore overdue data before binding records.
         $middleware->prependToPriorityList(SubstituteBindings::class, DemoMode::class);
+
+        $middleware->redirectGuestsTo(fn (\Illuminate\Http\Request $request) => $request->is('superadmin*') ? route('superadmin.login') : route('login'));
+        $middleware->redirectUsersTo(fn (\Illuminate\Http\Request $request) => \Illuminate\Support\Facades\Auth::guard('superadmin')->check() ? route('superadmin.dashboard') : route('dashboard'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -20,14 +20,27 @@ class ReportController extends Controller
 {
     public function index()
     {
-        return view('reports.index', ['titles' => ReportService::TITLES]);
+        if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('disable_reports')) {
+            abort(403, 'Reports are currently disabled.');
+        }
+
+        return view('reports.index', ['titles' => ReportService::titles()]);
     }
 
     public function show(ReportRequest $request, string $report, ReportService $service, ProfitLossService $profit)
     {
-        abort_unless(isset(ReportService::TITLES[$report]), 404);
+        if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('disable_reports')) {
+            abort(403, 'Reports are currently disabled.');
+        }
+
+        if ($report === 'profit' && class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_profit')) {
+            abort(403, 'Profit & loss report is hidden.');
+        }
+
+        $titles = ReportService::titles();
+        abort_unless(isset($titles[$report]), 404);
         $filters = $request->validated();
-        $title = ReportService::TITLES[$report];
+        $title = $titles[$report];
         if ($report === 'profit') {
             abort_unless($request->user()->hasPermission('products.view_cost'), 403);
             $summary = $profit->calculate($filters['from'], $filters['to']);
@@ -52,9 +65,18 @@ class ReportController extends Controller
 
     public function pdf(ReportRequest $request, string $report, ReportService $service, ProfitLossService $profit)
     {
-        abort_unless(isset(ReportService::TITLES[$report]), 404);
+        if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('disable_reports')) {
+            abort(403, 'Reports are currently disabled.');
+        }
+
+        if ($report === 'profit' && class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_profit')) {
+            abort(403, 'Profit & loss report is hidden.');
+        }
+
+        $titles = ReportService::titles();
+        abort_unless(isset($titles[$report]), 404);
         $filters = $request->validated();
-        $title = ReportService::TITLES[$report];
+        $title = $titles[$report];
         $labels = [];
         if (! in_array($report, ['purchases', 'stock']) && SalesVisibility::mode() !== 'ALL') {
             $labels['Sales access'] = SalesVisibility::OPTIONS[SalesVisibility::mode()];
@@ -114,7 +136,12 @@ class ReportController extends Controller
 
     public function export(ReportRequest $request, string $report, ReportService $service)
     {
-        abort_unless(isset(ReportService::TITLES[$report]) && $report !== 'profit', 404);
+        if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('disable_reports')) {
+            abort(403, 'Reports are currently disabled.');
+        }
+
+        $titles = ReportService::titles();
+        abort_unless(isset($titles[$report]) && $report !== 'profit', 404);
         $result = $service->build($report, $request->validated());
 
         return response()->streamDownload(function () use ($result) {

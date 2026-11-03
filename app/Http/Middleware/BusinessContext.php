@@ -11,6 +11,11 @@ class BusinessContext
 {
     public function handle($request, Closure $next)
     {
+        // Never interfere with Super Admin panel requests
+        if ($request->is('superadmin*')) {
+            return $next($request);
+        }
+
         if (Schema::hasTable('settings')) {
             $settings = app(SettingsService::class)->all();
             config(['app.timezone' => $settings['timezone'] ?? 'Asia/Colombo']);
@@ -18,7 +23,8 @@ class BusinessContext
             view()->share('settings', $settings);
         }
 
-        if ($request->user() && (! $request->user()->active || ! $request->user()->role)) {
+        // Only enforce active role on normal User instances (web guard)
+        if ($request->user() && $request->user() instanceof \App\Models\User && (! $request->user()->active || ! $request->user()->role)) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

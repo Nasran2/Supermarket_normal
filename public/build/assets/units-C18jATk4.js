@@ -1,0 +1,1 @@
+const o=()=>globalThis.document?.documentElement?.dataset.units!=="0",t=e=>o()?String(e??""):"",n=(e,s)=>typeof e=="string"&&(e==="In stock"||e==="Out of stock"||e==="—")?e:`${Number(e)}${t(s)?` ${t(s)}`:""}`;export{o as a,n as q,t as u};

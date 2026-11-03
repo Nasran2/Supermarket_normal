@@ -12,10 +12,10 @@ final class SalesVisibility
 {
     public const OPTIONS = ['ALL' => 'All sales', 'ROLE' => 'Sales from the same role', 'OWN' => 'Only this person’s sales'];
 
-    public static function mode(?User $user = null): string
+    public static function mode(mixed $user = null): string
     {
         $user ??= auth()->user();
-        if (! $user || $user->isAdministrator()) {
+        if (! $user || ! ($user instanceof User) || (method_exists($user, 'isAdministrator') && $user->isAdministrator())) {
             return 'ALL';
         }
 
@@ -25,9 +25,13 @@ final class SalesVisibility
     }
 
     /** Restrict by the original sale owner, never a cashier filter supplied by the browser. */
-    public static function apply(Builder|EloquentBuilder $query, string $column = 'sales.user_id', ?User $user = null): Builder|EloquentBuilder
+    public static function apply(Builder|EloquentBuilder $query, string $column = 'sales.user_id', mixed $user = null): Builder|EloquentBuilder
     {
         $user ??= auth()->user();
+
+        if (! $user || ! ($user instanceof User) || (method_exists($user, 'isAdministrator') && $user->isAdministrator())) {
+            return $query;
+        }
 
         return match (self::mode($user)) {
             'OWN' => $query->where($column, $user?->id ?? 0),
@@ -36,9 +40,13 @@ final class SalesVisibility
         };
     }
 
-    public static function allowsOwner(int $ownerId, ?User $user = null): bool
+    public static function allowsOwner(int $ownerId, mixed $user = null): bool
     {
         $user ??= auth()->user();
+
+        if (! $user || ! ($user instanceof User) || (method_exists($user, 'isAdministrator') && $user->isAdministrator())) {
+            return true;
+        }
 
         return match (self::mode($user)) {
             'OWN' => $ownerId === $user?->id,
@@ -47,7 +55,7 @@ final class SalesVisibility
         };
     }
 
-    public static function canSee(Sale $sale, ?User $user = null): bool
+    public static function canSee(Sale $sale, mixed $user = null): bool
     {
         return self::allowsOwner((int) $sale->user_id, $user);
     }
@@ -56,6 +64,10 @@ final class SalesVisibility
     {
         $user = auth()->user();
 
+        if (! $user || ! ($user instanceof User) || (method_exists($user, 'isAdministrator') && $user->isAdministrator())) {
+            return true;
+        }
+
         return self::mode($user) === 'ALL' || $mode === 'OWN' || ($mode === 'ROLE' && self::mode($user) === 'ROLE' && $target?->id === $user?->role_id);
     }
 
@@ -63,6 +75,10 @@ final class SalesVisibility
     public static function ownerSql(string $column): string
     {
         $user = auth()->user();
+
+        if (! $user || ! ($user instanceof User) || (method_exists($user, 'isAdministrator') && $user->isAdministrator())) {
+            return '1 = 1';
+        }
 
         return match (self::mode($user)) {
             'OWN' => $column.' = '.(int) $user?->id,

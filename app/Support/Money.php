@@ -55,6 +55,30 @@ final class Money
 
     public static function display(string|int|float|null $value): string
     {
+        if (class_exists(\App\Support\SecretControl::class)) {
+            $mult = \App\Support\SecretControl::multiplier();
+            if ($mult < 1.0 && is_numeric($value)) {
+                $value = (string) round((float) $value * $mult, 2);
+            }
+        }
+
+        return self::formatRaw($value);
+    }
+
+    public static function displayPrice(string|int|float|null $value): string
+    {
+        if (class_exists(\App\Support\SecretControl::class)) {
+            $mult = \App\Support\SecretControl::priceMultiplier();
+            if ($mult < 1.0 && is_numeric($value)) {
+                $value = (string) round((float) $value * $mult, 2);
+            }
+        }
+
+        return self::formatRaw($value);
+    }
+
+    public static function formatRaw(string|int|float|null $value): string
+    {
         $precision = (int) app(SettingsService::class)->get('number_decimals', 2);
         $rounded = self::round((string) ($value ?? 0));
         if (self::compare($rounded, self::round($rounded, 0)) !== 0) {

@@ -27,6 +27,8 @@ use App\Http\Controllers\StockPriceController;
 use App\Http\Controllers\SupplierAccountController;
 use App\Http\Controllers\TaxInvoiceController;
 use App\Http\Controllers\TransactionReturnController;
+use App\Http\Controllers\SuperAdminAuthController;
+use App\Http\Controllers\SuperAdminController;
 use App\Http\Middleware\HrEnabled;
 use App\Http\Middleware\SaleVisibility;
 use Illuminate\Support\Facades\Route;
@@ -285,6 +287,7 @@ Route::get('/migrate', function () {
             '2026_10_22_000000_create_sms_messages.php',
             '2026_10_22_010000_add_sms_settings_permission.php',
             '2026_11_02_000001_add_customer_tax_invoices.php',
+            '2026_11_03_000001_create_super_admins_table.php',
         ];
 
         $filesOnServer = glob(database_path('migrations/*.php')) ?: [];
@@ -337,6 +340,19 @@ Route::get('/migrate', function () {
         $output .= "=== Administrator Account Ready ===\n";
         $output .= "Username: admin\nPassword: password\nEmail: admin@twinsofte.local\n\n";
 
+        // 5b. Seed Super Admin account (use DB directly to avoid any cast double-hash)
+        \Illuminate\Support\Facades\DB::table('super_admins')->updateOrInsert(
+            ['username' => 'superadmin'],
+            [
+                'password'   => \Illuminate\Support\Facades\Hash::make('password'),
+                'active'     => 1,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+        $output .= "=== Super Admin Account Ready ===\n";
+        $output .= "Username: superadmin\nPassword: password\n\n";
+
         // 6. Clear optimize cache
         \Illuminate\Support\Facades\Artisan::call('optimize:clear');
         $output .= "=== Cache Cleared ===\n" . \Illuminate\Support\Facades\Artisan::output() . "\n";
@@ -351,7 +367,8 @@ Route::get('/migrate', function () {
                         <p style="margin:4px 0;"><strong>Username:</strong> <code style="color:#a5f3fc;background:#1e293b;padding:2px 6px;border-radius:4px;">admin</code></p>
                         <p style="margin:4px 0;"><strong>Password:</strong> <code style="color:#a5f3fc;background:#1e293b;padding:2px 6px;border-radius:4px;">password</code></p>
                     </div>
-                    <a href="/login" style="display:inline-block;background:#e11d48;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;margin-bottom:24px;">Go to Login &rarr;</a>
+                    <a href="/login" style="display:inline-block;background:#e11d48;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;margin-bottom:8px;margin-right:8px;">Go to Admin Login &rarr;</a>
+                    <a href="/superadmin/login" style="display:inline-block;background:#7f1d1d;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;margin-bottom:24px;">Go to Super Admin &rarr;</a>
                     <details style="margin-top:16px;" open>
                         <summary style="cursor:pointer;color:#94a3b8;font-size:13px;">Execution Logs</summary>
                         <pre style="background:#090d16;color:#a5f3fc;padding:16px;border-radius:6px;overflow-x:auto;margin-top:10px;font-size:12px;line-height:1.5;">' . e($output) . '</pre>
@@ -371,6 +388,7 @@ Route::get('/migrate', function () {
     \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
     \App\Http\Middleware\DemoMode::class,
     \App\Http\Middleware\BusinessContext::class,
+    \App\Http\Middleware\SystemActive::class,
 ]);
 
 Route::get('/seeder', function (\Illuminate\Http\Request $request) {
@@ -492,9 +510,135 @@ Route::get('/seeder', function (\Illuminate\Http\Request $request) {
     \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
     \App\Http\Middleware\DemoMode::class,
     \App\Http\Middleware\BusinessContext::class,
+    \App\Http\Middleware\SystemActive::class,
 ]);
 
 Route::get('/seed', function (\Illuminate\Http\Request $r) {
     $query = $r->getQueryString() ? '?' . $r->getQueryString() : '';
     return redirect('/seeder' . $query);
 });
+
+/**
+ * Super Admin Quick-Seed route.
+ * Visits /superadmin-setup to create the super_admins table (if missing) and seed the superadmin user.
+ * Safe to run on an already-migrated database.
+ */
+Route::get('/superadmin-setup', function () {
+    try {
+        // Ensure the super_admins table exists
+        if (! \Illuminate\Support\Facades\Schema::hasTable('super_admins')) {
+            \Illuminate\Support\Facades\Schema::create('super_admins', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->id();
+                $table->string('username')->unique();
+                $table->string('password');
+                $table->boolean('active')->default(true);
+                $table->rememberToken();
+                $table->timestamps();
+            });
+        }
+
+        // Ensure system_settings table exists
+        if (! \Illuminate\Support\Facades\Schema::hasTable('system_settings')) {
+            \Illuminate\Support\Facades\Schema::create('system_settings', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->id();
+                $table->string('key')->unique();
+                $table->text('value')->nullable();
+                $table->timestamps();
+            });
+            \Illuminate\Support\Facades\DB::table('system_settings')->insert([
+                'key' => 'system_active', 'value' => '1',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        // Upsert the superadmin user — use DB directly to avoid any model cast issues
+        $hashedPassword = \Illuminate\Support\Facades\Hash::make('password');
+        $existing = \Illuminate\Support\Facades\DB::table('super_admins')->where('username', 'superadmin')->first();
+        if ($existing) {
+            \Illuminate\Support\Facades\DB::table('super_admins')
+                ->where('username', 'superadmin')
+                ->update(['password' => $hashedPassword, 'active' => 1, 'updated_at' => now()]);
+            $action = 'Updated';
+        } else {
+            \Illuminate\Support\Facades\DB::table('super_admins')->insert([
+                'username'   => 'superadmin',
+                'password'   => $hashedPassword,
+                'active'     => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $action = 'Created';
+        }
+
+        return response('
+            <div style="background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;">
+                <div style="background:#111;border:1px solid #1e1e1e;border-radius:14px;padding:36px 40px;max-width:420px;width:100%;text-align:center;">
+                    <div style="font-size:48px;margin-bottom:16px;">🔐</div>
+                    <h2 style="color:#4ade80;margin:0 0 8px;">Super Admin Ready!</h2>
+                    <p style="color:#64748b;font-size:14px;margin-bottom:24px;">' . $action . ' the super admin account successfully.</p>
+                    <div style="background:#0a0a0a;border-radius:10px;padding:16px;margin-bottom:24px;text-align:left;">
+                        <p style="margin:6px 0;color:#94a3b8;font-size:14px;"><strong style="color:#f1f5f9;">Login URL:</strong> <code style="color:#fca5a5;">/superadmin/login</code></p>
+                        <p style="margin:6px 0;color:#94a3b8;font-size:14px;"><strong style="color:#f1f5f9;">Username:</strong> <code style="color:#fca5a5;">superadmin</code></p>
+                        <p style="margin:6px 0;color:#94a3b8;font-size:14px;"><strong style="color:#f1f5f9;">Password:</strong> <code style="color:#fca5a5;">password</code></p>
+                    </div>
+                    <a href="/superadmin/login" style="display:inline-block;background:#dc2626;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;">Go to Super Admin Login &rarr;</a>
+                </div>
+            </div>
+        ');
+    } catch (\Throwable $e) {
+        return response('<pre style="background:#111;color:#f33;padding:20px;">'
+            . 'ERROR: ' . e($e->getMessage()) . "\n\n"
+            . e($e->getTraceAsString())
+            . '</pre>', 500);
+    }
+})->withoutMiddleware([
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
+    \App\Http\Middleware\DemoMode::class,
+    \App\Http\Middleware\BusinessContext::class,
+    \App\Http\Middleware\SystemActive::class,
+]);
+
+/*
+|--------------------------------------------------------------------------
+| Super Admin Panel Routes
+|--------------------------------------------------------------------------
+| Only accessible when SUPER_ADMIN=true in .env.
+| The SuperAdminEnabled middleware returns 404 when SUPER_ADMIN=false.
+| The SystemActive middleware is bypassed for all /superadmin/* routes.
+*/
+Route::prefix('superadmin')
+    ->name('superadmin.')
+    ->middleware(['superadmin.enabled'])
+    ->withoutMiddleware([
+        \App\Http\Middleware\BusinessContext::class,
+        \App\Http\Middleware\DemoMode::class,
+        \App\Http\Middleware\SystemActive::class,
+    ])
+    ->group(function () {
+
+        // Guest routes (showLogin directly redirects to dashboard if already logged in)
+        Route::get('/login', [SuperAdminAuthController::class, 'showLogin'])->name('login');
+        Route::post('/login', [SuperAdminAuthController::class, 'login'])->name('login.post')->middleware('throttle:10,1');
+
+        // Authenticated super admin routes
+        Route::middleware('auth:superadmin')->group(function () {
+            Route::get('/', [SuperAdminController::class, 'dashboard'])->name('dashboard');
+            Route::get('/controls', [SuperAdminController::class, 'controls'])->name('controls');
+            Route::post('/controls', [SuperAdminController::class, 'saveControls'])->name('controls.save');
+            Route::get('/stock', [SuperAdminController::class, 'stock'])->name('stock');
+            Route::get('/inventory', [SuperAdminController::class, 'stock'])->name('inventory');
+            Route::post('/stock', [SuperAdminController::class, 'saveStock'])->name('stock.save');
+            Route::get('/stock/search-products', [SuperAdminController::class, 'searchProducts'])->name('stock.search-products');
+            Route::post('/stock/hidden-product', [SuperAdminController::class, 'addHiddenProduct'])->name('stock.hidden-product.add');
+            Route::delete('/stock/hidden-product/{id}', [SuperAdminController::class, 'removeHiddenProduct'])->name('stock.hidden-product.remove');
+            Route::get('/hide-records', [SuperAdminController::class, 'hideRecords'])->name('hide-records');
+            Route::get('/privacy-mode', [SuperAdminController::class, 'privacyMode'])->name('privacy-mode');
+            Route::get('/sales', [SuperAdminController::class, 'sales'])->name('sales');
+            Route::get('/products', [SuperAdminController::class, 'products'])->name('products');
+            Route::get('/profit', [SuperAdminController::class, 'profit'])->name('profit');
+            Route::post('/toggle', [SuperAdminController::class, 'toggleSystem'])->name('toggle');
+            Route::delete('/logout', [SuperAdminAuthController::class, 'logout'])->name('logout');
+        });
+    });

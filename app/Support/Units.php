@@ -45,7 +45,19 @@ final class Units
 
     public static function quantity(string|int|float|null $quantity, Unit|string|null $unit = null): string
     {
-        $number = (string) BigDecimal::of((string) ($quantity ?? 0))->stripTrailingZeros();
+        $raw = (float) ($quantity ?? 0);
+
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+            if (\App\Support\SecretControl::isHidden('hide_all_quantity_data')) {
+                return '—';
+            }
+            if (\App\Support\SecretControl::isHidden('hide_exact_stock_quantity')) {
+                return $raw > 0 ? 'In stock' : 'Out of stock';
+            }
+            $raw = round($raw * \App\Support\SecretControl::stockMultiplier(), 2);
+        }
+
+        $number = (string) BigDecimal::of((string) $raw)->stripTrailingZeros();
         $suffix = self::label($unit);
 
         return $number.($suffix !== '' ? ' '.$suffix : '');

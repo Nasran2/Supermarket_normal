@@ -110,8 +110,45 @@ class PosController extends Controller
     {
         $transform = function ($p) {
             $groups = app(StockLayerService::class)->choices($p, request()->route('sale'));
+            $price = $p->price;
+            $stock = Expiry::tracks($p) ? Money::quantity('0', (string) collect($groups)->sum('quantity')) : $p->stock;
 
-            return ['track_expiry' => Expiry::tracks($p), 'show_expiry' => Expiry::enabled() && Expiry::setting('expiry_show_pos'), 'track_stock' => $p->track_stock, 'default_discount_type' => $p->default_discount_type, 'default_discount_value' => $p->default_discount_value, 'price_options' => $groups, 'units' => array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->publicOptions($p)), 'unit_id' => $p->unit_id, 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => config('features.barcode') ? $p->barcode : null, 'price' => $p->price, 'stock' => Expiry::tracks($p) ? Money::quantity('0', (string) collect($groups)->sum('quantity')) : $p->stock, 'unit' => Units::label($p->unit), 'decimal' => $p->unit->allow_decimal, 'category' => $p->categories->pluck('name')->join(', '), 'image' => $p->image ? asset('storage/'.$p->image) : null];
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                if (\App\Support\SecretControl::isEnabled('enable_pos_price_percentage')) {
+                    $multiplier = \App\Support\SecretControl::priceMultiplier();
+                    $price = round((float) $price * $multiplier, 2);
+                    if (! empty($groups)) {
+                        foreach ($groups as &$grp) {
+                            if (isset($grp['selling_price'])) {
+                                $grp['selling_price'] = (string) round((float) $grp['selling_price'] * $multiplier, 2);
+                            }
+                            if (! empty($grp['units'])) {
+                                foreach ($grp['units'] as &$uOpt) {
+                                    if (isset($uOpt['price'])) {
+                                        $uOpt['price'] = (string) round((float) $uOpt['price'] * $multiplier, 2);
+                                    }
+                                }
+                                unset($uOpt);
+                            }
+                        }
+                        unset($grp);
+                    }
+                }
+                $stock = round((float) $stock * \App\Support\SecretControl::stockMultiplier(), 2);
+            }
+
+            $posUnits = array_map(fn ($o) => array_diff_key($o, ['cost' => true]), app(ProductUnitService::class)->publicOptions($p));
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isEnabled('enable_pos_price_percentage')) {
+                $multiplier = \App\Support\SecretControl::priceMultiplier();
+                foreach ($posUnits as &$uOpt) {
+                    if (isset($uOpt['price'])) {
+                        $uOpt['price'] = (string) round((float) $uOpt['price'] * $multiplier, 2);
+                    }
+                }
+                unset($uOpt);
+            }
+
+            return ['track_expiry' => Expiry::tracks($p), 'show_expiry' => Expiry::enabled() && Expiry::setting('expiry_show_pos'), 'track_stock' => $p->track_stock, 'default_discount_type' => $p->default_discount_type, 'default_discount_value' => $p->default_discount_value, 'price_options' => $groups, 'units' => $posUnits, 'unit_id' => $p->unit_id, 'id' => $p->id, 'name' => class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::productName($p) : $p->name, 'sku' => $p->sku, 'barcode' => config('features.barcode') ? $p->barcode : null, 'price' => $price, 'stock' => $stock, 'unit' => Units::label($p->unit), 'decimal' => $p->unit->allow_decimal, 'category' => $p->categories->pluck('name')->join(', '), 'image' => $p->image ? asset('storage/'.$p->image) : null];
         };
 
         return $products instanceof LengthAwarePaginator ? $products->through($transform) : $products->map($transform);

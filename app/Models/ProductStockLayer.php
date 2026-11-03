@@ -13,6 +13,18 @@ class ProductStockLayer extends Model
 
     protected $casts = ['expires_at' => 'date', 'remaining_cost_total' => 'decimal:2', 'inventory_cost_total' => 'decimal:2', 'cost_price' => 'decimal:2', 'selling_price' => 'decimal:2', 'original_quantity' => 'decimal:3', 'remaining_quantity' => 'decimal:3', 'received_at' => 'datetime'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_products', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
+                if (! empty($hiddenIds)) {
+                    $builder->whereNotIn('product_stock_layers.product_id', $hiddenIds);
+                }
+            }
+        });
+    }
+
     protected function expiresAt(): Attribute
     {
         return Attribute::make(set: fn ($value) => $value ? Carbon::parse($value)->toDateString() : null);

