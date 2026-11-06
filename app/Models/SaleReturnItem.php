@@ -12,6 +12,18 @@ class SaleReturnItem extends Model
 
     protected $casts = ['track_stock' => 'boolean', 'purchased_on' => 'date', 'suggested_credit_price' => 'decimal:2', 'credit_price' => 'decimal:2', 'cost_basis' => 'decimal:2', 'stock_selling_price' => 'decimal:2', 'fee_refund' => 'decimal:2', 'quantity' => 'decimal:3', 'base_quantity' => 'decimal:3', 'amount' => 'decimal:2', 'cost_total' => 'decimal:2'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_sale_return_items', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
+                if (! empty($hiddenIds)) {
+                    $builder->whereNotIn('sale_return_items.product_id', $hiddenIds);
+                }
+            }
+        });
+    }
+
     public function product()
     {
         return $this->belongsTo(Product::class);

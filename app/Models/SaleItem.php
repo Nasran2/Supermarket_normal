@@ -12,6 +12,18 @@ class SaleItem extends Model
 
     protected $casts = ['track_stock' => 'boolean', 'use_default_discount' => 'boolean', 'catalog_price' => 'decimal:2', 'line_subtotal' => 'decimal:2', 'line_discount' => 'decimal:2', 'discount_value' => 'decimal:2', 'base_quantity' => 'decimal:3', 'base_cost' => 'decimal:2', 'quantity' => 'decimal:3', 'price' => 'decimal:2', 'cost' => 'decimal:2', 'total' => 'decimal:2'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_sale_items', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
+                if (! empty($hiddenIds)) {
+                    $builder->whereNotIn('sale_items.product_id', $hiddenIds);
+                }
+            }
+        });
+    }
+
     public function getNameAttribute($value)
     {
         if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isHidden('hide_product_level_data')) {

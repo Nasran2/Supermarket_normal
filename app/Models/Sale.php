@@ -13,6 +13,20 @@ class Sale extends Model
 
     protected $casts = ['tax' => 'array', 'sold_at' => 'datetime', 'voided_at' => 'datetime', 'subtotal' => 'decimal:2', 'discount' => 'decimal:2', 'sale_amount' => 'decimal:2', 'processing_charge' => 'decimal:2', 'customer_payable' => 'decimal:2', 'cost_total' => 'decimal:2'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_sales', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
+                if (! empty($hiddenIds)) {
+                    $builder->whereDoesntHave('items', function ($q) use ($hiddenIds) {
+                        $q->withoutGlobalScopes()->whereIn('sale_items.product_id', $hiddenIds);
+                    });
+                }
+            }
+        });
+    }
+
     public function scopeVisibleTo(Builder $query, mixed $user = null): Builder
     {
         return SalesVisibility::apply($query, 'sales.user_id', $user);

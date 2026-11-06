@@ -15,6 +15,20 @@ class Purchase extends Model
 
     protected $casts = ['purchase_date' => 'date', 'total' => 'decimal:2', 'payment_tracking' => 'boolean', 'subtotal' => 'decimal:2', 'charges_total' => 'decimal:2'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_purchases', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
+                if (! empty($hiddenIds)) {
+                    $builder->whereDoesntHave('items', function ($q) use ($hiddenIds) {
+                        $q->withoutGlobalScopes()->whereIn('purchase_items.product_id', $hiddenIds);
+                    });
+                }
+            }
+        });
+    }
+
     public function returns()
     {
         return $this->hasMany(PurchaseReturn::class)->where('status', 'COMPLETED');

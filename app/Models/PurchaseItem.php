@@ -12,6 +12,18 @@ class PurchaseItem extends Model
 
     protected $casts = ['track_stock' => 'boolean', 'allocated_charge' => 'decimal:2', 'base_quantity' => 'decimal:3', 'base_cost' => 'decimal:2', 'quantity' => 'decimal:3', 'cost' => 'decimal:2', 'total' => 'decimal:2', 'previous_cost' => 'decimal:2'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_purchase_items', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
+                if (! empty($hiddenIds)) {
+                    $builder->whereNotIn('purchase_items.product_id', $hiddenIds);
+                }
+            }
+        });
+    }
+
     public function purchase()
     {
         return $this->belongsTo(Purchase::class);

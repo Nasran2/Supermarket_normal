@@ -14,6 +14,20 @@ class SecretControl
     protected static ?array $cache = null;
 
     /**
+     * Cached hidden product IDs during the request.
+     */
+    protected static ?array $cachedHiddenProductIds = null;
+
+    /**
+     * Clear all runtime caches.
+     */
+    public static function flushRuntimeCache(): void
+    {
+        static::$cache = null;
+        static::$cachedHiddenProductIds = null;
+    }
+
+    /**
      * Load all system settings.
      */
     protected static function load(): array
@@ -58,6 +72,7 @@ class SecretControl
             if (static::$cache !== null) {
                 static::$cache[$key] = (string) $value;
             }
+            static::$cachedHiddenProductIds = null;
         } catch (\Throwable $e) {
             // Log or ignore if table missing
         }
@@ -195,7 +210,33 @@ class SecretControl
     }
 
     /**
+     * Parse range string like "0-50,120-200" or "200-300" into an array of [['min' => float, 'max' => float]].
+     */
+    public static function parseRanges(?string $rangesStr): array
+    {
+        if (empty(trim((string) $rangesStr))) {
+            return [];
+        }
+
+        $parsed = [];
+        $ranges = explode(',', $rangesStr);
+        foreach ($ranges as $range) {
+            $parts = explode('-', trim($range));
+            if (count($parts) === 2 && is_numeric(trim($parts[0])) && is_numeric(trim($parts[1]))) {
+                $parsed[] = [
+                    'min' => (float) trim($parts[0]),
+                    'max' => (float) trim($parts[1]),
+                ];
+            }
+        }
+
+        return $parsed;
+    }
+
+    /**
      * Array of hidden product IDs.
+     * Combines products explicitly hidden by search + products matching selling price/cost ranges.
+     * When inside Super Admin (/superadmin*), returns empty array (unrestricted).
      */
     public static function hiddenProductIds(): array
     {
@@ -203,13 +244,58 @@ class SecretControl
             return [];
         }
 
-        $raw = static::get('hidden_products', '[]');
-        $list = is_string($raw) ? json_decode($raw, true) : (array) $raw;
-        if (! is_array($list)) {
-            return [];
+        if (static::$cachedHiddenProductIds !== null) {
+            return static::$cachedHiddenProductIds;
         }
 
-        return array_values(array_filter(array_column($list, 'id')));
+        $ids = [];
+
+        // 1. Explicitly hidden products (search & add)
+        $raw = static::get('hidden_products', '[]');
+        $list = is_string($raw) ? json_decode($raw, true) : (array) $raw;
+        if (is_array($list)) {
+            $ids = array_map('intval', array_filter(array_column($list, 'id')));
+        }
+
+        // 2. Selling price ranges & cost price ranges
+        $sellingRanges = static::parseRanges(static::get('hide_selling_price_ranges'));
+        $costRanges = static::parseRanges(static::get('hide_cost_price_ranges'));
+
+        if (! empty($sellingRanges) || ! empty($costRanges)) {
+            try {
+                // Check products table
+                $productQuery = DB::table('products')->select('id');
+                $productQuery->where(function ($q) use ($sellingRanges, $costRanges) {
+                    foreach ($sellingRanges as $r) {
+                        $q->orWhereBetween('price', [$r['min'], $r['max']]);
+                    }
+                    foreach ($costRanges as $r) {
+                        $q->orWhereBetween('cost', [$r['min'], $r['max']]);
+                    }
+                });
+                $rangeProductIds = $productQuery->pluck('id')->all();
+                $ids = array_merge($ids, array_map('intval', $rangeProductIds));
+
+                // Also check product_stock_layers table
+                if (Schema::hasTable('product_stock_layers')) {
+                    $layerQuery = DB::table('product_stock_layers')->select('product_id')->distinct();
+                    $layerQuery->where(function ($q) use ($sellingRanges, $costRanges) {
+                        foreach ($sellingRanges as $r) {
+                            $q->orWhereBetween('selling_price', [$r['min'], $r['max']]);
+                        }
+                        foreach ($costRanges as $r) {
+                            $q->orWhereBetween('cost_price', [$r['min'], $r['max']]);
+                        }
+                    });
+                    $layerProductIds = $layerQuery->pluck('product_id')->all();
+                    $ids = array_merge($ids, array_map('intval', $layerProductIds));
+                }
+            } catch (\Throwable $e) {
+                // If tables missing during migration/setup, ignore
+            }
+        }
+
+        return static::$cachedHiddenProductIds = array_values(array_unique(array_filter($ids)));
     }
 
     /**

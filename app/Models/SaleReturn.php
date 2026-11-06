@@ -11,6 +11,20 @@ class SaleReturn extends Model
 
     protected $casts = ['approved_at' => 'datetime', 'verified_amount' => 'decimal:2', 'historical_cost_total' => 'decimal:2', 'estimated_cost_total' => 'decimal:2', 'unverified_amount' => 'decimal:2', 'draft_payload' => 'array', 'amount' => 'decimal:2', 'cost_total' => 'decimal:2', 'due_reduction' => 'decimal:2', 'refund_amount' => 'decimal:2', 'replacement_value' => 'decimal:2', 'additional_payment' => 'decimal:2', 'customer_due_applied' => 'decimal:2', 'fee_refund' => 'decimal:2', 'returned_at' => 'datetime', 'cancelled_at' => 'datetime'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_sale_returns', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
+                if (! empty($hiddenIds)) {
+                    $builder->whereDoesntHave('items', function ($q) use ($hiddenIds) {
+                        $q->withoutGlobalScopes()->whereIn('sale_return_items.product_id', $hiddenIds);
+                    });
+                }
+            }
+        });
+    }
+
     public function scopeVisibleTo($query, mixed $user = null)
     {
         return $query->where(function ($q) use ($user) {

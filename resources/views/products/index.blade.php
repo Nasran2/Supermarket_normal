@@ -18,7 +18,11 @@
 @endif
 <div class="card customer-directory"><form class="customer-filters product-filters" method="GET"><label class="customer-search"><x-icon name="search"/><input name="q" type="search" value="{{ request('q') }}" placeholder="{{ config('features.barcode')?'Search name, SKU or barcode…':'Search name or SKU…' }}" aria-label="Search products"></label><label class="field"><span>Status</span><select name="active"><option value="">All statuses</option><option value="1" @selected(request('active')==='1')>Active</option><option value="0" @selected(request('active')==='0')>Inactive</option></select></label><label class="field"><span>Stock</span><select name="low_stock"><option value="">All stock levels</option><option value="1" @selected(request('low_stock'))>Low stock only</option></select></label><button class="btn secondary" type="submit">Apply</button><a class="text-link" href="{{ route('manage.index','products') }}">Reset</a></form>
 <div class="customer-directory-heading"><strong>{{ $rows->total() }} {{ \Illuminate\Support\Str::plural('product',$rows->total()) }}</strong><span>{{ \App\Support\Units::enabled()?'Stock in primary units':'Current stock' }}</span></div>
-<div class="table-wrap"><table class="product-table"><thead><tr><th>Product</th><th>Category</th><th>@if(\App\Support\Units::enabled())Units & selling prices @else Selling prices @endif</th><th>Stock</th>
+<div class="table-wrap"><table class="product-table"><thead><tr><th>Product</th><th>Category</th>
+@if(!\App\Support\SecretControl::isHidden('hide_exact_selling_price') && !\App\Support\SecretControl::isHidden('hide_all_price_data'))
+<th>@if(\App\Support\Units::enabled())Units & selling prices @else Selling prices @endif</th>
+@endif
+<th>Stock</th>
 @can('products.view_cost')
 @if(!\App\Support\SecretControl::isHidden('hide_stock_money') && !\App\Support\SecretControl::isHidden('hide_exact_purchase_cost') && !\App\Support\SecretControl::isHidden('hide_all_price_data'))
 <th>{{ \App\Support\Units::enabled()?'Default cost / primary unit':'Default cost' }}</th>
@@ -29,14 +33,13 @@
 <tr>
 <td><a class="product-list-identity" href="{{ route('manage.show',['products',$p->id]) }}"><span class="product-list-image">@if($p->image)<img src="{{ asset('storage/'.$p->image) }}" alt="">@else<x-icon name="package"/>@endif</span><span><strong>{{ \App\Support\SecretControl::productName($p) }}</strong><small>{{ \App\Support\SecretControl::isHidden('hide_product_level_data') ? 'SKU-'.$p->id : $p->sku }}{{ config('features.barcode') && $p->barcode && !\App\Support\SecretControl::isHidden('hide_product_level_data') ? ' · '.$p->barcode:'' }}</small>@if($p->default_discount_type!=='NONE' && (float)$p->default_discount_value>0)<small class="text-success">Default discount: {{ $p->default_discount_type==='PERCENT'?(float)$p->default_discount_value.'%':($settings['currency_symbol']??'Rs.').' '.\App\Support\Money::display($p->default_discount_value) }}</small>@endif</span></a></td>
 <td>{{ $p->categories->pluck('name')->join(', ') }}</td>
+@if(!\App\Support\SecretControl::isHidden('hide_exact_selling_price') && !\App\Support\SecretControl::isHidden('hide_all_price_data'))
 <td>
 <div class="product-unit-prices">
 @forelse(($p->track_stock ? $p->stockLayers->pluck('selling_price')->unique()->sort() : collect([$p->price])) as $price)
 @foreach(app(\App\Services\ProductUnitService::class)->options($p, $price) as $unit)
 @php($scaledUnitPrice = \App\Support\SecretControl::scalePrice($unit['price']))
-@if(\App\Support\SecretControl::isSellingPriceHiddenFor($unit['price']))
-<span class="unit-price-chip"><span class="muted">Hidden</span></span>
-@else
+@if(!\App\Support\SecretControl::isSellingPriceHiddenFor($unit['price']))
 <span class="unit-price-chip">@if(\App\Support\Units::enabled())<b>{{ $unit['short_name'] }}</b> @endif{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::formatRaw($scaledUnitPrice) }}</span>
 @endif
 @endforeach
@@ -45,6 +48,7 @@
 @endforelse
 </div>
 </td>
+@endif
 <td>
 @if(!$p->track_stock)
 <span class="badge slate">Not maintained</span>
@@ -59,7 +63,7 @@
 @if(!\App\Support\SecretControl::isHidden('hide_stock_money') && !\App\Support\SecretControl::isHidden('hide_exact_purchase_cost') && !\App\Support\SecretControl::isHidden('hide_all_price_data'))
 <td>
 @if(\App\Support\SecretControl::isCostHiddenFor($p->cost))
-<span class="muted">Hidden</span>
+<span class="muted">—</span>
 @else
 {{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($p->cost) }}
 @endif
@@ -87,7 +91,8 @@
 </td>
 </tr>
 @empty
-<tr><td colspan="7"><div class="empty-state"><x-icon name="package" :size="34"/><h3>No products found</h3><p>Add your first product or adjust the filters.</p></div></td></tr>
+@php($colCount = 5 + (!\App\Support\SecretControl::isHidden('hide_exact_selling_price') && !\App\Support\SecretControl::isHidden('hide_all_price_data') ? 1 : 0) + (auth()->user()->can('products.view_cost') && !\App\Support\SecretControl::isHidden('hide_stock_money') && !\App\Support\SecretControl::isHidden('hide_exact_purchase_cost') && !\App\Support\SecretControl::isHidden('hide_all_price_data') ? 1 : 0))
+<tr><td colspan="{{ $colCount }}"><div class="empty-state"><x-icon name="package" :size="34"/><h3>No products found</h3><p>Add your first product or adjust the filters.</p></div></td></tr>
 @endforelse
 </tbody></table></div><div class="customer-pagination">{{ $rows->links() }}</div></div>
 @endsection

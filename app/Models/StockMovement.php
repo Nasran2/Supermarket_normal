@@ -12,6 +12,18 @@ class StockMovement extends Model
 
     protected $casts = ['quantity' => 'decimal:3', 'balance' => 'decimal:3'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_stock_movements', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
+                if (! empty($hiddenIds)) {
+                    $builder->whereNotIn('stock_movements.product_id', $hiddenIds);
+                }
+            }
+        });
+    }
+
     public function scopeVisibleSales(Builder $query): Builder
     {
         if (SalesVisibility::mode() === 'ALL') {

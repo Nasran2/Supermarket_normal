@@ -10,6 +10,18 @@ class StockAdjustmentItem extends Model
 
     protected $casts = ['stock_before' => 'decimal:3', 'stock_after' => 'decimal:3', 'quantity_change' => 'decimal:3', 'price_before' => 'decimal:2', 'price_after' => 'decimal:2', 'cost_before' => 'decimal:2', 'cost_after' => 'decimal:2', 'price_changed' => 'boolean', 'cost_changed' => 'boolean'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_adjustment_items', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
+                if (! empty($hiddenIds)) {
+                    $builder->whereNotIn('stock_adjustment_items.product_id', $hiddenIds);
+                }
+            }
+        });
+    }
+
     public function product()
     {
         return $this->belongsTo(Product::class);

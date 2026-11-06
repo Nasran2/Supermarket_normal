@@ -10,6 +10,20 @@ class StockAdjustment extends Model
 
     protected $casts = ['voided_at' => 'datetime', 'revision' => 'integer'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_adjustments', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+                $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
+                if (! empty($hiddenIds)) {
+                    $builder->whereDoesntHave('items', function ($q) use ($hiddenIds) {
+                        $q->withoutGlobalScopes()->whereIn('stock_adjustment_items.product_id', $hiddenIds);
+                    });
+                }
+            }
+        });
+    }
+
     public function items()
     {
         return $this->hasMany(StockAdjustmentItem::class);
