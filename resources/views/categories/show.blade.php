@@ -1,19 +1,59 @@
 @extends('layouts.app')
 @section('title',$record->name.' · Category')
 @section('content')
-<div class="page-heading"><div><span class="eyebrow">CATEGORY</span><h1>{{ $record->name }}</h1><p>Products assigned to this category, including products shared with other categories.</p></div><div class="heading-actions"><a class="btn secondary" href="{{ route('manage.index','categories') }}"><x-icon name="arrow-left"/>Categories</a>@can('categories.edit')<a class="btn primary" href="{{ route('manage.edit',['categories',$record->id]) }}"><x-icon name="pencil"/>Edit category</a>@endcan
-</div></div>
-<section class="card"><div class="card-heading"><div><h2>Products in {{ $record->name }}</h2><p class="muted">{{ $products->total() }} {{ \Illuminate\Support\Str::plural('product',$products->total()) }}</p></div><span class="tile-icon"><x-icon name="tags"/></span></div><form class="filter-bar" method="GET"><label class="search-field"><x-icon name="search"/><input type="search" name="q" value="{{ request('q') }}" placeholder="{{ config('features.barcode')?'Search name, SKU or barcode…':'Search name or SKU…' }}" aria-label="Search category products"></label><select name="active" aria-label="Product status"><option value="">All products</option><option value="1" @selected(request('active')==='1')>Active</option><option value="0" @selected(request('active')==='0')>Inactive</option></select><button class="btn secondary">Apply</button><a class="text-link" href="{{ route('manage.show',['categories',$record->id]) }}">Reset</a> </form>
-<div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU @if(config('features.barcode'))/ barcode @endif</th><th>Stock</th>
-@if(!\App\Support\SecretControl::isHidden('hide_exact_selling_price') && !\App\Support\SecretControl::isHidden('hide_all_price_data'))
-<th>Selling price @if(\App\Support\Units::enabled()) / unit @endif</th>
-@endif
-<th>Status</th><th class="text-right">Actions</th></tr></thead><tbody>@forelse($products as $product)<tr><td>@can('products.view')<a class="text-link" href="{{ route('manage.show',['products',$product->id]) }}">{{ \App\Support\SecretControl::productName($product) }}</a>@else {{ \App\Support\SecretControl::productName($product) }}@endcan </td><td>{{ \App\Support\SecretControl::isHidden('hide_product_level_data') ? 'SKU-'.$product->id : $product->sku }}@if(config('features.barcode') && !\App\Support\SecretControl::isHidden('hide_product_level_data'))<small class="table-secondary">{{ $product->barcode??'No barcode' }}</small>@endif</td><td>{{ \App\Support\Units::quantity((float)$product->stock, $product->unit?->short_name) }}</td>
-@if(!\App\Support\SecretControl::isHidden('hide_exact_selling_price') && !\App\Support\SecretControl::isHidden('hide_all_price_data'))
-<td>@if(\App\Support\SecretControl::isSellingPriceHiddenFor($product->price))—@else{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::displayPrice($product->price) }} @if(\App\Support\Units::enabled())/ {{ $product->unit?->short_name }}@endif @endif</td>
-@endif
-<td><span class="badge {{ $product->active?'green':'slate' }}">{{ $product->active?'Active':'Inactive' }}</span></td><td><div class="row-actions">@can('products.view')<a class="btn secondary small" href="{{ route('manage.show',['products',$product->id]) }}"><x-icon name="eye" :size="16"/>View</a>@endcan @can('products.edit')<a class="btn secondary small" href="{{ route('manage.edit',['products',$product->id]) }}"><x-icon name="pencil" :size="16"/>Edit</a>@endcan
-</div></td></tr>@empty
-<tr><td colspan="{{ (!\App\Support\SecretControl::isHidden('hide_exact_selling_price') && !\App\Support\SecretControl::isHidden('hide_all_price_data')) ? 6 : 5 }}" class="empty-cell">No products match this category and filter.</td></tr>@endforelse
-</tbody></table></div><div class="pagination">{{ $products->links() }}</div></section>
+<div class="page-heading">
+    <div><span class="eyebrow">CATEGORY</span>
+        <h1>{{ $record->name }}</h1>
+        <p>Products assigned to this category, including products shared with other categories.</p>
+    </div>
+    <div class="heading-actions"><a class="btn secondary" href="{{ route('manage.index','categories') }}"><x-icon name="arrow-left" />Categories</a>@can('categories.edit')<a class="btn primary" href="{{ route('manage.edit',['categories',$record->id]) }}"><x-icon name="pencil" />Edit category</a>@endcan
+    </div>
+</div>
+<section class="card">
+    <div class="card-heading">
+        <div>
+            <h2>Products in {{ $record->name }}</h2>
+            <p class="muted">{{ $products->total() }} {{ \Illuminate\Support\Str::plural('product',$products->total()) }}</p>
+        </div><span class="tile-icon"><x-icon name="tags" /></span>
+    </div>
+    <form class="filter-bar" method="GET"><label class="search-field"><x-icon name="search" /><input type="search" name="q" value="{{ request('q') }}" placeholder="{{ config('features.barcode')?'Search name, SKU or barcode…':'Search name or SKU…' }}" aria-label="Search category products"></label><select name="active" aria-label="Product status">
+            <option value="">All products</option>
+            <option value="1" @selected(request('active')==='1' )>Active</option>
+            <option value="0" @selected(request('active')==='0' )>Inactive</option>
+        </select><button class="btn secondary">Apply</button><a class="text-link" href="{{ route('manage.show',['categories',$record->id]) }}">Reset</a> </form>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>SKU @if(config('features.barcode'))/ barcode @endif</th>
+                    <th>Stock</th>
+                    @if(!\App\Support\SecretControl::isHidden('hide_exact_selling_price') && !\App\Support\SecretControl::isHidden('hide_all_price_data'))
+                    <th>Selling price @if(\App\Support\Units::enabled()) / unit @endif</th>
+                    @endif
+                    <th>Status</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>@forelse($products as $product)<tr>
+                    <td>@can('products.view')<a class="text-link" href="{{ route('manage.show',['products',$product->id]) }}">{{ \App\Support\SecretControl::productName($product) }}</a>@else {{ \App\Support\SecretControl::productName($product) }}@endcan </td>
+                    <td>{{ \App\Support\SecretControl::isHidden('hide_product_level_data') ? 'SKU-'.$product->id : $product->sku }}@if(config('features.barcode') && !\App\Support\SecretControl::isHidden('hide_product_level_data'))<small class="table-secondary">{{ $product->barcode??'No barcode' }}</small>@endif</td>
+                    <td>{{ \App\Support\Units::quantity((float)$product->stock, $product->unit?->short_name) }}</td>
+                    @if(!\App\Support\SecretControl::isHidden('hide_exact_selling_price') && !\App\Support\SecretControl::isHidden('hide_all_price_data'))
+                    <td>@if(\App\Support\SecretControl::isSellingPriceHiddenFor($product->price))—@else{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::displayPrice($product->price) }} @if(\App\Support\Units::enabled())/ {{ $product->unit?->short_name }}@endif @endif</td>
+                    @endif
+                    <td><span class="badge {{ $product->active?'green':'slate' }}">{{ $product->active?'Active':'Inactive' }}</span></td>
+                    <td>
+                        <div class="row-actions">@can('products.view')<a class="btn secondary small" href="{{ route('manage.show',['products',$product->id]) }}"><x-icon name="eye" :size="16" />View</a>@endcan @can('products.edit')<a class="btn secondary small" href="{{ route('manage.edit',['products',$product->id]) }}"><x-icon name="pencil" :size="16" />Edit</a>@endcan
+                        </div>
+                    </td>
+                </tr>@empty
+                <tr>
+                    <td colspan="{{ (!\App\Support\SecretControl::isHidden('hide_exact_selling_price') && !\App\Support\SecretControl::isHidden('hide_all_price_data')) ? 6 : 5 }}" class="empty-cell">No products match this category and filter.</td>
+                </tr>@endforelse
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination">{{ $products->links() }}</div>
+</section>
 @endsection
