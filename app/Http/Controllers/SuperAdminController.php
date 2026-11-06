@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Services\ProfitLossService;
 use App\Support\SecretControl;
@@ -29,10 +31,22 @@ class SuperAdminController extends Controller
         // Real calculations (Super Admin has 100% unrestricted multiplier)
         $realSummary = $profit->calculate($from, $to);
 
-        // Calculate what normal users see with the current percentage
+        // Calculate what normal users see with the current percentages
         $normalSummary = [];
+        $sellMult = SecretControl::sellingPriceMultiplier();
+        $costMult = SecretControl::costMultiplier();
+        $genMult  = SecretControl::multiplier();
         foreach ($realSummary as $k => $v) {
-            $normalSummary[$k] = round((float) $v * $multiplier, 2);
+            $mult = match ($k) {
+                'grossSales', 'salesReturns', 'revenue' => $sellMult,
+                'cogs', 'estimatedRecovery' => $costMult,
+                default => $genMult,
+            };
+            $normalSummary[$k] = round((float) $v * $mult, 2);
+        }
+        if (isset($normalSummary['revenue'], $normalSummary['cogs'])) {
+            $normalSummary['gross'] = round($normalSummary['revenue'] - $normalSummary['cogs'], 2);
+            $normalSummary['net'] = round($normalSummary['gross'] - ($normalSummary['expenses'] ?? 0), 2);
         }
 
         // Stats
@@ -52,10 +66,11 @@ class SuperAdminController extends Controller
         for ($i = $days - 1; $i >= 0; $i--) {
             $date = today()->subDays($i);
             $day = $date->toDateString();
+            $dayRev = (float) ($profit->calculate($day, $day)['revenue'] ?? 0);
             $overview[] = [
                 'label'       => $date->format('d M'),
-                'real_amount' => $profit->calculate($day, $day)['revenue'],
-                'user_amount' => round((float) $profit->calculate($day, $day)['revenue'] * $multiplier, 2),
+                'real_amount' => $dayRev,
+                'user_amount' => round($dayRev * $sellMult, 2),
             ];
         }
 
@@ -186,6 +201,7 @@ class SuperAdminController extends Controller
         $systemActive    = (bool) SecretControl::get('system_active', 1);
         $percentage      = SecretControl::percentage();
         $pricePercentage = SecretControl::pricePercentage();
+        $costPercentage  = SecretControl::costPercentage();
 
         $query = Product::with(['categories', 'unit', 'stockLayers']);
         if ($request->filled('q')) {
@@ -202,7 +218,7 @@ class SuperAdminController extends Controller
             ->selectRaw('SUM(COALESCE(remaining_cost_total, remaining_quantity * cost_price)) as value')
             ->value('value') ?? '0';
 
-        return view('superadmin.products', compact('products', 'stats', 'systemActive', 'percentage', 'pricePercentage'));
+        return view('superadmin.products', compact('products', 'stats', 'systemActive', 'percentage', 'pricePercentage', 'costPercentage'));
     }
 
     /**
@@ -229,8 +245,10 @@ class SuperAdminController extends Controller
     {
         $systemActive = (bool) SecretControl::get('system_active', 1);
 
-        $stockPercentage = SecretControl::stockPercentage();
-        $pricePercentage = SecretControl::pricePercentage();
+        $stockPercentage        = SecretControl::stockPercentage();
+        $sellingPricePercentage = SecretControl::sellingPricePercentage();
+        $costPercentage         = SecretControl::costPercentage();
+        $pricePercentage        = $sellingPricePercentage; // backward compatibility
 
         $switches = [
             'enable_pos_price_percentage' => (bool) SecretControl::get('enable_pos_price_percentage', 0),
@@ -249,6 +267,8 @@ class SuperAdminController extends Controller
         return view('superadmin.stock', compact(
             'systemActive',
             'stockPercentage',
+            'sellingPricePercentage',
+            'costPercentage',
             'pricePercentage',
             'switches',
             'hiddenProducts',
@@ -263,14 +283,20 @@ class SuperAdminController extends Controller
     public function saveStock(Request $request)
     {
         $validated = $request->validate([
-            'visible_stock_percentage'  => ['required', 'numeric', 'min:0', 'max:100'],
-            'visible_price_percentage'  => ['required', 'numeric', 'min:0', 'max:100'],
-            'hide_cost_price_ranges'    => ['nullable', 'string', 'max:255'],
-            'hide_selling_price_ranges' => ['nullable', 'string', 'max:255'],
+            'visible_stock_percentage'         => ['required', 'numeric', 'min:0', 'max:100'],
+            'visible_selling_price_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'visible_price_percentage'         => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'visible_cost_percentage'          => ['required', 'numeric', 'min:0', 'max:100'],
+            'hide_cost_price_ranges'           => ['nullable', 'string', 'max:255'],
+            'hide_selling_price_ranges'        => ['nullable', 'string', 'max:255'],
         ]);
 
+        $sellingPct = (float) ($request->input('visible_selling_price_percentage', $request->input('visible_price_percentage', 100)));
+
         SecretControl::set('visible_stock_percentage', (float) $validated['visible_stock_percentage']);
-        SecretControl::set('visible_price_percentage', (float) $validated['visible_price_percentage']);
+        SecretControl::set('visible_selling_price_percentage', $sellingPct);
+        SecretControl::set('visible_price_percentage', $sellingPct);
+        SecretControl::set('visible_cost_percentage', (float) $validated['visible_cost_percentage']);
         SecretControl::set('hide_cost_price_ranges', trim((string) ($validated['hide_cost_price_ranges'] ?? '')));
         SecretControl::set('hide_selling_price_ranges', trim((string) ($validated['hide_selling_price_ranges'] ?? '')));
 
@@ -378,7 +404,284 @@ class SuperAdminController extends Controller
     {
         $systemActive = (bool) SecretControl::get('system_active', 1);
         $percentage   = SecretControl::percentage();
-        return view('superadmin.hide-records', compact('systemActive', 'percentage'));
+
+        $switches = [
+            'mask_supplier_customer_names' => (bool) SecretControl::get('mask_supplier_customer_names', 0),
+            'hide_all_customers'           => (bool) SecretControl::get('hide_all_customers', 0),
+            'hide_all_suppliers'           => (bool) SecretControl::get('hide_all_suppliers', 0),
+            'mask_invoice_numbers'         => (bool) SecretControl::get('mask_invoice_numbers', 0),
+            'mask_payment_amounts'         => (bool) SecretControl::get('mask_payment_amounts', 0),
+            'hide_weekly_purchase_info'    => (bool) SecretControl::get('hide_weekly_purchase_info', 0),
+            'hide_monthly_purchase_info'   => (bool) SecretControl::get('hide_monthly_purchase_info', 0),
+            'hide_genuine_stock_values'    => (bool) SecretControl::get('hide_genuine_stock_values', 0),
+            'hide_own_cheques'             => (bool) SecretControl::get('hide_own_cheques', 0),
+            'hide_customer_cheques'        => (bool) SecretControl::get('hide_customer_cheques', 0),
+            'hide_party_cheques'           => (bool) SecretControl::get('hide_party_cheques', 0),
+        ];
+
+        $customerPercentage = SecretControl::customerAmountPercentage();
+        $chequePercentage   = SecretControl::chequeAmountPercentage();
+        $chequeCountRule    = SecretControl::get('cheque_count_rule', 'NONE');
+        $chequeRuleLimit    = (int) SecretControl::get('cheque_rule_limit', 0);
+
+        $hiddenSuppliers    = SecretControl::hiddenSuppliersList();
+        $hiddenCustomers    = SecretControl::hiddenCustomersList();
+        $hiddenSalesBills   = SecretControl::hiddenSalesList();
+
+        $hideSalesAmountRanges       = SecretControl::get('hide_sales_amount_ranges', '');
+        $hidePurchaseAmountRanges    = SecretControl::get('hide_purchase_amount_ranges', '');
+        $hideCustomerPurchaseRanges  = SecretControl::get('hide_customer_purchase_ranges', '');
+
+        return view('superadmin.hide-records', compact(
+            'systemActive',
+            'percentage',
+            'switches',
+            'customerPercentage',
+            'chequePercentage',
+            'chequeCountRule',
+            'chequeRuleLimit',
+            'hiddenSuppliers',
+            'hiddenCustomers',
+            'hiddenSalesBills',
+            'hideSalesAmountRanges',
+            'hidePurchaseAmountRanges',
+            'hideCustomerPurchaseRanges'
+        ));
+    }
+
+    /**
+     * Save Hide Records settings.
+     */
+    public function saveHideRecords(Request $request)
+    {
+        $validated = $request->validate([
+            'visible_customer_amount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'visible_cheque_amount_percentage'   => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'cheque_count_rule'                  => ['nullable', 'string', 'max:50'],
+            'cheque_rule_limit'                  => ['nullable', 'integer', 'min:0'],
+            'hide_sales_amount_ranges'           => ['nullable', 'string', 'max:255'],
+            'hide_purchase_amount_ranges'        => ['nullable', 'string', 'max:255'],
+            'hide_customer_purchase_ranges'      => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $switches = [
+            'mask_supplier_customer_names',
+            'hide_all_customers',
+            'hide_all_suppliers',
+            'mask_invoice_numbers',
+            'mask_payment_amounts',
+            'hide_weekly_purchase_info',
+            'hide_monthly_purchase_info',
+            'hide_genuine_stock_values',
+            'hide_own_cheques',
+            'hide_customer_cheques',
+            'hide_party_cheques',
+        ];
+
+        foreach ($switches as $key) {
+            SecretControl::set($key, $request->has($key) ? 1 : 0);
+        }
+
+        SecretControl::set('visible_customer_amount_percentage', (float) ($validated['visible_customer_amount_percentage'] ?? 100));
+
+        if (config('features.cheque')) {
+            SecretControl::set('visible_cheque_amount_percentage', (float) ($validated['visible_cheque_amount_percentage'] ?? 100));
+            SecretControl::set('cheque_count_rule', $validated['cheque_count_rule'] ?? 'NONE');
+            SecretControl::set('cheque_rule_limit', (int) ($validated['cheque_rule_limit'] ?? 0));
+        }
+
+        SecretControl::set('hide_sales_amount_ranges', trim((string) ($validated['hide_sales_amount_ranges'] ?? '')));
+        SecretControl::set('hide_purchase_amount_ranges', trim((string) ($validated['hide_purchase_amount_ranges'] ?? '')));
+        SecretControl::set('hide_customer_purchase_ranges', trim((string) ($validated['hide_customer_purchase_ranges'] ?? '')));
+
+        return redirect()->route('superadmin.hide-records')
+            ->with('success', 'Hide Records controls saved successfully!');
+    }
+
+    public function searchSuppliers(Request $request)
+    {
+        $q = trim((string) $request->input('q', ''));
+        if (strlen($q) < 1) {
+            return response()->json([]);
+        }
+
+        $suppliers = Supplier::where(function ($sub) use ($q) {
+            $sub->where('name', 'like', "%{$q}%")
+                ->orWhere('phone', 'like', "%{$q}%");
+        })->limit(10)->get(['id', 'name', 'phone']);
+
+        return response()->json($suppliers);
+    }
+
+    public function addHiddenSupplier(Request $request)
+    {
+        $input = trim((string) $request->input('supplier', ''));
+        if ($input === '') {
+            return back()->with('error', 'Please enter a supplier name or phone.');
+        }
+
+        $supplier = is_numeric($input) ? Supplier::find((int) $input) : null;
+        if (! $supplier) {
+            $supplier = Supplier::where('phone', $input)
+                ->orWhere('name', 'like', "%{$input}%")
+                ->first();
+        }
+
+        if (! $supplier) {
+            return back()->with('error', "No supplier found matching '{$input}'.");
+        }
+
+        SecretControl::addHiddenSupplier($supplier->id);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success'  => true,
+                'supplier' => ['id' => $supplier->id, 'name' => $supplier->name, 'phone' => $supplier->phone ?? ''],
+                'hidden'   => SecretControl::hiddenSuppliersList(),
+            ]);
+        }
+
+        return back()->with('success', "Supplier '{$supplier->name}' hidden from normal users.");
+    }
+
+    public function removeHiddenSupplier(Request $request, $id)
+    {
+        SecretControl::removeHiddenSupplier((int) $id);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'hidden'  => SecretControl::hiddenSuppliersList(),
+            ]);
+        }
+
+        return back()->with('success', 'Supplier removed from hidden list.');
+    }
+
+    public function searchCustomers(Request $request)
+    {
+        $q = trim((string) $request->input('q', ''));
+        if (strlen($q) < 1) {
+            return response()->json([]);
+        }
+
+        $customers = Customer::where(function ($sub) use ($q) {
+            $sub->where('name', 'like', "%{$q}%")
+                ->orWhere('phone', 'like', "%{$q}%")
+                ->orWhere('email', 'like', "%{$q}%");
+        })->limit(10)->get(['id', 'name', 'phone']);
+
+        return response()->json($customers);
+    }
+
+    public function addHiddenCustomer(Request $request)
+    {
+        $input = trim((string) $request->input('customer', ''));
+        if ($input === '') {
+            return back()->with('error', 'Please enter a customer name or phone.');
+        }
+
+        $customer = is_numeric($input) ? Customer::find((int) $input) : null;
+        if (! $customer) {
+            $customer = Customer::where('phone', $input)
+                ->orWhere('name', 'like', "%{$input}%")
+                ->first();
+        }
+
+        if (! $customer) {
+            return back()->with('error', "No customer found matching '{$input}'.");
+        }
+
+        SecretControl::addHiddenCustomer($customer->id);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success'  => true,
+                'customer' => ['id' => $customer->id, 'name' => $customer->name, 'phone' => $customer->phone ?? ''],
+                'hidden'   => SecretControl::hiddenCustomersList(),
+            ]);
+        }
+
+        return back()->with('success', "Customer '{$customer->name}' hidden from normal users.");
+    }
+
+    public function removeHiddenCustomer(Request $request, $id)
+    {
+        SecretControl::removeHiddenCustomer((int) $id);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'hidden'  => SecretControl::hiddenCustomersList(),
+            ]);
+        }
+
+        return back()->with('success', 'Customer removed from hidden list.');
+    }
+
+    public function searchSales(Request $request)
+    {
+        $q = trim((string) $request->input('q', ''));
+        if (strlen($q) < 1) {
+            return response()->json([]);
+        }
+
+        $sales = Sale::with('customer')->where(function ($sub) use ($q) {
+            $sub->where('invoice', 'like', "%{$q}%")
+                ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$q}%"));
+        })->limit(10)->get(['id', 'invoice', 'customer_id', 'customer_payable']);
+
+        $res = $sales->map(fn ($s) => [
+            'id'            => $s->id,
+            'invoice'       => $s->invoice,
+            'customer_name' => $s->customer?->name ?? 'Walk-in',
+            'amount'        => (float) $s->customer_payable,
+        ]);
+
+        return response()->json($res);
+    }
+
+    public function addHiddenSale(Request $request)
+    {
+        $input = trim((string) $request->input('sale', ''));
+        if ($input === '') {
+            return back()->with('error', 'Please enter an invoice number or sale ID.');
+        }
+
+        $sale = is_numeric($input) ? Sale::find((int) $input) : null;
+        if (! $sale) {
+            $sale = Sale::where('invoice', $input)->first();
+        }
+
+        if (! $sale) {
+            return back()->with('error', "No sale found matching '{$input}'.");
+        }
+
+        SecretControl::addHiddenSale($sale->id);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'sale'    => ['id' => $sale->id, 'invoice' => $sale->invoice],
+                'hidden'  => SecretControl::hiddenSalesList(),
+            ]);
+        }
+
+        return back()->with('success', "Sale invoice '{$sale->invoice}' hidden from normal users.");
+    }
+
+    public function removeHiddenSale(Request $request, $id)
+    {
+        SecretControl::removeHiddenSale((int) $id);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'hidden'  => SecretControl::hiddenSalesList(),
+            ]);
+        }
+
+        return back()->with('success', 'Sale removed from hidden list.');
     }
 
     /**

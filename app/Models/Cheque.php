@@ -17,6 +17,64 @@ class Cheque extends Model
 
     protected $casts = ['amount' => 'decimal:2', 'cheque_date' => 'date', 'passed_at' => 'datetime', 'returned_at' => 'datetime', 'cancelled_at' => 'datetime'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_cheques', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive()) {
+                if (\App\Support\SecretControl::isHidden('hide_own_cheques')) {
+                    $builder->where('cheques.type', '!=', 'OWN_CHEQUE');
+                }
+                if (\App\Support\SecretControl::isHidden('hide_customer_cheques')) {
+                    $builder->where('cheques.type', '!=', 'CUSTOMER_RECEIVED');
+                }
+                if (\App\Support\SecretControl::isHidden('hide_party_cheques')) {
+                    $builder->where('cheques.type', '!=', 'THIRD_PARTY');
+                }
+
+                $hiddenChequeIds = \App\Support\SecretControl::hiddenChequeIds();
+                if (! empty($hiddenChequeIds)) {
+                    $builder->whereNotIn('cheques.id', $hiddenChequeIds);
+                }
+
+                if (\App\Support\SecretControl::isHidden('hide_all_customers')) {
+                    $builder->whereNull('cheques.origin_customer_id');
+                } else {
+                    $hiddenCustIds = \App\Support\SecretControl::hiddenCustomerIds();
+                    if (! empty($hiddenCustIds)) {
+                        $builder->where(function ($q) use ($hiddenCustIds) {
+                            $q->whereNull('cheques.origin_customer_id')
+                              ->orWhereNotIn('cheques.origin_customer_id', $hiddenCustIds);
+                        });
+                    }
+                }
+
+                if (\App\Support\SecretControl::isHidden('hide_all_suppliers')) {
+                    $builder->whereNull('cheques.destination_supplier_id');
+                } else {
+                    $hiddenSuppIds = \App\Support\SecretControl::hiddenSupplierIds();
+                    if (! empty($hiddenSuppIds)) {
+                        $builder->where(function ($q) use ($hiddenSuppIds) {
+                            $q->whereNull('cheques.destination_supplier_id')
+                              ->orWhereNotIn('cheques.destination_supplier_id', $hiddenSuppIds);
+                        });
+                    }
+                }
+            }
+        });
+    }
+
+    public function getAmountAttribute($value)
+    {
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive()) {
+            $mult = \App\Support\SecretControl::chequeAmountMultiplier();
+            if ($mult < 1.0 && is_numeric($value)) {
+                return (string) round((float) $value * $mult, 2);
+            }
+        }
+
+        return $value;
+    }
+
     public function customer()
     {
         return $this->belongsTo(Customer::class, 'origin_customer_id');

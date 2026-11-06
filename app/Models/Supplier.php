@@ -12,6 +12,49 @@ class Supplier extends Model
 
     protected $casts = ['active' => 'boolean'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_suppliers', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive()) {
+                if (\App\Support\SecretControl::isHidden('hide_all_suppliers')) {
+                    $builder->whereRaw('0 = 1');
+                    return;
+                }
+                $hiddenSuppIds = \App\Support\SecretControl::hiddenSupplierIds();
+                if (! empty($hiddenSuppIds)) {
+                    $builder->whereNotIn('suppliers.id', $hiddenSuppIds);
+                }
+            }
+        });
+    }
+
+    public function getNameAttribute($value)
+    {
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive() && \App\Support\SecretControl::isHidden('mask_supplier_customer_names')) {
+            return 'Hidden';
+        }
+
+        return $value;
+    }
+
+    public function getPhoneAttribute($value)
+    {
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive() && \App\Support\SecretControl::isHidden('mask_supplier_customer_names')) {
+            return '—';
+        }
+
+        return $value;
+    }
+
+    public function getEmailAttribute($value)
+    {
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive() && \App\Support\SecretControl::isHidden('mask_supplier_customer_names')) {
+            return '—';
+        }
+
+        return $value;
+    }
+
     public function supplierReturns()
     {
         return $this->hasMany(SupplierReturn::class);

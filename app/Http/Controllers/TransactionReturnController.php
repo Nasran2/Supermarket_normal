@@ -221,7 +221,7 @@ class TransactionReturnController extends Controller
                 }
             }
             unset($unit);
-            $recent = PurchaseItem::where('product_id', $p->id)->whereHas('purchase', fn ($q) => $q->where('status', 'ACTIVE'))->with('purchase.supplier')->latest('id')->limit(10)->get()->unique(fn ($i) => $i->purchase->supplier_id)->take(5)->map(fn ($i) => ['id' => $i->purchase->supplier_id, 'name' => $i->purchase->supplier->name, 'date' => $i->purchase->purchase_date->format('d M Y')])->values();
+            $recent = PurchaseItem::where('product_id', $p->id)->whereHas('purchase', fn ($q) => $q->where('status', 'ACTIVE'))->with('purchase.supplier')->latest('id')->limit(10)->get()->filter(fn ($i) => $i->purchase && $i->purchase->supplier)->unique(fn ($i) => $i->purchase->supplier_id)->take(5)->map(fn ($i) => ['id' => $i->purchase->supplier_id, 'name' => $i->purchase->supplier->name, 'date' => $i->purchase->purchase_date->format('d M Y')])->values();
 
             return ['batch_enabled' => Expiry::enabled() && Expiry::setting('expiry_batch_enabled'), 'track_expiry' => Expiry::tracks($p), 'id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'barcode' => config('features.barcode') ? $p->barcode : null, 'unit_id' => $p->unit_id, 'units' => $units, 'price_options' => app(StockLayerService::class)->choices($p), 'recent_suppliers' => $recent];
         });

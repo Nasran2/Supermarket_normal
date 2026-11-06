@@ -16,15 +16,43 @@ class Sale extends Model
     protected static function booted()
     {
         static::addGlobalScope('secret_hidden_sales', function ($builder) {
-            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive()) {
                 $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
                 if (! empty($hiddenIds)) {
                     $builder->whereDoesntHave('items', function ($q) use ($hiddenIds) {
                         $q->withoutGlobalScopes()->whereIn('sale_items.product_id', $hiddenIds);
                     });
                 }
+
+                $hiddenSaleIds = \App\Support\SecretControl::hiddenSaleIds();
+                if (! empty($hiddenSaleIds)) {
+                    $builder->whereNotIn('sales.id', $hiddenSaleIds);
+                }
+
+                $hiddenCustIds = \App\Support\SecretControl::hiddenCustomerIds();
+                if (! empty($hiddenCustIds)) {
+                    $builder->whereNotIn('sales.customer_id', $hiddenCustIds);
+                }
+
+                $salesRanges = \App\Support\SecretControl::parseRanges(\App\Support\SecretControl::get('hide_sales_amount_ranges'));
+                if (! empty($salesRanges)) {
+                    $builder->where(function ($q) use ($salesRanges) {
+                        foreach ($salesRanges as $r) {
+                            $q->whereNotBetween('sales.customer_payable', [$r['min'], $r['max']]);
+                        }
+                    });
+                }
             }
         });
+    }
+
+    public function getInvoiceAttribute($value)
+    {
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive() && \App\Support\SecretControl::isHidden('mask_invoice_numbers')) {
+            return 'INV-****';
+        }
+
+        return $value;
     }
 
     public function scopeVisibleTo(Builder $query, mixed $user = null): Builder

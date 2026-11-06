@@ -16,6 +16,49 @@ class Customer extends Model
 
     protected $attributes = ['opening_due' => '0.00', 'opening_due_paid' => '0.00'];
 
+    protected static function booted()
+    {
+        static::addGlobalScope('secret_hidden_customers', function ($builder) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive()) {
+                if (\App\Support\SecretControl::isHidden('hide_all_customers')) {
+                    $builder->whereRaw('0 = 1');
+                    return;
+                }
+                $hiddenCustIds = \App\Support\SecretControl::hiddenCustomerIds();
+                if (! empty($hiddenCustIds)) {
+                    $builder->whereNotIn('customers.id', $hiddenCustIds);
+                }
+            }
+        });
+    }
+
+    public function getNameAttribute($value)
+    {
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive() && \App\Support\SecretControl::isHidden('mask_supplier_customer_names')) {
+            return 'Hidden';
+        }
+
+        return $value;
+    }
+
+    public function getPhoneAttribute($value)
+    {
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive() && \App\Support\SecretControl::isHidden('mask_supplier_customer_names')) {
+            return '—';
+        }
+
+        return $value;
+    }
+
+    public function getEmailAttribute($value)
+    {
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive() && \App\Support\SecretControl::isHidden('mask_supplier_customer_names')) {
+            return '—';
+        }
+
+        return $value;
+    }
+
     public static function invoiceDueSql(): string
     {
         $owner = SalesVisibility::ownerSql('due_sales.user_id');

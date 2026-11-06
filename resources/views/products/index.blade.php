@@ -65,7 +65,7 @@
 @if(\App\Support\SecretControl::isCostHiddenFor($p->cost))
 <span class="muted">—</span>
 @else
-{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($p->cost) }}
+{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::displayCost($p->cost) }}
 @endif
 </td>
 @endif

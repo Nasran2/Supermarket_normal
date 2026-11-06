@@ -634,6 +634,16 @@ Route::prefix('superadmin')
             Route::post('/stock/hidden-product', [SuperAdminController::class, 'addHiddenProduct'])->name('stock.hidden-product.add');
             Route::delete('/stock/hidden-product/{id}', [SuperAdminController::class, 'removeHiddenProduct'])->name('stock.hidden-product.remove');
             Route::get('/hide-records', [SuperAdminController::class, 'hideRecords'])->name('hide-records');
+            Route::post('/hide-records', [SuperAdminController::class, 'saveHideRecords'])->name('hide-records.save');
+            Route::get('/hide-records/search-suppliers', [SuperAdminController::class, 'searchSuppliers'])->name('hide-records.search-suppliers');
+            Route::post('/hide-records/hidden-supplier', [SuperAdminController::class, 'addHiddenSupplier'])->name('hide-records.hidden-supplier.add');
+            Route::delete('/hide-records/hidden-supplier/{id}', [SuperAdminController::class, 'removeHiddenSupplier'])->name('hide-records.hidden-supplier.remove');
+            Route::get('/hide-records/search-customers', [SuperAdminController::class, 'searchCustomers'])->name('hide-records.search-customers');
+            Route::post('/hide-records/hidden-customer', [SuperAdminController::class, 'addHiddenCustomer'])->name('hide-records.hidden-customer.add');
+            Route::delete('/hide-records/hidden-customer/{id}', [SuperAdminController::class, 'removeHiddenCustomer'])->name('hide-records.hidden-customer.remove');
+            Route::get('/hide-records/search-sales', [SuperAdminController::class, 'searchSales'])->name('hide-records.search-sales');
+            Route::post('/hide-records/hidden-sale', [SuperAdminController::class, 'addHiddenSale'])->name('hide-records.hidden-sale.add');
+            Route::delete('/hide-records/hidden-sale/{id}', [SuperAdminController::class, 'removeHiddenSale'])->name('hide-records.hidden-sale.remove');
             Route::get('/privacy-mode', [SuperAdminController::class, 'privacyMode'])->name('privacy-mode');
             Route::get('/sales', [SuperAdminController::class, 'sales'])->name('sales');
             Route::get('/products', [SuperAdminController::class, 'products'])->name('products');

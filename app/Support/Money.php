@@ -68,7 +68,52 @@ final class Money
     public static function displayPrice(string|int|float|null $value): string
     {
         if (class_exists(\App\Support\SecretControl::class)) {
-            $mult = \App\Support\SecretControl::priceMultiplier();
+            $mult = \App\Support\SecretControl::sellingPriceMultiplier();
+            if ($mult < 1.0 && is_numeric($value)) {
+                $value = (string) round((float) $value * $mult, 2);
+            }
+        }
+
+        return self::formatRaw($value);
+    }
+
+    public static function displayCost(string|int|float|null $value): string
+    {
+        if (class_exists(\App\Support\SecretControl::class)) {
+            $mult = \App\Support\SecretControl::costMultiplier();
+            if ($mult < 1.0 && is_numeric($value)) {
+                $value = (string) round((float) $value * $mult, 2);
+            }
+        }
+
+        return self::formatRaw($value);
+    }
+
+    public static function displayPayment(string|int|float|null $value): string
+    {
+        if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('mask_payment_amounts')) {
+            return '—';
+        }
+
+        return self::displayCustomerAmount($value);
+    }
+
+    public static function displayCustomerAmount(string|int|float|null $value): string
+    {
+        if (class_exists(\App\Support\SecretControl::class)) {
+            $mult = \App\Support\SecretControl::customerAmountMultiplier();
+            if ($mult < 1.0 && is_numeric($value)) {
+                $value = (string) round((float) $value * $mult, 2);
+            }
+        }
+
+        return self::formatRaw($value);
+    }
+
+    public static function displayCheque(string|int|float|null $value): string
+    {
+        if (class_exists(\App\Support\SecretControl::class)) {
+            $mult = \App\Support\SecretControl::chequeAmountMultiplier();
             if ($mult < 1.0 && is_numeric($value)) {
                 $value = (string) round((float) $value * $mult, 2);
             }

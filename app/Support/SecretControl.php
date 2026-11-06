@@ -79,10 +79,25 @@ class SecretControl
     }
 
     /**
+     * Whether the Super Admin feature is enabled via .env (SUPER_ADMIN=true).
+     * When SUPER_ADMIN is false, all secret controls, multipliers, and hiding features
+     * are completely bypassed/disabled, and all prices, costs, stock, and UI elements
+     * revert 100% to normal.
+     */
+    public static function isSuperAdminFeatureActive(): bool
+    {
+        return filter_var(config('features.super_admin', env('SUPER_ADMIN', false)), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
      * Whether the current request is inside the Super Admin panel.
      */
     public static function isSuperAdminArea(): bool
     {
+        if (! static::isSuperAdminFeatureActive()) {
+            return false;
+        }
+
         try {
             return request()->is('superadmin*');
         } catch (\Throwable $e) {
@@ -92,13 +107,13 @@ class SecretControl
 
     /**
      * Multiplier factor for prices, costs, and profits.
-     * When viewing inside the Super Admin panel (/superadmin*), ALWAYS 1.0 (100% real numbers).
-     * For ALL normal app pages (even when logged in as admin), scales by (visible_profit_percentage / 100).
+     * When SUPER_ADMIN=false, or when viewing inside the Super Admin panel (/superadmin*),
+     * ALWAYS returns 1.0 (100% real numbers).
+     * For normal app pages when SUPER_ADMIN=true, scales by (visible_profit_percentage / 100).
      */
     public static function multiplier(): float
     {
-        // Inside Super Admin area, always show 100% real numbers
-        if (static::isSuperAdminArea()) {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
             return 1.0;
         }
 
@@ -115,16 +130,20 @@ class SecretControl
      */
     public static function percentage(): float
     {
+        if (! static::isSuperAdminFeatureActive()) {
+            return 100.0;
+        }
+
         return (float) static::get('visible_profit_percentage', 100);
     }
 
     /**
      * Check if a feature/card/widget is hidden from normal users.
-     * Always returns false inside Super Admin area.
+     * Always returns false when SUPER_ADMIN=false or inside Super Admin area.
      */
     public static function isHidden(string $key): bool
     {
-        if (static::isSuperAdminArea()) {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
             return false;
         }
 
@@ -136,6 +155,10 @@ class SecretControl
      */
     public static function isEnabled(string $key): bool
     {
+        if (! static::isSuperAdminFeatureActive()) {
+            return false;
+        }
+
         return (bool) static::get($key, 0);
     }
 
@@ -145,7 +168,16 @@ class SecretControl
     public static function scalePrice(float|int|string|null $price): float
     {
         $val = (float) ($price ?? 0);
-        return round($val * static::priceMultiplier(), 2);
+        return round($val * static::sellingPriceMultiplier(), 2);
+    }
+
+    /**
+     * Scale a cost price by the cost multiplier.
+     */
+    public static function scaleCost(float|int|string|null $cost): float
+    {
+        $val = (float) ($cost ?? 0);
+        return round($val * static::costMultiplier(), 2);
     }
 
     /**
@@ -159,11 +191,11 @@ class SecretControl
 
     /**
      * Multiplier factor for stock/quantities.
-     * Always 1.0 in Super Admin area.
+     * Always 1.0 when SUPER_ADMIN=false or in Super Admin area.
      */
     public static function stockMultiplier(): float
     {
-        if (static::isSuperAdminArea()) {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
             return 1.0;
         }
 
@@ -180,20 +212,24 @@ class SecretControl
      */
     public static function stockPercentage(): float
     {
+        if (! static::isSuperAdminFeatureActive()) {
+            return 100.0;
+        }
+
         return (float) static::get('visible_stock_percentage', 100);
     }
 
     /**
      * Multiplier factor for selling prices.
-     * Always 1.0 in Super Admin area.
+     * Always 1.0 when SUPER_ADMIN=false or in Super Admin area.
      */
-    public static function priceMultiplier(): float
+    public static function sellingPriceMultiplier(): float
     {
-        if (static::isSuperAdminArea()) {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
             return 1.0;
         }
 
-        $pct = (float) static::get('visible_price_percentage', static::get('visible_profit_percentage', 100));
+        $pct = static::sellingPricePercentage();
         if ($pct <= 0) {
             return 0.0;
         }
@@ -202,11 +238,61 @@ class SecretControl
     }
 
     /**
-     * Raw visible price percentage.
+     * Raw visible selling price percentage.
+     */
+    public static function sellingPricePercentage(): float
+    {
+        if (! static::isSuperAdminFeatureActive()) {
+            return 100.0;
+        }
+
+        return (float) static::get('visible_selling_price_percentage', static::get('visible_price_percentage', static::get('visible_profit_percentage', 100)));
+    }
+
+    /**
+     * Multiplier factor for selling prices (alias).
+     */
+    public static function priceMultiplier(): float
+    {
+        return static::sellingPriceMultiplier();
+    }
+
+    /**
+     * Raw visible price percentage (alias).
      */
     public static function pricePercentage(): float
     {
-        return (float) static::get('visible_price_percentage', static::get('visible_profit_percentage', 100));
+        return static::sellingPricePercentage();
+    }
+
+    /**
+     * Multiplier factor for cost prices.
+     * Always 1.0 when SUPER_ADMIN=false or in Super Admin area.
+     */
+    public static function costMultiplier(): float
+    {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
+            return 1.0;
+        }
+
+        $pct = static::costPercentage();
+        if ($pct <= 0) {
+            return 0.0;
+        }
+
+        return min(100.0, $pct) / 100.0;
+    }
+
+    /**
+     * Raw visible cost price percentage.
+     */
+    public static function costPercentage(): float
+    {
+        if (! static::isSuperAdminFeatureActive()) {
+            return 100.0;
+        }
+
+        return (float) static::get('visible_cost_percentage', static::get('visible_profit_percentage', 100));
     }
 
     /**
@@ -236,11 +322,11 @@ class SecretControl
     /**
      * Array of hidden product IDs.
      * Combines products explicitly hidden by search + products matching selling price/cost ranges.
-     * When inside Super Admin (/superadmin*), returns empty array (unrestricted).
+     * When SUPER_ADMIN=false or inside Super Admin (/superadmin*), returns empty array (unrestricted).
      */
     public static function hiddenProductIds(): array
     {
-        if (static::isSuperAdminArea()) {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
             return [];
         }
 
@@ -377,11 +463,11 @@ class SecretControl
      */
     public static function isCostHiddenFor(float|int|string|null $cost): bool
     {
-        if (static::isSuperAdminArea()) {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
             return false;
         }
 
-        if (static::isHidden('hide_all_price_data') || static::isHidden('hide_exact_purchase_cost') || static::isHidden('hide_stock_money')) {
+        if (static::isHidden('hide_all_price_data') || static::isHidden('hide_exact_purchase_cost') || static::isHidden('hide_stock_money') || static::isHidden('hide_genuine_stock_values')) {
             return true;
         }
 
@@ -398,7 +484,7 @@ class SecretControl
      */
     public static function isSellingPriceHiddenFor(float|int|string|null $price): bool
     {
-        if (static::isSuperAdminArea()) {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
             return false;
         }
 
@@ -425,7 +511,7 @@ class SecretControl
 
         $name = is_object($product) ? ($product->name ?? '') : (string) $product;
 
-        if (static::isSuperAdminArea()) {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
             return $name;
         }
 
@@ -435,6 +521,299 @@ class SecretControl
         }
 
         return $name;
+    }
+
+    /**
+     * Customer amount percentage (default: 100).
+     */
+    public static function customerAmountPercentage(): float
+    {
+        if (! static::isSuperAdminFeatureActive()) {
+            return 100.0;
+        }
+
+        return (float) static::get('visible_customer_amount_percentage', 100);
+    }
+
+    /**
+     * Multiplier factor for customer balances, dues, and payments.
+     */
+    public static function customerAmountMultiplier(): float
+    {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
+            return 1.0;
+        }
+
+        $pct = static::customerAmountPercentage();
+        if ($pct <= 0) {
+            return 0.0;
+        }
+
+        return min(100.0, $pct) / 100.0;
+    }
+
+    /**
+     * Cheque amount percentage (default: 100).
+     */
+    public static function chequeAmountPercentage(): float
+    {
+        if (! static::isSuperAdminFeatureActive()) {
+            return 100.0;
+        }
+
+        return (float) static::get('visible_cheque_amount_percentage', 100);
+    }
+
+    /**
+     * Multiplier factor for displayed cheque amounts.
+     */
+    public static function chequeAmountMultiplier(): float
+    {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
+            return 1.0;
+        }
+
+        $pct = static::chequeAmountPercentage();
+        if ($pct <= 0) {
+            return 0.0;
+        }
+
+        return min(100.0, $pct) / 100.0;
+    }
+
+    /**
+     * Cheque IDs to hide based on cheque count rules.
+     */
+    public static function hiddenChequeIds(): array
+    {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
+            return [];
+        }
+
+        $rule = static::get('cheque_count_rule', 'NONE');
+        $limit = (int) static::get('cheque_rule_limit', 0);
+
+        if ($rule === 'HIDE_ALL') {
+            try {
+                return DB::table('cheques')->pluck('id')->all();
+            } catch (\Throwable $e) {
+                return [];
+            }
+        }
+
+        if ($limit > 0 && in_array($rule, ['HIDE_TOP_HIGHEST', 'HIDE_TOP_LOWEST'], true)) {
+            try {
+                $dir = $rule === 'HIDE_TOP_HIGHEST' ? 'desc' : 'asc';
+                return DB::table('cheques')->orderBy('amount', $dir)->limit($limit)->pluck('id')->all();
+            } catch (\Throwable $e) {
+                return [];
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Hidden suppliers list.
+     */
+    public static function hiddenSuppliersList(): array
+    {
+        $raw = static::get('hidden_suppliers', '[]');
+        $list = is_string($raw) ? json_decode($raw, true) : (array) $raw;
+        return is_array($list) ? $list : [];
+    }
+
+    /**
+     * Hidden supplier IDs.
+     */
+    public static function hiddenSupplierIds(): array
+    {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
+            return [];
+        }
+
+        $list = static::hiddenSuppliersList();
+        return array_values(array_unique(array_filter(array_map('intval', array_column($list, 'id')))));
+    }
+
+    /**
+     * Add a supplier to hidden suppliers.
+     */
+    public static function addHiddenSupplier(int $id): bool
+    {
+        $supplier = \App\Models\Supplier::find($id);
+        if (! $supplier) {
+            return false;
+        }
+
+        $list = static::hiddenSuppliersList();
+        foreach ($list as $item) {
+            if ((int) ($item['id'] ?? 0) === $id) {
+                return true;
+            }
+        }
+
+        $list[] = [
+            'id'    => $supplier->id,
+            'name'  => $supplier->name,
+            'phone' => $supplier->phone ?? '',
+        ];
+
+        static::set('hidden_suppliers', json_encode(array_values($list)));
+        return true;
+    }
+
+    /**
+     * Remove a supplier from hidden suppliers.
+     */
+    public static function removeHiddenSupplier(int $id): bool
+    {
+        $list = static::hiddenSuppliersList();
+        $newList = array_values(array_filter($list, fn ($item) => (int) ($item['id'] ?? 0) !== $id));
+        static::set('hidden_suppliers', json_encode($newList));
+        return true;
+    }
+
+    /**
+     * Hidden customers list.
+     */
+    public static function hiddenCustomersList(): array
+    {
+        $raw = static::get('hidden_customers', '[]');
+        $list = is_string($raw) ? json_decode($raw, true) : (array) $raw;
+        return is_array($list) ? $list : [];
+    }
+
+    /**
+     * Hidden customer IDs.
+     */
+    public static function hiddenCustomerIds(): array
+    {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
+            return [];
+        }
+
+        $list = static::hiddenCustomersList();
+        $ids = array_values(array_unique(array_filter(array_map('intval', array_column($list, 'id')))));
+
+        // Also check hide_customer_purchase_ranges if defined
+        $ranges = static::parseRanges(static::get('hide_customer_purchase_ranges'));
+        if (! empty($ranges)) {
+            try {
+                $rangeCustIds = DB::table('sales')
+                    ->select('customer_id')
+                    ->whereNotNull('customer_id')
+                    ->groupBy('customer_id')
+                    ->havingRaw(implode(' OR ', array_map(fn ($r) => "(SUM(customer_payable) BETWEEN {$r['min']} AND {$r['max']})", $ranges)))
+                    ->pluck('customer_id')
+                    ->all();
+                $ids = array_merge($ids, array_map('intval', $rangeCustIds));
+            } catch (\Throwable $e) {
+                // Ignore if query fails
+            }
+        }
+
+        return array_values(array_unique(array_filter($ids)));
+    }
+
+    /**
+     * Add a customer to hidden customers.
+     */
+    public static function addHiddenCustomer(int $id): bool
+    {
+        $customer = \App\Models\Customer::find($id);
+        if (! $customer) {
+            return false;
+        }
+
+        $list = static::hiddenCustomersList();
+        foreach ($list as $item) {
+            if ((int) ($item['id'] ?? 0) === $id) {
+                return true;
+            }
+        }
+
+        $list[] = [
+            'id'    => $customer->id,
+            'name'  => $customer->name,
+            'phone' => $customer->phone ?? '',
+        ];
+
+        static::set('hidden_customers', json_encode(array_values($list)));
+        return true;
+    }
+
+    /**
+     * Remove a customer from hidden customers.
+     */
+    public static function removeHiddenCustomer(int $id): bool
+    {
+        $list = static::hiddenCustomersList();
+        $newList = array_values(array_filter($list, fn ($item) => (int) ($item['id'] ?? 0) !== $id));
+        static::set('hidden_customers', json_encode($newList));
+        return true;
+    }
+
+    /**
+     * Hidden sales bills list.
+     */
+    public static function hiddenSalesList(): array
+    {
+        $raw = static::get('hidden_sales_bills', '[]');
+        $list = is_string($raw) ? json_decode($raw, true) : (array) $raw;
+        return is_array($list) ? $list : [];
+    }
+
+    /**
+     * Hidden sale IDs.
+     */
+    public static function hiddenSaleIds(): array
+    {
+        if (! static::isSuperAdminFeatureActive() || static::isSuperAdminArea()) {
+            return [];
+        }
+
+        $list = static::hiddenSalesList();
+        return array_values(array_unique(array_filter(array_map('intval', array_column($list, 'id')))));
+    }
+
+    /**
+     * Add a sale to hidden sales bills.
+     */
+    public static function addHiddenSale(int $id): bool
+    {
+        $sale = \App\Models\Sale::with('customer')->find($id);
+        if (! $sale) {
+            return false;
+        }
+
+        $list = static::hiddenSalesList();
+        foreach ($list as $item) {
+            if ((int) ($item['id'] ?? 0) === $id) {
+                return true;
+            }
+        }
+
+        $list[] = [
+            'id'            => $sale->id,
+            'invoice'       => $sale->invoice,
+            'customer_name' => $sale->customer?->name ?? 'Walk-in',
+            'amount'        => (float) $sale->customer_payable,
+        ];
+
+        static::set('hidden_sales_bills', json_encode(array_values($list)));
+        return true;
+    }
+
+    /**
+     * Remove a sale from hidden sales bills.
+     */
+    public static function removeHiddenSale(int $id): bool
+    {
+        $list = static::hiddenSalesList();
+        $newList = array_values(array_filter($list, fn ($item) => (int) ($item['id'] ?? 0) !== $id));
+        static::set('hidden_sales_bills', json_encode($newList));
+        return true;
     }
 }
 

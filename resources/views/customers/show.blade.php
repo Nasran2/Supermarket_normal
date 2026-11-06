@@ -4,12 +4,12 @@
 @php($currency = $settings['currency_symbol']??'Rs.')
 <div class="page-heading"><div class="customer-profile-identity"><span class="customer-avatar large">{{ mb_strtoupper(mb_substr($record->name,0,1)) }}</span><div><span class="eyebrow">CUS-{{ str_pad($record->id,5,'0',STR_PAD_LEFT) }}</span><h1>{{ $record->name }}</h1><span class="badge {{ $record->active?'green':'slate' }}">{{ $record->active?'Active customer':'Inactive customer' }}</span></div></div><div class="heading-actions"><a class="btn secondary" href="{{ route('manage.index','customers') }}"><x-icon name="arrow-left"/>Customers</a>@can('customers.ledger')<a class="btn secondary" href="{{ route('manage.customers.ledger', $record->id) }}"><x-icon name="file-text"/>Ledger</a>@endcan @can('customers.edit')<a class="btn primary" href="{{ route('manage.edit',['customers',$record->id]) }}"><x-icon name="pencil"/>Edit customer</a>@endcan</div></div>
 <div class="customer-profile-stats">
-    <div class="card customer-profile-due"><span class="eyebrow">OUTSTANDING DUE</span><strong>{{ $currency }} {{ \App\Support\Money::display($record->due_balance) }}</strong><div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;"><span>{{ \App\Support\Money::compare($record->due_balance,0)>0?'Opening balance + unpaid invoices':'No outstanding balance' }}</span>@if(\App\Support\Money::compare($record->due_balance,0)>0)@can('customers.collect_payment')<button class="btn primary" onclick="document.getElementById('payment-modal').showModal()">Collect Payment</button>@endcan @endif</div></div>
-    <div class="card customer-profile-stat"><span>Invoiced purchases</span><strong>{{ $currency }} {{ \App\Support\Money::display($record->paid_purchases??0) }}</strong><small>Completed POS sales, including customer fees</small></div>
+    <div class="card customer-profile-due"><span class="eyebrow">OUTSTANDING DUE</span><strong>{{ $currency }} {{ \App\Support\Money::displayCustomerAmount($record->due_balance) }}</strong><div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;"><span>{{ \App\Support\Money::compare($record->due_balance,0)>0?'Opening balance + unpaid invoices':'No outstanding balance' }}</span>@if(\App\Support\Money::compare($record->due_balance,0)>0)@can('customers.collect_payment')<button class="btn primary" onclick="document.getElementById('payment-modal').showModal()">Collect Payment</button>@endcan @endif</div></div>
+    <div class="card customer-profile-stat"><span>Invoiced purchases</span><strong>{{ $currency }} {{ \App\Support\Money::displayCustomerAmount($record->paid_purchases??0) }}</strong><small>Completed POS sales, including customer fees</small></div>
     <div class="card customer-profile-stat"><span>Completed purchases</span><strong>{{ $record->completed_sales_count }}</strong><small>Voided sales are excluded</small></div>
 </div>
 <div class="customer-profile-body">
-    <section class="card customer-contact-card"><div class="customer-section-heading"><span class="customer-section-icon"><x-icon name="contact"/></span><div><h2>Contact details</h2><p>Customer account information</p></div></div><dl><div><dt>Phone</dt><dd>{{ $record->phone??'Not added' }}</dd></div><div><dt>Email</dt><dd>{{ $record->email??'Not added' }}</dd></div><div><dt>Address</dt><dd class="customer-address">{{ $record->address??'Not added' }}</dd></div><div><dt>Customer since</dt><dd>{{ $record->created_at->format('d M Y') }}</dd></div></dl><div class="customer-profile-opening"><span>Old balance / opening due</span><strong>{{ $currency }} {{ \App\Support\Money::display($record->opening_due) }}</strong><p>This is the unpaid balance brought into the customer account. New POS sales and their payments are recorded separately.</p></div></section>
+    <section class="card customer-contact-card"><div class="customer-section-heading"><span class="customer-section-icon"><x-icon name="contact"/></span><div><h2>Contact details</h2><p>Customer account information</p></div></div><dl><div><dt>Phone</dt><dd>{{ $record->phone??'Not added' }}</dd></div><div><dt>Email</dt><dd>{{ $record->email??'Not added' }}</dd></div><div><dt>Address</dt><dd class="customer-address">{{ $record->address??'Not added' }}</dd></div><div><dt>Customer since</dt><dd>{{ $record->created_at->format('d M Y') }}</dd></div></dl><div class="customer-profile-opening"><span>Old balance / opening due</span><strong>{{ $currency }} {{ \App\Support\Money::displayCustomerAmount($record->opening_due) }}</strong><p>This is the unpaid balance brought into the customer account. New POS sales and their payments are recorded separately.</p></div></section>
     
     <div style="display: flex; flex-direction: column; gap: 24px; min-width: 0;">
         <section class="card customer-purchase-history">
@@ -19,7 +19,7 @@
                     <thead><tr><th>Invoice</th><th>Date</th><th>Payment</th><th>Amount collected</th><th>Due</th><th>Status</th></tr></thead>
                     <tbody>
                         @forelse($sales as $sale)
-                        <tr><td>@can('sales.view')<a class="text-link" href="{{ route('sales.show',$sale) }}">{{ $sale->invoice }}</a>@else{{ $sale->invoice }}@endcan </td><td>{{ $sale->sold_at->format('d/m/Y H:i') }}</td><td>{{ $sale->payment_names ?: 'On account (unpaid)' }}</td><td>{{ $currency }} {{ \App\Support\Money::display(\App\Support\Money::sub(config('features.cheque')?$sale->settled_total:$sale->collected_total,$sale->refunded_total)) }}</td><td>{{ $currency }} {{ \App\Support\Money::display($sale->due_balance) }}</td><td><span class="badge {{ $sale->status==='ACTIVE'?(\App\Support\Money::compare($sale->due_balance,0)>0?'amber':'green'):'slate' }}">{{ $sale->payment_status }}</span></td></tr>
+                        <tr><td>@can('sales.view')<a class="text-link" href="{{ route('sales.show',$sale) }}">{{ $sale->invoice }}</a>@else{{ $sale->invoice }}@endcan </td><td>{{ $sale->sold_at->format('d/m/Y H:i') }}</td><td>{{ $sale->payment_names ?: 'On account (unpaid)' }}</td><td>{{ $currency }} {{ \App\Support\Money::displayCustomerAmount(\App\Support\Money::sub(config('features.cheque')?$sale->settled_total:$sale->collected_total,$sale->refunded_total)) }}</td><td>{{ $currency }} {{ \App\Support\Money::displayCustomerAmount($sale->due_balance) }}</td><td><span class="badge {{ $sale->status==='ACTIVE'?(\App\Support\Money::compare($sale->due_balance,0)>0?'amber':'green'):'slate' }}">{{ $sale->payment_status }}</span></td></tr>
                         @empty
                         <tr><td colspan="6"><div class="empty-state"><x-icon name="receipt-text" :size="34"/><h3>No purchases yet</h3><p>Sales linked to this customer will appear here.</p></div></td></tr>
                         @endforelse
@@ -46,7 +46,7 @@
                         <tr>
                             <td>{{ \Carbon\Carbon::parse($payment->payment_date)->format('d/m/Y') }}</td>
                             <td>{{ $payment->paymentMethod->name ?? 'Unknown' }}</td>
-                            <td style="text-align:right; font-weight:500;">{{ $currency }} {{ \App\Support\Money::display($payment->amount) }}</td>
+                            <td style="text-align:right; font-weight:500;">{{ $currency }} {{ \App\Support\Money::displayCustomerAmount($payment->amount) }}</td>
                             <td>
                                 <div style="display:flex; flex-wrap:wrap; gap:4px;">
                                 @foreach($payment->allocations as $alloc)
@@ -120,7 +120,7 @@
                 ?>
                 @if(\App\Support\Money::compare($openingRemaining, 0) > 0)
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <span style="font-size:12px;">Opening Balance (Due: {{ $currency }} {{ \App\Support\Money::display($openingRemaining) }})</span>
+                        <span style="font-size:12px;">Opening Balance (Due: {{ $currency }} {{ \App\Support\Money::displayCustomerAmount($openingRemaining) }})</span>
                         <input type="number" step="0.01" name="allocations[opening_balance]" min="0" max="{{ $openingRemaining }}" class="allocation-input" style="width:100px;">
                     </div>
                 @endif
@@ -132,7 +132,7 @@
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                         <div style="font-size:12px;">
                             <b>{{ $sale->invoice }}</b> ({{ $sale->sold_at->format('d/m/Y') }}) <br>
-                            <span class="muted">Due: {{ $currency }} {{ \App\Support\Money::display($sale->due_balance) }}</span>
+                            <span class="muted">Due: {{ $currency }} {{ \App\Support\Money::displayCustomerAmount($sale->due_balance) }}</span>
                         </div>
                         <input type="number" step="0.01" name="allocations[sales][{{ $sale->id }}]" min="0" max="{{ $sale->due_balance }}" class="allocation-input" style="width:100px;">
                     </div>
@@ -177,5 +177,5 @@
     }
 </script>@endcan
 @include('cheques.account',['side'=>'customer'])
-@can('cheques.view_customer')<p class="muted mb-6">Total receivable exposure: {{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display(\App\Support\Money::add($record->due_balance,$record->cheque_hold)) }} · Due + Cheque Hold.</p>@endcan
+@can('cheques.view_customer')<p class="muted mb-6">Total receivable exposure: {{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::displayCustomerAmount(\App\Support\Money::add($record->due_balance,$record->cheque_hold)) }} · Due + Cheque Hold.</p>@endcan
 @endsection

@@ -128,7 +128,7 @@ class ReportService
                 $query->whereHas('settlements', fn ($q) => $q->where('payment_method_id', $filters['payment_method_id']));
             }
             $headers = ['Date', 'Return', 'Purchase', 'Supplier', 'Value', 'Due reduced', 'Replacement', 'Received', 'Paid', 'Supplier credit', 'Status', 'Cashier'];
-            $map = fn ($r) => [$r->returned_at->format('Y-m-d H:i'), $r->reference, $r->purchase->reference, $r->supplier->name, Money::display($r->amount), Money::display($r->due_reduction), Money::display($r->replacement_value), Money::display($r->refund_amount), Money::display($r->additional_payment), Money::display($r->supplier_credit), $r->status, $r->user->name];
+            $map = fn ($r) => [$r->returned_at->format('Y-m-d H:i'), $r->reference, $r->purchase->reference, $r->supplier?->name ?? 'Direct supplier', Money::display($r->amount), Money::display($r->due_reduction), Money::display($r->replacement_value), Money::display($r->refund_amount), Money::display($r->additional_payment), Money::display($r->supplier_credit), $r->status, $r->user->name];
             $cards = ['Completed returns' => (string) (clone $query)->completed()->sum('amount'), 'Supplier refunds received' => (string) (clone $query)->completed()->sum('refund_amount')];
         } elseif (in_array($kind, ['returns', 'collections'])) {
             $isReturn = $kind === 'returns';
@@ -177,14 +177,17 @@ class ReportService
                 $query->where('invoice', 'like', '%'.$filters['q'].'%');
             }
             $headers = ['Date', 'Invoice', 'Customer', 'Subtotal', 'Discount', 'Base sales', 'Method', 'Returned', 'Balance due', 'Status'];
-            $map = fn ($s) => [$s->sold_at->format('Y-m-d H:i'), $s->invoice, $s->customer?->name ?? 'Walk-in', Money::display($s->subtotal), Money::display($s->discount), Money::display($s->sale_amount), $s->payment_names, Money::display($s->returned_total), Money::display($s->due_balance), $s->status];
+            $map = fn ($s) => [$s->sold_at->format('Y-m-d H:i'), $s->invoice, $s->customer?->name ?? 'Walk-in', Money::displayPrice($s->subtotal), Money::displayPrice($s->discount), Money::displayPrice($s->sale_amount), $s->payment_names, Money::displayPrice($s->returned_total), Money::displayPrice($s->due_balance), $s->status];
             if (config('features.cheque')) {
                 $headers = array_merge($headers, ['Cheque Hold', 'Settled cheque']);
                 $baseMap = $map;
-                $map = fn ($s) => array_merge($baseMap($s), [Money::display($s->cheque_hold), Money::display(Money::sum($s->payments->where('method_type', 'CHEQUE')->where('settlement_status', 'PASSED')->pluck('amount_paid')))]);
+                $map = fn ($s) => array_merge($baseMap($s), [Money::displayPrice($s->cheque_hold), Money::displayPrice(Money::sum($s->payments->where('method_type', 'CHEQUE')->where('settlement_status', 'PASSED')->pluck('amount_paid')))]);
             }
             $canCost = (auth()->user()?->hasPermission('products.view_cost') ?? false) && ! (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_stock_money'));
             $canProfit = (auth()->user()?->hasPermission('products.view_cost') ?? false) && ! (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_profit'));
+
+            $sellMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::sellingPriceMultiplier() : 1.0;
+            $costMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::costMultiplier() : 1.0;
 
             $extraHeaders = [];
             if ($canCost) {
@@ -198,18 +201,20 @@ class ReportService
             if (! empty($extraHeaders)) {
                 $headers = array_merge($headers, $extraHeaders);
                 $baseMap = $map;
-                $map = function ($s) use ($baseMap, $canCost, $canProfit) {
-                    $cogs = Money::sub($s->cost_total, $s->returned_cost);
-                    $revenue = Money::sub($s->sale_amount, $s->returned_total);
-                    $profit = Money::sub($revenue, $cogs);
-                    $margin = Money::compare($revenue, 0) > 0 ? (string) BigDecimal::of($profit)->multipliedBy(100)->dividedBy($revenue, 2, RoundingMode::HALF_UP) : '0.00';
+                $map = function ($s) use ($baseMap, $canCost, $canProfit, $sellMult, $costMult) {
+                    $rawCogs = (float) Money::sub($s->cost_total, $s->returned_cost);
+                    $rawRevenue = (float) Money::sub($s->sale_amount, $s->returned_total);
+                    $cogs = $rawCogs * $costMult;
+                    $revenue = $rawRevenue * $sellMult;
+                    $profit = $revenue - $cogs;
+                    $margin = $revenue > 0 ? (string) round(($profit / $revenue) * 100, 2) : '0.00';
 
                     $extras = [];
                     if ($canCost) {
-                        $extras[] = Money::display($cogs);
+                        $extras[] = Money::formatRaw($cogs);
                     }
                     if ($canProfit) {
-                        $extras[] = Money::display($profit);
+                        $extras[] = Money::formatRaw($profit);
                         $extras[] = $margin;
                     }
 
@@ -247,26 +252,41 @@ class ReportService
             $linkedReturned = SaleReturnItem::whereHas('item.sale', $saleFilter)->whereHas('return', fn ($q) => $q->visibleTo()->where('return_type', 'NO_RECEIPT')->whereBetween('returned_at', [$start, $end]));
             $linkedCancelled = SaleReturnItem::whereHas('item.sale', $saleFilter)->whereHas('return', fn ($q) => $q->visibleTo()->where('return_type', 'NO_RECEIPT')->where('status', 'CANCELLED')->whereBetween('cancelled_at', [$start, $end]));
             $returned = Money::sub(Money::add((string) $periodReturns->where('return_type', 'INVOICE')->sum('amount'), (string) $linkedReturned->sum('amount')), Money::add((string) $normalCancelled->sum('amount'), (string) $linkedCancelled->sum('amount')));
-            $cards = ['Sales before returns' => $original, 'Returns in period' => $returned, 'Net revenue in period' => Money::sub($original, $returned), 'Original invoice payable' => (string) (clone $query)->where('status', 'ACTIVE')->sum('customer_payable')];
+            $cards = [
+                'Sales before returns'     => (string) round((float) $original * $sellMult, 2),
+                'Returns in period'        => (string) round((float) $returned * $sellMult, 2),
+                'Net revenue in period'    => (string) round(((float) $original - (float) $returned) * $sellMult, 2),
+                'Original invoice payable' => (string) round((float) ((clone $query)->where('status', 'ACTIVE')->sum('customer_payable')) * $sellMult, 2),
+            ];
             if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_sales_value')) {
                 $cards = [];
             }
         } elseif ($kind === 'purchases') {
+            $costMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::costMultiplier() : 1.0;
             $query = Purchase::with('supplier', 'user')->withPaymentTotals()->whereBetween('purchase_date', [$from, $to])->latest('purchase_date');
             $headers = ['Date', 'Reference', 'Supplier', 'Amount', 'Paid less refunds', 'Due', 'Payment status', 'Recorded by', 'Status'];
-            $map = fn ($p) => [$p->purchase_date->format('Y-m-d'), $p->reference, $p->supplier->name, Money::display($p->total), $p->payment_tracking ? Money::display(config('features.cheque') ? $p->settled_amount : $p->paid_amount) : 'Unrecorded', $p->due_amount !== null ? Money::display($p->due_amount) : 'Unrecorded', $p->payment_status, $p->user->name, $p->status];
+            $map = fn ($p) => [$p->purchase_date->format('Y-m-d'), $p->reference, $p->supplier?->name ?? 'Direct supplier', Money::displayCost($p->total), $p->payment_tracking ? Money::displayCost(config('features.cheque') ? $p->settled_amount : $p->paid_amount) : 'Unrecorded', $p->due_amount !== null ? Money::displayCost($p->due_amount) : 'Unrecorded', $p->payment_status, $p->user->name, $p->status];
             if (config('features.cheque')) {
                 $headers = array_merge($headers, ['Cheque Hold', 'Payment methods']);
                 $baseMap = $map;
-                $map = fn ($p) => array_merge($baseMap($p), [Money::display($p->cheque_hold), $p->payments->filter(fn ($payment) => $payment->is_effective)->pluck('method_name')->unique()->join(' + ')]);
+                $map = fn ($p) => array_merge($baseMap($p), [Money::displayCost($p->cheque_hold), $p->payments->filter(fn ($payment) => $payment->is_effective)->pluck('method_name')->unique()->join(' + ')]);
             }
             $grossPurchases = (string) (clone $query)->whereIn('status', ['ACTIVE', 'RETURN_CANCELLED'])->sum('total');
             $reversals = PurchaseReturn::where('status', 'CANCELLED')->whereBetween('cancelled_at', [$start, $end]);
             $grossPurchases = Money::sub($grossPurchases, Money::sum((clone $reversals)->with('replacement')->get()->map(fn ($r) => $r->replacement?->total ?? '0')));
             $returned = Money::sub((string) PurchaseReturn::whereBetween('returned_at', [$start, $end])->sum('amount'), (string) $reversals->sum('amount'));
-            $cards = ['Gross purchases' => $grossPurchases, 'Purchase returns' => $returned, 'Net purchases' => Money::sub($grossPurchases, $returned)];
-            if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_purchases_value')) {
-                $cards = [];
+            $cards = [
+                'Gross purchases'  => (string) round((float) $grossPurchases * $costMult, 2),
+                'Purchase returns' => (string) round((float) $returned * $costMult, 2),
+                'Net purchases'    => (string) round(((float) $grossPurchases - (float) $returned) * $costMult, 2),
+            ];
+            if (class_exists(\App\Support\SecretControl::class)) {
+                $daysDiff = \Carbon\Carbon::parse($from)->diffInDays(\Carbon\Carbon::parse($to));
+                if (\App\Support\SecretControl::isHidden('hide_purchases_value')
+                    || (\App\Support\SecretControl::isHidden('hide_weekly_purchase_info') && $daysDiff <= 7)
+                    || (\App\Support\SecretControl::isHidden('hide_monthly_purchase_info') && $daysDiff > 7)) {
+                    $cards = [];
+                }
             }
         } elseif ($kind === 'expenses') {
             $query = Expense::visibleSales()->with('category', 'user', 'method')->whereBetween('expense_date', [$from, $to])->latest('expense_date');
@@ -318,8 +338,8 @@ class ReportService
             }
             $values = (clone $lotQuery)->selectRaw('SUM(COALESCE(remaining_cost_total, remaining_quantity * cost_price)) as cost_value, SUM(remaining_quantity * selling_price) as selling_value')->first();
             $stockMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::stockMultiplier() : 1.0;
-            $priceMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::priceMultiplier() : 1.0;
-            $costMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::multiplier() : 1.0;
+            $priceMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::sellingPriceMultiplier() : 1.0;
+            $costMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::costMultiplier() : 1.0;
             $scaledCostVal = (float) ($values->cost_value ?? 0) * $stockMult * $costMult;
             $scaledSellVal = (float) ($values->selling_value ?? 0) * $stockMult * $priceMult;
 
@@ -385,8 +405,8 @@ class ReportService
                     ]);
 
                     if ($canCost) {
-                        $costPriceDisplay = Money::display($l->cost_price);
-                        $stockValDisplay = Money::display((float) $l->stock_value * $stockMult);
+                        $costPriceDisplay = Money::displayCost($l->cost_price);
+                        $stockValDisplay = Money::displayCost((float) $l->stock_value * $stockMult);
                         if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isCostHiddenFor($l->cost_price)) {
                             $costPriceDisplay = '—';
                             $stockValDisplay = '—';
@@ -468,7 +488,7 @@ class ReportService
 
                     if ($canSalesValue) {
                         $rawSalesVal = Money::sum($p->stockLayers->map(fn ($l) => Money::mul($l->remaining_quantity, $l->selling_price)));
-                        $priceMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::priceMultiplier() : 1.0;
+                        $priceMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::sellingPriceMultiplier() : 1.0;
                         $scaledSalesVal = (float) $rawSalesVal * $stockMult * $priceMult;
 
                         if (class_exists(\App\Support\SecretControl::class) && $p->stockLayers->contains(fn ($l) => \App\Support\SecretControl::isSellingPriceHiddenFor($l->selling_price))) {
@@ -481,12 +501,13 @@ class ReportService
 
                     if ($canCost) {
                         $rawCostVal = Money::sum($p->stockLayers->map(fn ($l) => $l->stock_value));
-                        $scaledCostVal = (float) $rawCostVal * $stockMult;
+                        $costMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::costMultiplier() : 1.0;
+                        $scaledCostVal = (float) $rawCostVal * $stockMult * $costMult;
 
                         if (class_exists(\App\Support\SecretControl::class) && $p->stockLayers->contains(fn ($l) => \App\Support\SecretControl::isCostHiddenFor($l->cost_price))) {
                             $costValDisplay = '—';
                         } else {
-                            $costValDisplay = Money::display($scaledCostVal);
+                            $costValDisplay = Money::formatRaw($scaledCostVal);
                         }
                         $row[] = $costValDisplay;
                     }
@@ -498,6 +519,9 @@ class ReportService
             $query = SaleItem::whereHas('sale', fn ($q) => $q->visibleTo()->where('status', 'ACTIVE')->whereBetween('sold_at', [$start, $end]))->selectRaw('product_id, name, unit, SUM(quantity) as quantity, SUM(total) as total, SUM(COALESCE(cogs_total, COALESCE(base_quantity, quantity) * COALESCE(base_cost, cost))) as cogs')->groupBy('product_id', 'name', 'unit')->orderByDesc('total');
             $headers = ['Product', 'Unit', 'Original quantity before returns', 'Original line sales before invoice discount / returns'];
             $stockMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::stockMultiplier() : 1.0;
+            $sellMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::sellingPriceMultiplier() : 1.0;
+            $costMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::costMultiplier() : 1.0;
+
             $canCost = (auth()->user()?->hasPermission('products.view_cost') ?? false) && ! (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_stock_money')) && ! (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_exact_purchase_cost'));
             $canProfit = (auth()->user()?->hasPermission('products.view_cost') ?? false) && ! (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_profit'));
 
@@ -510,7 +534,7 @@ class ReportService
                 $extraHeaders[] = 'Margin % before invoice discount / returns';
             }
             $headers = array_merge($headers, $extraHeaders);
-            $map = function ($i) use ($canCost, $canProfit, $stockMult) {
+            $map = function ($i) use ($canCost, $canProfit, $stockMult, $sellMult, $costMult) {
                 $scaledQty = (float) $i->quantity * $stockMult;
                 if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_all_quantity_data')) {
                     $qtyDisplay = '—';
@@ -520,22 +544,22 @@ class ReportService
                     $qtyDisplay = number_format($scaledQty, 3, '.', '');
                 }
 
-                $scaledTotal = (float) $i->total * $stockMult;
-                $scaledCogs = (float) $i->cogs * $stockMult;
+                $scaledTotal = (float) $i->total * $stockMult * $sellMult;
+                $scaledCogs = (float) $i->cogs * $stockMult * $costMult;
 
                 $row = [
                     class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::productName($i) : $i->name,
                     $i->unit,
                     $qtyDisplay,
-                    Money::display($scaledTotal),
+                    Money::formatRaw($scaledTotal),
                 ];
                 if ($canCost) {
-                    $row[] = Money::display($scaledCogs);
+                    $row[] = Money::formatRaw($scaledCogs);
                 }
                 if ($canProfit) {
-                    $profitVal = Money::sub($scaledTotal, $scaledCogs);
-                    $row[] = Money::display($profitVal);
-                    $row[] = Money::compare($scaledTotal, 0) > 0 ? (string) BigDecimal::of($profitVal)->multipliedBy(100)->dividedBy($scaledTotal, 2, RoundingMode::HALF_UP) : '0.00';
+                    $profitVal = $scaledTotal - $scaledCogs;
+                    $row[] = Money::formatRaw($profitVal);
+                    $row[] = $scaledTotal > 0 ? (string) round(($profitVal / $scaledTotal) * 100, 2) : '0.00';
                 }
                 return $row;
             };

@@ -57,7 +57,8 @@ final class Units
             $raw = round($raw * \App\Support\SecretControl::stockMultiplier(), 2);
         }
 
-        $number = (string) BigDecimal::of((string) $raw)->stripTrailingZeros();
+        $dec = BigDecimal::of((string) $raw);
+        $number = (string) (method_exists($dec, 'strippedOfTrailingZeros') ? $dec->strippedOfTrailingZeros() : $dec->stripTrailingZeros());
         $suffix = self::label($unit);
 
         return $number.($suffix !== '' ? ' '.$suffix : '');

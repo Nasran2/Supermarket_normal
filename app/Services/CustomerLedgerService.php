@@ -88,6 +88,19 @@ class CustomerLedgerService
             $period->prepend(['date' => Carbon::parse($from), 'type' => 'Opening Balance', 'description' => 'Balance before selected period', 'debit' => $opening, 'credit' => '0.00', 'balance' => $opening]);
         }
 
+        if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive()) {
+            $mult = \App\Support\SecretControl::customerAmountMultiplier();
+            if ($mult < 1.0) {
+                $period = $period->map(function ($row) use ($mult) {
+                    $row['debit'] = (string) round((float) $row['debit'] * $mult, 2);
+                    $row['credit'] = (string) round((float) $row['credit'] * $mult, 2);
+                    $row['balance'] = (string) round((float) $row['balance'] * $mult, 2);
+
+                    return $row;
+                });
+            }
+        }
+
         return $period;
     }
 }

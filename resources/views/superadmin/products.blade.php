@@ -37,7 +37,7 @@ $currency = $settings['currency_symbol'] ?? 'Rs.';
     <div class="card">
         <span>Real Stock Value at Cost</span>
         <strong>{{ $currency }} {{ \App\Support\Money::display($stats->stock_value ?? 0) }}</strong>
-        <small style="color:#4f46e5;font-weight:600;">Normal users see: {{ $currency }} {{ \App\Support\Money::display((float)($stats->stock_value ?? 0) * ($percentage/100)) }}</small>
+        <small style="color:#4f46e5;font-weight:600;">Normal users see: {{ $currency }} {{ \App\Support\Money::display((float)($stats->stock_value ?? 0) * ($costPercentage/100)) }}</small>
     </div>
 </div>
 
@@ -75,7 +75,7 @@ $currency = $settings['currency_symbol'] ?? 'Rs.';
                     <th class="text-right">Real Cost</th>
                     <th class="text-right">Real Price</th>
                     <th class="text-right" style="color:#4f46e5;">Users See Price ({{ $pricePercentage }}%)</th>
-                    <th class="text-right" style="color:#4f46e5;">Users See Cost ({{ $percentage }}%)</th>
+                    <th class="text-right" style="color:#4f46e5;">Users See Cost ({{ $costPercentage }}%)</th>
                 </tr>
             </thead>
             <tbody>
@@ -99,7 +99,7 @@ $currency = $settings['currency_symbol'] ?? 'Rs.';
                         {{ $currency }} {{ \App\Support\Money::display((float)$p->price * ($pricePercentage/100)) }}
                     </td>
                     <td class="text-right" style="color:#4f46e5;font-weight:600;">
-                        {{ $currency }} {{ \App\Support\Money::display((float)$p->cost * ($percentage/100)) }}
+                        {{ $currency }} {{ \App\Support\Money::display((float)$p->cost * ($costPercentage/100)) }}
                     </td>
                 </tr>
                 @empty

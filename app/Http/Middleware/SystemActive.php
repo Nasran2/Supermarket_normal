@@ -21,6 +21,11 @@ class SystemActive
             return $next($request);
         }
 
+        // When SUPER_ADMIN is false, the system is always active (no maintenance lockdown)
+        if (! filter_var(config('features.super_admin', env('SUPER_ADMIN', false)), FILTER_VALIDATE_BOOLEAN)) {
+            return $next($request);
+        }
+
         // Check if system_settings table exists and read the flag
         try {
             $setting = DB::table('system_settings')->where('key', 'system_active')->value('value');

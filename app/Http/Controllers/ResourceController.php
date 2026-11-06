@@ -95,7 +95,8 @@ class ResourceController extends Controller
 
             $rawVal = ProductStockLayer::available()->whereHas('product', fn ($q) => $q->where('track_stock', true))->selectRaw('SUM(COALESCE(remaining_cost_total, remaining_quantity * cost_price)) as value')->value('value') ?? '0';
             $stockMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::stockMultiplier() : 1.0;
-            $stats->stock_value = (float) $rawVal * $stockMult;
+            $costMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::costMultiplier() : 1.0;
+            $stats->stock_value = (float) $rawVal * $stockMult * $costMult;
 
             return view('products.index', compact('resource', 'def', 'rows', 'stats'));
         }
@@ -169,8 +170,8 @@ class ResourceController extends Controller
 
             if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
                 $stockMult = \App\Support\SecretControl::stockMultiplier();
-                $priceMult = \App\Support\SecretControl::priceMultiplier();
-                $costMult = \App\Support\SecretControl::multiplier();
+                $priceMult = \App\Support\SecretControl::sellingPriceMultiplier();
+                $costMult = \App\Support\SecretControl::costMultiplier();
                 if ($pricing) {
                     $pricing->cost_value = (float) ($pricing->cost_value ?? 0) * $stockMult * $costMult;
                     $pricing->selling_value = (float) ($pricing->selling_value ?? 0) * $stockMult * $priceMult;

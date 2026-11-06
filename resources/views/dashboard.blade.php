@@ -38,10 +38,20 @@ if ($from !== $to) $dateDisplay .= ' - ' . \Carbon\Carbon::parse($to)->format('d
 </div>
 <x-sales-visibility-note />
 @if(!\App\Support\SecretControl::isHidden('hide_top_summary'))
+@php
+    $dashSellMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::sellingPriceMultiplier() : 1.0;
+    $dashCostMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::costMultiplier() : 1.0;
+    $dashGenMult  = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::multiplier() : 1.0;
+
+    $dashRevenue = (float)($summary['revenue'] ?? 0) * $dashSellMult;
+    $dashCogs    = (float)($summary['cogs'] ?? 0) * $dashCostMult;
+    $dashExpense = (float)($summary['expenses'] ?? 0) * $dashGenMult;
+    $dashNet     = ($dashRevenue - $dashCogs) - $dashExpense;
+@endphp
 <div class="stat-grid">
-    @foreach([['Sales',$summary['revenue'],'sales','shopping-bag','green'],['Profit',$summary['net'],'profit','trending-up','blue'],['Expenses',$summary['expenses'],'expenses','wallet','amber'],['Transactions',$transactions,'sales','receipt-text','purple']] as [$label,$value,$report,$icon,$color])
+    @foreach([['Sales',$dashRevenue,'sales','shopping-bag','green'],['Profit',$dashNet,'profit','trending-up','blue'],['Expenses',$dashExpense,'expenses','wallet','amber'],['Transactions',$transactions,'sales','receipt-text','purple']] as [$label,$value,$report,$icon,$color])
     @if(($label!=='Profit' || !\App\Support\SecretControl::isHidden('hide_profit')) && ($label!=='Sales' || !\App\Support\SecretControl::isHidden('hide_sales_value')) && auth()->user()->hasPermission('dashboard.'.($label==='Transactions'?'transactions':$report)) && ($report!=='profit' || auth()->user()->hasPermission('products.view_cost')))
-    @php($cardUrl=auth()->user()->hasPermission('reports.'.$report)?route('reports.show',['report'=>$report,'from'=>$from,'to'=>$to]):($report==='sales' && auth()->user()->hasPermission('sales.view')?route('sales.index',['from'=>$from,'to'=>$to]):null)) @if($cardUrl)<a class="card stat-card" href="{{ $cardUrl }}">@else<div class="card stat-card">@endif<div class="stat-top"><span>{{ $label }}</span><span class="stat-icon {{ $color }}"><x-icon :name="$icon" /></span></div><strong>{{ $report==='sales' && $label==='Transactions'?$value:($settings['currency_symbol']??'Rs.').' '.\App\Support\Money::display($value) }}</strong><small>{{ $label==='Profit'?'After cost and expenses':'From real transactions' }}</small>@if($cardUrl)</a>@else</div>@endif @endif @endforeach</div>
+    @php($cardUrl=auth()->user()->hasPermission('reports.'.$report)?route('reports.show',['report'=>$report,'from'=>$from,'to'=>$to]):($report==='sales' && auth()->user()->hasPermission('sales.view')?route('sales.index',['from'=>$from,'to'=>$to]):null)) @if($cardUrl)<a class="card stat-card" href="{{ $cardUrl }}">@else<div class="card stat-card">@endif<div class="stat-top"><span>{{ $label }}</span><span class="stat-icon {{ $color }}"><x-icon :name="$icon" /></span></div><strong>{{ $report==='sales' && $label==='Transactions'?$value:($settings['currency_symbol']??'Rs.').' '.\App\Support\Money::formatRaw($value) }}</strong><small>{{ $label==='Profit'?'After cost and expenses':'From real transactions' }}</small>@if($cardUrl)</a>@else</div>@endif @endif @endforeach</div>
 @endif
 @if(!\App\Support\SecretControl::isHidden('hide_small_widgets'))
 @can('dashboard.collections')<div class="payment-strip card"><span class="payment-strip-title"><x-icon name="credit-card" /> Collections</span>@forelse($payments as $p)@can('reports.payments')<a href="{{ route('reports.show',['report'=>'payments','from'=>$from,'to'=>$to,'payment_method_id'=>$p->payment_method_id]) }}">@else<div class="payment-readonly">@endcan<span>{{ $p->method_name }}</span><strong>{{ $settings['currency_symbol']??'Rs.' }} {{ \App\Support\Money::display($p->collections) }}</strong>@can('reports.payments')</a>@else</div>@endcan @empty<span class="muted">No collections in this period.</span>@endforelse</div>@endcan
@@ -98,7 +108,7 @@ if ($from !== $to) $dateDisplay .= ' - ' . \Carbon\Carbon::parse($to)->format('d
                         <td>@can('sales.view')<a class="text-link" href="{{ route('sales.show',$sale) }}">{{ $sale->invoice }}</a>@else {{ $sale->invoice }} @endcan<small class="cell-note">{{ $sale->sold_at->format('d M, h:i A') }} · {{ $sale->status }}</small></td>
                         <td>{{ $sale->user->name }}</td>
                         <td><span class="badge slate">{{ $sale->payment_names }}</span></td>
-                        <td class="text-right font-semibold">{{ \App\Support\Money::display($sale->customer_payable) }}</td>
+                        <td class="text-right font-semibold">{{ \App\Support\Money::displayPrice($sale->customer_payable) }}</td>
                     </tr>@empty<tr>
                         <td colspan="4" class="empty-cell">No sales yet. Your first sale will appear here.</td>
                     </tr>@endforelse</tbody>
@@ -118,7 +128,7 @@ if ($from !== $to) $dateDisplay .= ' - ' . \Carbon\Carbon::parse($to)->format('d
         <div class="card-heading">
             <h2>Original product sales</h2><span class="muted text-sm">Last {{ $days }} days</span>
         </div>
-        <div class="widget-list">@forelse($topProducts as $p)<div><span class="rank">{{ $loop->iteration }}</span><span><strong>{{ $p->name }}</strong><small>{{ \App\Support\Units::quantity($p->quantity, $p->unit) }} sold before returns</small></span><strong>{{ \App\Support\Money::display($p->total) }}</strong></div>@empty<p class="empty-cell">No product sales yet.</p>@endforelse</div>
+        <div class="widget-list">@forelse($topProducts as $p)<div><span class="rank">{{ $loop->iteration }}</span><span><strong>{{ $p->name }}</strong><small>{{ \App\Support\Units::quantity($p->quantity, $p->unit) }} sold before returns</small></span><strong>{{ \App\Support\Money::displayPrice($p->total) }}</strong></div>@empty<p class="empty-cell">No product sales yet.</p>@endforelse</div>
     </section>@endcan
     @endif
     @if(!\App\Support\SecretControl::isHidden('hide_small_widgets'))

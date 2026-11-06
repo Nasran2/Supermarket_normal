@@ -41,7 +41,7 @@ class PurchaseChargeService
             $expense = null;
             if ($purchase->charge_treatment === 'EXPENSE') {
                 $category = ExpenseCategory::firstOrCreate(['name' => 'Purchase charges'], ['system' => true]);
-                $expense = Expense::create(['expense_category_id' => $category->id, 'user_id' => $userId, 'type' => 'PURCHASE_CHARGE', 'status' => 'ACTIVE', 'expense_date' => $purchase->purchase_date, 'reference' => $purchase->reference, 'description' => $row['label'].' · '.$purchase->supplier->name, 'amount' => $row['amount']]);
+                $expense = Expense::create(['expense_category_id' => $category->id, 'user_id' => $userId, 'type' => 'PURCHASE_CHARGE', 'status' => 'ACTIVE', 'expense_date' => $purchase->purchase_date, 'reference' => $purchase->reference, 'description' => $row['label'].' · '.($purchase->supplier?->name ?? 'Direct supplier'), 'amount' => $row['amount']]);
             }
             $purchase->charges()->create(['label' => $row['label'], 'amount' => $row['amount'], 'expense_id' => $expense?->id]);
         }

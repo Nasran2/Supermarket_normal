@@ -39,33 +39,83 @@
         </div>
 
         <div style="padding: 0 24px 24px;">
+
+        {{-- 3-Card Percentage Grid --}}
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;margin-bottom:24px;">
+
+            {{-- Visible stock/quantity percentage --}}
+            <div style="background:var(--bg, #f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:16px;">
+                <label for="visible_stock_percentage" style="display:block;font-size:14px;font-weight:600;margin-bottom:6px;color:var(--ink);">
+                    Visible stock/quantity percentage
+                </label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <input type="number"
+                           id="visible_stock_percentage"
+                           name="visible_stock_percentage"
+                           min="0"
+                           max="100"
+                           step="1"
+                           value="{{ old('visible_stock_percentage', $stockPercentage) }}"
+                           style="font-size:18px;font-weight:700;padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);width:100%;color:#4f46e5;background:#fff;"
+                           required>
+                    <span style="font-size:16px;font-weight:700;color:var(--muted);">%</span>
+                </div>
+                <p style="font-size:12px;color:var(--muted);margin-top:6px;margin-bottom:0;">
+                    100 means show the full quantity. 50 means show half.
+                </p>
+            </div>
+
+            {{-- Visible cost price percentage --}}
+            <div style="background:var(--bg, #f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:16px;">
+                <label for="visible_cost_percentage" style="display:block;font-size:14px;font-weight:600;margin-bottom:6px;color:var(--ink);">
+                    Visible cost price percentage
+                </label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <input type="number"
+                           id="visible_cost_percentage"
+                           name="visible_cost_percentage"
+                           min="0"
+                           max="100"
+                           step="1"
+                           value="{{ old('visible_cost_percentage', $costPercentage) }}"
+                           style="font-size:18px;font-weight:700;padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);width:100%;color:#4f46e5;background:#fff;"
+                           required>
+                    <span style="font-size:16px;font-weight:700;color:var(--muted);">%</span>
+                </div>
+                <p style="font-size:12px;color:var(--muted);margin-top:6px;margin-bottom:0;">
+                    100 means show full cost. 50 means show 50% of cost prices and COGS.
+                </p>
+            </div>
+
+            {{-- Visible selling price percentage --}}
+            <div style="background:var(--bg, #f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:16px;">
+                <label for="visible_selling_price_percentage" style="display:block;font-size:14px;font-weight:600;margin-bottom:6px;color:var(--ink);">
+                    Visible selling price percentage
+                </label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <input type="number"
+                           id="visible_selling_price_percentage"
+                           name="visible_selling_price_percentage"
+                           min="0"
+                           max="100"
+                           step="1"
+                           value="{{ old('visible_selling_price_percentage', $sellingPricePercentage ?? $pricePercentage) }}"
+                           style="font-size:18px;font-weight:700;padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);width:100%;color:#4f46e5;background:#fff;"
+                           required>
+                    <span style="font-size:16px;font-weight:700;color:var(--muted);">%</span>
+                </div>
+                <p style="font-size:12px;color:var(--muted);margin-top:6px;margin-bottom:0;">
+                    100 means show full price. 50 means show 50% of selling prices.
+                </p>
+            </div>
+
+        </div>
+
         {{-- 2-Column Grid matching Screenshot --}}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;" class="stock-control-grid">
 
             {{-- LEFT COLUMN --}}
             <div style="display:flex;flex-direction:column;gap:18px;">
-
-                {{-- Visible stock/quantity percentage --}}
-                <div style="background:var(--bg, #f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:16px;">
-                    <label for="visible_stock_percentage" style="display:block;font-size:14px;font-weight:600;margin-bottom:6px;color:var(--ink);">
-                        Visible stock/quantity percentage
-                    </label>
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <input type="number"
-                               id="visible_stock_percentage"
-                               name="visible_stock_percentage"
-                               min="0"
-                               max="100"
-                               step="1"
-                               value="{{ old('visible_stock_percentage', $stockPercentage) }}"
-                               style="font-size:18px;font-weight:700;padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);width:100%;color:#4f46e5;background:#fff;"
-                               required>
-                        <span style="font-size:16px;font-weight:700;color:var(--muted);">%</span>
-                    </div>
-                    <p style="font-size:12px;color:var(--muted);margin-top:6px;margin-bottom:0;">
-                        100 means show the full quantity. 50 means show half.
-                    </p>
-                </div>
 
                 {{-- Hide exact stock quantity --}}
                 <div class="switch-wrap">
@@ -158,28 +208,6 @@
 
             {{-- RIGHT COLUMN --}}
             <div style="display:flex;flex-direction:column;gap:18px;">
-
-                {{-- Visible price percentage --}}
-                <div style="background:var(--bg, #f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:16px;">
-                    <label for="visible_price_percentage" style="display:block;font-size:14px;font-weight:600;margin-bottom:6px;color:var(--ink);">
-                        Visible price percentage
-                    </label>
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <input type="number"
-                               id="visible_price_percentage"
-                               name="visible_price_percentage"
-                               min="0"
-                               max="100"
-                               step="1"
-                               value="{{ old('visible_price_percentage', $pricePercentage) }}"
-                               style="font-size:18px;font-weight:700;padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);width:100%;color:#4f46e5;background:#fff;"
-                               required>
-                        <span style="font-size:16px;font-weight:700;color:var(--muted);">%</span>
-                    </div>
-                    <p style="font-size:12px;color:var(--muted);margin-top:6px;margin-bottom:0;">
-                        100 means show the full price. 45 means show 45% of the value.
-                    </p>
-                </div>
 
                 {{-- Enable POS price percentage --}}
                 <div class="switch-wrap">

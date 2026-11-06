@@ -14,7 +14,7 @@ class SuperAdminEnabled
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! env('SUPER_ADMIN', false)) {
+        if (! filter_var(config('features.super_admin', env('SUPER_ADMIN', false)), FILTER_VALIDATE_BOOLEAN)) {
             abort(404);
         }
 

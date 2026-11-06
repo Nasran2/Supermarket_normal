@@ -35,13 +35,16 @@
 @endif
 @can('products.view_cost')
 @if(!\App\Support\SecretControl::isHidden('hide_stock_money') && !\App\Support\SecretControl::isHidden('hide_exact_purchase_cost') && !\App\Support\SecretControl::isHidden('hide_all_price_data'))
-<td>@if(\App\Support\SecretControl::isCostHiddenFor($layer->cost_price))—@else{{ \App\Support\Money::display($layer->cost_price) }}@endif</td>
+<td>@if(\App\Support\SecretControl::isCostHiddenFor($layer->cost_price))—@else{{ \App\Support\Money::displayCost($layer->cost_price) }}@endif</td>
 @endif
 @endcan
 <td><strong>{{ \App\Support\Units::quantity((float)$layer->remaining_quantity, $record->unit->short_name) }}</strong><small>Originally {{ \App\Support\Units::quantity((float)$layer->original_quantity, $record->unit->short_name) }}</small></td>
 @can('products.view_cost')
 @if(!\App\Support\SecretControl::isHidden('hide_profit'))
-<td class="{{ \App\Support\Money::compare($layer->selling_price,$layer->cost_price)<0?'text-warning':'' }}">@if(\App\Support\SecretControl::isCostHiddenFor($layer->cost_price) || \App\Support\SecretControl::isSellingPriceHiddenFor($layer->selling_price))—@else{{ \App\Support\Money::display(\App\Support\Money::sub($layer->selling_price,$layer->cost_price)) }}@endif</td>
+@php($scaledSell = \App\Support\SecretControl::scalePrice($layer->selling_price))
+@php($scaledCost = \App\Support\SecretControl::scaleCost($layer->cost_price))
+@php($scaledMargin = $scaledSell - $scaledCost)
+<td class="{{ $scaledMargin < 0 ? 'text-warning' : '' }}">@if(\App\Support\SecretControl::isCostHiddenFor($layer->cost_price) || \App\Support\SecretControl::isSellingPriceHiddenFor($layer->selling_price))—@else{{ \App\Support\Money::formatRaw($scaledMargin) }}@endif</td>
 @endif
 @endcan<td>{{ \Illuminate\Support\Str::headline(strtolower($layer->source_type)) }}<small>{{ $layer->source_reference }}</small></td><td>{{ $layer->received_at->format($settings['date_format']??'d/m/Y') }}</td>@can('products.manage_prices')<td>@if(\App\Support\Money::compare($layer->remaining_quantity,0)>0)<details><summary class="text-link">Change selling price</summary><form method="POST" action="{{ route('stock-prices.update',$layer) }}" data-confirm="Change the selling price for the remaining {{ \App\Support\Units::quantity((float)$layer->remaining_quantity, $record->unit->short_name) }}? Historical sales stay unchanged.">@csrf @method('PUT')<input type="hidden" name="confirmed" value="1"><input type="number" name="selling_price" step="0.01" min="0" max="999999999" value="{{ $layer->selling_price }}" aria-label="New selling price for stock row {{ $layer->id }}" required><button class="btn primary small">Save price</button></form></details>@else<span class="badge slate">Depleted</span>@endif</td>@endcan</tr>
 @empty<tr><td colspan="7" class="empty-cell">No stock rows match this view.</td></tr>@endforelse

@@ -18,11 +18,25 @@ class Purchase extends Model
     protected static function booted()
     {
         static::addGlobalScope('secret_hidden_purchases', function ($builder) {
-            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea()) {
+            if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive()) {
                 $hiddenIds = \App\Support\SecretControl::hiddenProductIds();
                 if (! empty($hiddenIds)) {
                     $builder->whereDoesntHave('items', function ($q) use ($hiddenIds) {
                         $q->withoutGlobalScopes()->whereIn('purchase_items.product_id', $hiddenIds);
+                    });
+                }
+
+                $hiddenSuppIds = \App\Support\SecretControl::hiddenSupplierIds();
+                if (! empty($hiddenSuppIds)) {
+                    $builder->whereNotIn('purchases.supplier_id', $hiddenSuppIds);
+                }
+
+                $purchaseRanges = \App\Support\SecretControl::parseRanges(\App\Support\SecretControl::get('hide_purchase_amount_ranges'));
+                if (! empty($purchaseRanges)) {
+                    $builder->where(function ($q) use ($purchaseRanges) {
+                        foreach ($purchaseRanges as $r) {
+                            $q->whereNotBetween('purchases.total', [$r['min'], $r['max']]);
+                        }
                     });
                 }
             }
