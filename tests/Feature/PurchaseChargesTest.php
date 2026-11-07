@@ -16,6 +16,7 @@ use App\Services\ProfitLossService;
 use App\Services\RegisterService;
 use App\Services\SaleRevisionService;
 use App\Services\SaleService;
+use App\Services\SettingsService;
 use App\Services\StockLayerService;
 use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -227,5 +228,26 @@ class PurchaseChargesTest extends TestCase
         $three = $this->sell($this->product, '1');
         $this->assertSame('INV-'.today()->format('Ymd').'-00001', $three->invoice);
         $this->assertSame($one->invoice, $one->fresh()->invoice);
+    }
+
+    public function test_coded_sale_numbers_share_a_sequence_across_dates_and_code_modes(): void
+    {
+        $this->travelTo(now()->setDate(2026, 11, 7)->setTime(12, 0));
+        $this->purchase();
+        $legacy = $this->sell($this->product, '1');
+        config(['features.super_admin' => true, 'features.scode' => true, 'features.barcode' => false]);
+        app(SettingsService::class)->put('barcode', ['scode_digit_2' => 'Z']);
+
+        $encoded = $this->sell($this->product, '1');
+        $this->assertSame('INV-ZJZFAAJG01', $encoded->invoice);
+        $this->travel(1)->days();
+        $nextDay = $this->sell($this->product, '1');
+        $this->assertSame('INV-ZJZFAAJH02', $nextDay->invoice);
+
+        config(['features.scode' => false]);
+        $random = $this->sell($this->product, '1');
+        $this->assertMatchesRegularExpression('/^INV-[A-Z]{8}03$/', $random->invoice);
+        $this->assertSame('INV-20261107-00001', $legacy->fresh()->invoice);
+        $this->get(route('sales.show', $encoded))->assertOk()->assertSee($encoded->invoice);
     }
 }

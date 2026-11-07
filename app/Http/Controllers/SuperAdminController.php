@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cheque;
 use App\Models\Customer;
 use App\Models\Product;
+use App\Models\Purchase;
 use App\Models\Sale;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\ProfitLossService;
+use App\Support\SalesPrivacy;
 use App\Support\SecretControl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class SuperAdminController extends Controller
 {
@@ -236,6 +240,136 @@ class SuperAdminController extends Controller
         $summary = $profitService->calculate($from, $to);
 
         return view('superadmin.profit', compact('summary', 'from', 'to', 'systemActive', 'percentage'));
+    }
+
+    /**
+     * Super Admin Real Purchases view.
+     * Shows 100% REAL purchases, supplier orders, and payment statuses.
+     */
+    public function purchases(Request $request)
+    {
+        $systemActive   = (bool) SecretControl::get('system_active', 1);
+        $percentage     = SecretControl::percentage();
+        $costPercentage = SecretControl::costPercentage();
+
+        $query = Purchase::with(['supplier', 'user'])->withPaymentTotals();
+        if ($request->filled('q')) {
+            $q = $request->input('q');
+            $query->where(fn ($sub) => $sub->where('reference', 'like', "%{$q}%")
+                ->orWhereHas('supplier', fn ($s) => $s->where('name', 'like', "%{$q}%")));
+        }
+        if ($request->filled('from')) {
+            $query->whereDate('purchase_date', '>=', $request->input('from'));
+        }
+        if ($request->filled('to')) {
+            $query->whereDate('purchase_date', '<=', $request->input('to'));
+        }
+
+        $activePurchases = (clone $query)->where('status', 'ACTIVE')->get();
+        $totals = (object) [
+            'total_count' => $activePurchases->count(),
+            'gross_total' => $activePurchases->sum('total'),
+            'total_due'   => \App\Support\Money::sum($activePurchases->pluck('due_amount')->filter()),
+        ];
+
+        $purchases = $query->latest('purchase_date')->paginate(20)->withQueryString();
+
+        return view('superadmin.purchases', compact('purchases', 'totals', 'systemActive', 'percentage', 'costPercentage'));
+    }
+
+    /**
+     * Super Admin Real Customers view.
+     * Shows 100% REAL customer accounts, balances, and contact details.
+     */
+    public function customers(Request $request)
+    {
+        $systemActive       = (bool) SecretControl::get('system_active', 1);
+        $percentage         = SecretControl::percentage();
+        $customerPercentage = SecretControl::customerAmountPercentage();
+
+        $query = Customer::withDueBalances();
+        if ($request->filled('q')) {
+            $q = $request->input('q');
+            $query->where(fn ($sub) => $sub->where('name', 'like', "%{$q}%")
+                ->orWhere('phone', 'like', "%{$q}%")
+                ->orWhere('email', 'like', "%{$q}%"));
+        }
+        if ($request->filled('balance')) {
+            $query->whereRaw('(opening_due - opening_due_paid + '.Customer::invoiceDueSql().') '.($request->input('balance') === 'due' ? '>' : '=').' 0');
+        }
+        if ($request->filled('active')) {
+            $query->where('active', $request->boolean('active'));
+        }
+
+        $stats = DB::query()->fromSub(Customer::withDueBalances()->toBase(), 'cust_balances')
+            ->selectRaw('COUNT(*) as total, SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_count, SUM(CASE WHEN opening_due - opening_due_paid + invoice_due > 0 THEN 1 ELSE 0 END) as due_count, SUM(opening_due - opening_due_paid + invoice_due) as total_due')
+            ->first();
+
+        $customers = $query->orderBy('name')->paginate(20)->withQueryString();
+
+        return view('superadmin.customers', compact('customers', 'stats', 'systemActive', 'percentage', 'customerPercentage'));
+    }
+
+    /**
+     * Super Admin Real Suppliers view.
+     * Shows 100% REAL supplier accounts, confirmed dues, and contact details.
+     */
+    public function suppliers(Request $request)
+    {
+        $systemActive = (bool) SecretControl::get('system_active', 1);
+        $percentage   = SecretControl::percentage();
+
+        $query = Supplier::withDueBalances();
+        if ($request->filled('q')) {
+            $q = $request->input('q');
+            $query->where(fn ($sub) => $sub->where('name', 'like', "%{$q}%")
+                ->orWhere('phone', 'like', "%{$q}%")
+                ->orWhere('email', 'like', "%{$q}%"));
+        }
+        if ($request->filled('active')) {
+            $query->where('active', $request->boolean('active'));
+        }
+
+        $stats = DB::query()->fromSub(Supplier::withDueBalances()->toBase(), 'supp_balances')
+            ->selectRaw('COUNT(*) as total, SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_count, SUM(outstanding_due) as total_due, SUM(unrecorded_count) as unrecorded_count')
+            ->first();
+
+        $suppliers = $query->orderBy('name')->paginate(20)->withQueryString();
+
+        return view('superadmin.suppliers', compact('suppliers', 'stats', 'systemActive', 'percentage'));
+    }
+
+    /**
+     * Super Admin Real Cheques view.
+     * Shows 100% REAL cheques, full amounts, and clearance statuses.
+     */
+    public function cheques(Request $request)
+    {
+        $systemActive     = (bool) SecretControl::get('system_active', 1);
+        $percentage       = SecretControl::percentage();
+        $chequePercentage = SecretControl::chequeAmountPercentage();
+
+        $query = Cheque::with(['customer', 'supplier', 'bankAccount', 'user']);
+        if ($request->filled('q')) {
+            $q = $request->input('q');
+            $query->where(fn ($sub) => $sub->where('cheque_number', 'like', "%{$q}%")
+                ->orWhere('bank_name', 'like', "%{$q}%")
+                ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$q}%"))
+                ->orWhereHas('supplier', fn ($s) => $s->where('name', 'like', "%{$q}%")));
+        }
+        if ($request->filled('type')) {
+            $query->where('type', $request->input('type'));
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        $totals = (clone $query)->selectRaw('COUNT(*) as total_count, SUM(amount) as total_amount, SUM(CASE WHEN status = "PASSED" THEN amount ELSE 0 END) as passed_amount, SUM(CASE WHEN status = "PENDING" THEN amount ELSE 0 END) as pending_amount')
+            ->first();
+
+        $cheques = $query->latest('cheque_date')->paginate(20)->withQueryString();
+
+        return view('superadmin.cheques', compact('cheques', 'totals', 'systemActive', 'percentage', 'chequePercentage'));
     }
 
     /**
@@ -689,8 +823,22 @@ class SuperAdminController extends Controller
      */
     public function privacyMode()
     {
-        $systemActive = (bool) SecretControl::get('system_active', 1);
-        $percentage   = SecretControl::percentage();
-        return view('superadmin.privacy-mode', compact('systemActive', 'percentage'));
+        return view('superadmin.privacy-mode', ['privacy' => SalesPrivacy::settings()]);
+    }
+
+    public function savePrivacyMode(Request $request)
+    {
+        $settings = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'bill_count' => ['required', 'integer', 'between:1,1000'],
+            'applies_to' => ['sometimes', 'array'],
+            'applies_to.*' => ['required', 'distinct', Rule::in(array_keys(SalesPrivacy::SURFACES))],
+        ]);
+
+        $settings['enabled'] = $request->boolean('enabled');
+        $settings['applies_to'] ??= [];
+        SalesPrivacy::save($settings);
+
+        return back()->with('success', 'Sales privacy settings saved.');
     }
 }

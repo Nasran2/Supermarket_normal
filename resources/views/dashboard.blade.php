@@ -36,6 +36,9 @@ if ($from !== $to) $dateDisplay .= ' - ' . \Carbon\Carbon::parse($to)->format('d
         @can('pos.access')<a class="btn primary" href="{{ route('pos.index') }}"><x-icon name="scan-line" />Open POS</a>@endcan
     </div>
 </div>
+@if(!empty($privacy))
+    @include('sales.partials.privacy-shortcuts', ['surface' => 'dashboard'])
+@endif
 <x-sales-visibility-note />
 @if(!\App\Support\SecretControl::isHidden('hide_top_summary'))
 @php
@@ -92,7 +95,7 @@ if ($from !== $to) $dateDisplay .= ' - ' . \Carbon\Carbon::parse($to)->format('d
     @endif
     @if(!\App\Support\SecretControl::isHidden('hide_tables'))@can('dashboard.recent_sales')<section class="card">
         <div class="card-heading">
-            <h2>Recent sales</h2>@can('sales.view')<a class="text-link" href="{{ route('sales.index') }}">View all<x-icon name="arrow-right" :size="14" /></a>@endcan
+            <h2>{{ ($privacy['mode'] ?? 'all') === 'all' ? 'Recent sales' : 'Selected bills' }}</h2>@can('sales.view')<a class="text-link" href="{{ route('sales.index') }}">Sales List<x-icon name="arrow-right" :size="14" /></a>@endcan
         </div>
         <div class="table-wrap">
             <table>

@@ -95,6 +95,11 @@ class Cheque extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function user()
+    {
+        return $this->creator();
+    }
+
     public function sale()
     {
         return $this->belongsTo(Sale::class);

@@ -19,6 +19,7 @@ use App\Models\SaleReturn;
 use App\Models\SaleReturnItem;
 use App\Models\SaleRevision;
 use App\Support\Money;
+use App\Support\SalesPrivacy;
 use App\Support\SalesVisibility;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -28,6 +29,7 @@ use Illuminate\Support\Facades\Schema;
 
 class ReportService
 {
+    public const RANKED_REPORTS = ['sales', 'product-sales', 'profit', 'payments', 'payment-charges', 'card-charges', 'qr-charges', 'bank-charges', 'collections', 'returns'];
     public const TITLES = ['sales' => 'Sales', 'purchases' => 'Purchases', 'expenses' => 'Expenses', 'profit' => 'Profit & loss', 'stock' => 'Stock', 'product-sales' => 'Product sales', 'payments' => 'Payment methods', 'register' => 'Register', 'cash' => 'Cash summary', 'payment-charges' => 'Payment processing charges', 'card-charges' => 'Card charges', 'qr-charges' => 'QR charges', 'bank-charges' => 'Bank charges', 'purchase-returns' => 'Purchase returns', 'returns' => 'Sales returns', 'collections' => 'Due collections', 'audit' => 'Audit log'];
 
     public static function titles(): array
@@ -50,14 +52,40 @@ class ReportService
         return 'reports.'.$kind;
     }
 
-    public function build(string $kind, array $filters): array
+    public function build(string $kind, array $filters, ?array $privacy = null): array
     {
         $from = $filters['from'];
         $to = $filters['to'];
         $cards = [];
         $start = $from.' 00:00:00';
         $end = $to.' 23:59:59';
+        $ids = null;
+        if ($privacy && $privacy['mode'] !== 'all' && in_array($kind, self::RANKED_REPORTS, true) && $kind !== 'sales') {
+            $candidates = Sale::visibleTo()->whereBetween('sold_at', [$start, $end])
+                ->when(! empty($filters['user_id']) && ! in_array($kind, ['collections', 'returns'], true), fn ($q) => $q->where('user_id', $filters['user_id']))
+                ->when(! empty($filters['q']) && $kind !== 'returns', fn ($q) => $q->where('invoice', 'like', '%'.$filters['q'].'%'));
+            $tenderFilters = array_filter(array_intersect_key($filters, array_flip(['payment_method_id', 'rule_id', 'charge_bearer'])));
+            if (in_array($kind, ['payment-charges', 'card-charges', 'qr-charges', 'bank-charges'], true) || ($kind === 'payments' && $tenderFilters)) {
+                $candidates->whereHas('payments', function ($query) use ($filters, $kind) {
+                    foreach (['payment_method_id' => 'payment_method_id', 'rule_id' => 'payment_charge_rule_id', 'charge_bearer' => 'charge_bearer'] as $input => $column) {
+                        if (! empty($filters[$input])) {
+                            $query->where($column, $filters[$input]);
+                        }
+                    }
+                    if ($kind !== 'payments') {
+                        $query->where('processing_charge', '>', 0);
+                    }
+                    if ($type = ['card-charges' => 'CARD', 'qr-charges' => 'QR', 'bank-charges' => 'BANK_TRANSFER'][$kind] ?? null) {
+                        $query->where('method_type', $type);
+                    }
+                });
+            }
+            $ids = SalesPrivacy::selectedIds($candidates, $privacy);
+        }
         $pay = SalePayment::featureVisible()->with(['sale.user', 'expense'])->whereHas('sale', fn ($q) => $q->visibleTo()->whereIn('status', ['ACTIVE', 'RETURN_CANCELLED'])->whereBetween('sold_at', [$start, $end]));
+        if ($ids) {
+            $pay->whereIn('sale_id', $ids);
+        }
         foreach (['payment_method_id' => 'payment_method_id', 'rule_id' => 'payment_charge_rule_id', 'charge_bearer' => 'charge_bearer'] as $input => $col) {
             if (! empty($filters[$input])) {
                 $pay->where($col, $filters[$input]);
@@ -90,6 +118,11 @@ class ReportService
                     }
                 }
                 $events = ReturnSettlement::whereBetween('created_at', [$start, $end])->whereIn('kind', ['PURCHASE_RETURN_REFUND', 'PURCHASE_RETURN_PAYMENT', 'SUPPLIER_RETURN_REFUND', 'REVERSAL'])->where(fn ($q) => $q->whereNull('sale_return_id')->orWhereHas('saleReturn', fn ($q) => $q->visibleTo()))->selectRaw("payment_method_id, method_name, method_type, 0 as base, 0 as customer_fees, 0 as business_fees, CASE WHEN method_type='CHEQUE' THEN 0 ELSE amount END as collections");
+                if ($ids) {
+                    $collections->whereIn('sale_id', $ids);
+                    $refunds->whereIn('sale_id', $ids);
+                    $events->whereHas('saleReturn', fn ($q) => $q->whereIn('sale_id', $ids));
+                }
                 foreach (['user_id', 'payment_method_id'] as $key) {
                     if (! empty($filters[$key])) {
                         $events->where($key, $filters[$key]);
@@ -97,6 +130,9 @@ class ReportService
                 }
                 if (config('features.cheque')) {
                     $cleared = Cheque::visibleTo()->where('type', 'CUSTOMER_RECEIVED')->where('status', 'PASSED')->whereBetween('passed_at', [$start, $end])->selectRaw("(SELECT id FROM payment_methods WHERE type='CHEQUE' ORDER BY id LIMIT 1) as payment_method_id, 'Cheque' as method_name, 'CHEQUE' as method_type, 0 as base, 0 as customer_fees, 0 as business_fees, amount as collections");
+                    if ($ids) {
+                        $cleared->whereIn('sale_id', $ids);
+                    }
                     if (! empty($filters['payment_method_id'])) {
                         $cleared->whereRaw("(SELECT id FROM payment_methods WHERE type='CHEQUE' ORDER BY id LIMIT 1) = ?", [$filters['payment_method_id']]);
                     }
@@ -133,6 +169,15 @@ class ReportService
         } elseif (in_array($kind, ['returns', 'collections'])) {
             $isReturn = $kind === 'returns';
             $query = ($isReturn ? SaleReturn::visibleTo() : SaleCollection::settled()->featureVisible()->whereHas('sale', fn ($q) => $q->visibleTo()))->with('sale', 'user')->whereBetween($isReturn ? 'returned_at' : 'collected_at', [$start, $end])->latest('id');
+            if ($ids) {
+                if ($isReturn) {
+                    $query->where(fn ($q) => $q->whereIn('sale_id', $ids)->orWhere(fn ($q) => $q
+                        ->where('return_type', 'NO_RECEIPT')->whereHas('items')
+                        ->whereDoesntHave('items', fn ($line) => $line->whereDoesntHave('item', fn ($item) => $item->whereIn('sale_id', $ids)))));
+                } else {
+                    $query->whereIn('sale_id', $ids);
+                }
+            }
             if (! empty($filters['user_id'])) {
                 $query->where('user_id', $filters['user_id']);
             }
@@ -175,6 +220,10 @@ class ReportService
             }
             if (! empty($filters['q'])) {
                 $query->where('invoice', 'like', '%'.$filters['q'].'%');
+            }
+            $ids = SalesPrivacy::selectedIds($query, $privacy);
+            if ($ids) {
+                $query->whereIn('sales.id', $ids);
             }
             $headers = ['Date', 'Invoice', 'Customer', 'Subtotal', 'Discount', 'Base sales', 'Method', 'Returned', 'Balance due', 'Status'];
             $map = fn ($s) => [$s->sold_at->format('Y-m-d H:i'), $s->invoice, $s->customer?->name ?? 'Walk-in', Money::displayPrice($s->subtotal), Money::displayPrice($s->discount), Money::displayPrice($s->sale_amount), $s->payment_names, Money::displayPrice($s->returned_total), Money::displayPrice($s->due_balance), $s->status];
@@ -222,7 +271,10 @@ class ReportService
                 };
             }
             $periodReturns = SaleReturn::visibleTo()->whereBetween('returned_at', [$start, $end]);
-            $saleFilter = function ($q) use ($filters) {
+            $saleFilter = function ($q) use ($filters, $ids) {
+                if ($ids) {
+                    $q->whereIn('sales.id', $ids);
+                }
                 if (! empty($filters['user_id'])) {
                     $q->where('user_id', $filters['user_id']);
                 }
@@ -236,6 +288,9 @@ class ReportService
             $periodReturns->where(fn ($q) => $q->whereHas('sale', $saleFilter)->orWhereHas('items.item.sale', $saleFilter));
             $original = (string) (clone $query)->whereIn('status', ['ACTIVE', 'RETURN_CANCELLED'])->sum('sale_amount');
             $exchangeReversals = Sale::visibleTo()->where('status', 'RETURN_CANCELLED')->whereBetween('voided_at', [$start, $end]);
+            if ($ids) {
+                $exchangeReversals->whereIn('sales.id', $ids);
+            }
             foreach (['user_id'] as $key) {
                 if (! empty($filters[$key])) {
                     $exchangeReversals->where($key, $filters[$key]);
@@ -260,6 +315,12 @@ class ReportService
             ];
             if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_sales_value')) {
                 $cards = [];
+            }
+            if ($ids) {
+                $query->reorder('customer_payable', SalesPrivacy::direction($privacy))->orderBy('sales.id');
+                $headers[] = 'Bill total';
+                $baseMap = $map;
+                $map = fn ($sale) => [...$baseMap($sale), Money::displayPrice($sale->customer_payable)];
             }
         } elseif ($kind === 'purchases') {
             $costMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::costMultiplier() : 1.0;
@@ -517,6 +578,9 @@ class ReportService
             }
         } elseif ($kind === 'product-sales') {
             $query = SaleItem::whereHas('sale', fn ($q) => $q->visibleTo()->where('status', 'ACTIVE')->whereBetween('sold_at', [$start, $end]))->selectRaw('product_id, name, unit, SUM(quantity) as quantity, SUM(total) as total, SUM(COALESCE(cogs_total, COALESCE(base_quantity, quantity) * COALESCE(base_cost, cost))) as cogs')->groupBy('product_id', 'name', 'unit')->orderByDesc('total');
+            if ($ids) {
+                $query->whereIn('sale_id', $ids);
+            }
             $headers = ['Product', 'Unit', 'Original quantity before returns', 'Original line sales before invoice discount / returns'];
             $stockMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::stockMultiplier() : 1.0;
             $sellMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::sellingPriceMultiplier() : 1.0;

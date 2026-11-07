@@ -4,7 +4,13 @@
 @section('main-class','pos-main')
 @section('content')
 <div class="pos-heading"><div><span class="eyebrow">{{ isset($editingSale)?'INVOICE WORKSPACE':'YOUR CHECKOUT WORKSPACE' }}</span><h1>{{ isset($editingSale)?'Edit '.$editingSale->invoice:'Point of sale' }}</h1>@isset($editingSale)<p class="pos-edit-description">Update the saved invoice. Unsaved changes reset when you refresh or return.</p>@endisset</div><div class="pos-heading-actions">@isset($editingSale)<a class="btn secondary" href="{{ route('sales.show',$editingSale) }}"><x-icon name="arrow-left"/>Cancel edit</a>@endisset<span class="badge {{ $register?'green':'amber' }}">{{ $register?'REG-'.$register->id.' · Ready to sell':'Register closed' }}</span>@if($register)@can('register.close')<button class="btn secondary pos-close-register" type="button" data-close-register><x-icon name="wallet"/>Close register</button>@endcan
-@endif<span class="pos-shortcut">F1 Search <span>·</span> F4 Payment</span></div></div>
+@endif<span class="pos-shortcut">F1 Search <span>·</span> F4 Payment</span>
+@unless(isset($editingSale))
+    @if($privacy = \App\Support\SalesPrivacy::view('pos'))
+        @include('sales.partials.privacy-shortcuts', ['surface' => 'pos'])
+    @endif
+@endunless
+</div></div>
 @if(!$register)
 <div class="card pos-register-gate"><span class="register-welcome-icon"><x-icon name="wallet" :size="30"/></span><h2>Open a register to start selling</h2><p>Your POS will unlock once you enter the opening cash.</p>@can('register.open')<button class="btn primary" type="button" data-open-register>Open register</button>@endcan</div>
 @else

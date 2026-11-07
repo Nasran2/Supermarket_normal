@@ -228,6 +228,32 @@
                 <span>Products (Real Prices)</span>
             </a>
 
+            <a href="{{ route('superadmin.purchases') }}"
+               class="nav-link {{ request()->routeIs('superadmin.purchases') ? 'active' : '' }}">
+                <x-icon name="shopping-bag"/>
+                <span>Purchases (Real Purchases)</span>
+            </a>
+
+            <a href="{{ route('superadmin.customers') }}"
+               class="nav-link {{ request()->routeIs('superadmin.customers') ? 'active' : '' }}">
+                <x-icon name="contact"/>
+                <span>Customers (Real Data)</span>
+            </a>
+
+            <a href="{{ route('superadmin.suppliers') }}"
+               class="nav-link {{ request()->routeIs('superadmin.suppliers') ? 'active' : '' }}">
+                <x-icon name="truck"/>
+                <span>Suppliers (Real Data)</span>
+            </a>
+
+            @if(config('features.cheque'))
+            <a href="{{ route('superadmin.cheques') }}"
+               class="nav-link {{ request()->routeIs('superadmin.cheques') ? 'active' : '' }}">
+                <x-icon name="wallet"/>
+                <span>Cheques (Real Cheques)</span>
+            </a>
+            @endif
+
             <a href="{{ route('superadmin.profit') }}"
                class="nav-link {{ request()->routeIs('superadmin.profit') ? 'active' : '' }}">
                 <x-icon name="trending-up"/>

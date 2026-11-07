@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\PaymentMethod;
 use App\Models\Product;
+use App\Models\Sale;
 use App\Models\User;
 use App\Services\PdfReportService;
 use App\Services\ProfitLossService;
@@ -14,10 +15,23 @@ use App\Services\ReportService;
 use App\Services\SettingsService;
 use App\Support\AuditPresentation;
 use App\Support\Money;
+use App\Support\SalesPrivacy;
 use App\Support\SalesVisibility;
 
 class ReportController extends Controller
 {
+    private function privacy(string $report): ?array
+    {
+        return in_array($report, ReportService::RANKED_REPORTS, true) ? SalesPrivacy::view('reports') : null;
+    }
+
+    private function profitSummary(ProfitLossService $profit, array $filters, ?array $privacy): array
+    {
+        $sales = Sale::visibleTo()->whereBetween('sold_at', [$filters['from'].' 00:00:00', $filters['to'].' 23:59:59']);
+
+        return $profit->calculate($filters['from'], $filters['to'], SalesPrivacy::selectedIds($sales, $privacy));
+    }
+
     public function index()
     {
         if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('disable_reports')) {
@@ -41,13 +55,14 @@ class ReportController extends Controller
         abort_unless(isset($titles[$report]), 404);
         $filters = $request->validated();
         $title = $titles[$report];
+        $privacy = $this->privacy($report);
         if ($report === 'profit') {
             abort_unless($request->user()->hasPermission('products.view_cost'), 403);
-            $summary = $profit->calculate($filters['from'], $filters['to']);
+            $summary = $this->profitSummary($profit, $filters, $privacy);
 
-            return view('reports.profit', compact('filters', 'title', 'summary'));
+            return view('reports.profit', compact('filters', 'title', 'summary', 'privacy'));
         }
-        $result = $service->build($report, $filters);
+        $result = $service->build($report, $filters, $privacy);
         $records = $result['query']->paginate(25)->withQueryString();
         $rows = $records->getCollection()->map($result['map']);
         $auditComparisons = $report === 'audit' ? $records->getCollection()->map(fn ($record) => AuditPresentation::compare($record->before, $record->after, app(SettingsService::class)->all(), $record->action)) : collect();
@@ -60,7 +75,7 @@ class ReportController extends Controller
         $products = $report === 'stock' ? Product::where('track_stock', true)->orderBy('name')->get(['id', 'name']) : collect();
         $categories = $report === 'stock' ? Category::orderBy('name')->get(['id', 'name']) : collect();
 
-        return view('reports.table', compact('report', 'filters', 'title', 'records', 'rows', 'headers', 'cards', 'methods', 'users', 'rules', 'products', 'categories', 'auditComparisons'));
+        return view('reports.table', compact('report', 'filters', 'title', 'records', 'rows', 'headers', 'cards', 'methods', 'users', 'rules', 'products', 'categories', 'auditComparisons', 'privacy'));
     }
 
     public function pdf(ReportRequest $request, string $report, ReportService $service, ProfitLossService $profit)
@@ -78,6 +93,10 @@ class ReportController extends Controller
         $filters = $request->validated();
         $title = $titles[$report];
         $labels = [];
+        $privacy = $this->privacy($report);
+        if ($privacy && $privacy['mode'] !== 'all') {
+            $labels['Sales view'] = SalesPrivacy::MODES[$privacy['mode']].' · Up to '.$privacy['bill_count'].' bills';
+        }
         if (! in_array($report, ['purchases', 'stock']) && SalesVisibility::mode() !== 'ALL') {
             $labels['Sales access'] = SalesVisibility::OPTIONS[SalesVisibility::mode()];
         }
@@ -93,13 +112,13 @@ class ReportController extends Controller
         }
         if ($report === 'profit') {
             abort_unless($request->user()->hasPermission('products.view_cost'), 403);
-            $summary = $profit->calculate($filters['from'], $filters['to']);
+            $summary = $this->profitSummary($profit, $filters, $privacy);
             $headers = ['Profit & loss statement', 'Amount'];
             $rows = collect(['grossSales' => 'Gross sales', 'salesReturns' => 'Less sales returns', 'revenue' => 'Net sales revenue', 'cogs' => 'Cost of goods sold', 'gross' => 'Gross profit', 'manual' => 'Other operating expenses', 'processing' => 'Business-paid processing expenses', 'purchaseCharges' => 'Purchase shipping & other charges', 'returnWriteoffs' => 'Return write-off expenses', 'noReceiptCredit' => 'No-receipt approved credit (unverified)', 'estimatedRecovery' => 'Estimated returned inventory / supplier claim cost', 'noReceiptAdjustments' => 'No-receipt return adjustments', 'expenses' => 'Total operating expenses', 'net' => 'Net profit'])->map(fn ($label, $key) => [$label, Money::display($summary[$key])])->values();
             $cards = ['Revenue' => $summary['revenue'], 'Gross profit' => $summary['gross'], 'Net profit' => $summary['net']];
             $notes = 'Revenue and cost of goods sold are net of returns. Voided sales and reversed expenses are excluded. Customer-paid processing fees are not product revenue.';
         } else {
-            $result = $service->build($report, $filters);
+            $result = $service->build($report, $filters, $privacy);
             $headers = $result['headers'];
             $rowCount = (clone $result['query'])->getCountForPagination();
             $rows = $result['query']->lazy(500)->map($result['map']);
@@ -142,7 +161,7 @@ class ReportController extends Controller
 
         $titles = ReportService::titles();
         abort_unless(isset($titles[$report]) && $report !== 'profit', 404);
-        $result = $service->build($report, $request->validated());
+        $result = $service->build($report, $request->validated(), $this->privacy($report));
 
         return response()->streamDownload(function () use ($result) {
             $out = fopen('php://output', 'w');

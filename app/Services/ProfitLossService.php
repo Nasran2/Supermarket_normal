@@ -5,28 +5,51 @@ namespace App\Services;
 use App\Models\Expense;
 use App\Models\Sale;
 use App\Models\SaleReturn;
+use App\Models\SaleReturnItem;
 use App\Support\Money;
 use App\Support\SalesVisibility;
+use Illuminate\Database\Query\Builder;
 
 class ProfitLossService
 {
-    public function calculate(string $from, string $to): array
+    public function calculate(string $from, string $to, Builder|array|null $selectedSales = null): array
     {
         $period = [$from.' 00:00:00', $to.' 23:59:59'];
         $sales = Sale::visibleTo()->whereIn('status', ['ACTIVE', 'RETURN_CANCELLED'])->whereBetween('sold_at', $period);
         $returns = SaleReturn::visibleTo()->whereBetween('returned_at', $period);
         $cancellations = SaleReturn::visibleTo()->where('status', 'CANCELLED')->whereBetween('cancelled_at', $period);
+        $linkedAmount = $linkedCost = '0';
+        if ($selectedSales !== null) {
+            $sales->whereIn('sales.id', $selectedSales);
+            $linked = SaleReturnItem::whereHas('item', fn ($q) => $q->whereIn('sale_id', $selectedSales));
+            $completed = (clone $linked)->whereHas('return', fn ($q) => $q->visibleTo()->where('return_type', 'NO_RECEIPT')->whereBetween('returned_at', $period));
+            $cancelled = $linked->whereHas('return', fn ($q) => $q->visibleTo()->where('return_type', 'NO_RECEIPT')->where('status', 'CANCELLED')->whereBetween('cancelled_at', $period));
+            $linkedAmount = Money::sub((string) (clone $completed)->sum('amount'), (string) (clone $cancelled)->sum('amount'));
+            $linkedCost = Money::sub((string) $completed->sum('cost_total'), (string) $cancelled->sum('cost_total'));
+            $returns->whereIn('sale_id', $selectedSales);
+            $cancellations->whereIn('sale_id', $selectedSales);
+        }
         $grossSales = Money::round((string) (clone $sales)->sum('sale_amount'));
-        $salesReturns = Money::sub((string) (clone $returns)->sum('verified_amount'), (string) (clone $cancellations)->sum('verified_amount'));
+        $salesReturns = Money::add($linkedAmount, Money::sub((string) (clone $returns)->sum('verified_amount'), (string) (clone $cancellations)->sum('verified_amount')));
         $exchangeReversals = Sale::visibleTo()->where('status', 'RETURN_CANCELLED')->whereBetween('voided_at', $period);
+        if ($selectedSales !== null) {
+            $exchangeReversals->whereIn('sales.id', $selectedSales);
+        }
         $grossSales = Money::sub($grossSales, (string) (clone $exchangeReversals)->sum('sale_amount'));
         $revenue = Money::sub($grossSales, $salesReturns);
         $cogs = Money::sub(Money::sub((string) $sales->sum('cost_total'), (string) $returns->sum('historical_cost_total')), (string) $exchangeReversals->sum('cost_total'));
         $cogs = Money::add($cogs, (string) $cancellations->sum('historical_cost_total'));
+        $cogs = Money::sub($cogs, $linkedCost);
         $gross = Money::sub($revenue, $cogs);
         $expenses = SalesVisibility::apply(Expense::visibleSales(), 'expenses.user_id')->whereBetween('expense_date', [$from, $to]);
         $expenses->where(fn ($q) => $q->where('status', 'ACTIVE')->orWhere(fn ($q) => $q->where('status', 'REVERSED')->where(fn ($q) => $q->where('type', 'RETURN_WRITEOFF')->orWhere(fn ($q) => $q->where('type', 'AUTOMATIC')->whereHas('sale', fn ($q) => $q->where('status', 'RETURN_CANCELLED'))))));
         $reversed = SalesVisibility::apply(Expense::visibleSales(), 'expenses.user_id')->where('status', 'REVERSED')->whereBetween('updated_at', $period)->where(fn ($q) => $q->where('type', 'RETURN_WRITEOFF')->orWhere(fn ($q) => $q->where('type', 'AUTOMATIC')->whereHas('sale', fn ($q) => $q->where('status', 'RETURN_CANCELLED'))));
+        if ($selectedSales !== null) {
+            foreach ([$expenses, $reversed] as $query) {
+                $query->where(fn ($q) => $q->whereIn('sale_id', $selectedSales)
+                    ->orWhere(fn ($q) => $q->whereNull('sale_id')->whereNotIn('type', ['AUTOMATIC', 'RETURN_WRITEOFF'])));
+            }
+        }
         $manual = Money::round((string) (clone $expenses)->whereIn('type', ['MANUAL', 'HR_PAYROLL', 'EXPIRY_WRITEOFF'])->sum('amount'));
         $processing = Money::sub((string) (clone $expenses)->where('type', 'AUTOMATIC')->sum('amount'), (string) (clone $reversed)->where('type', 'AUTOMATIC')->sum('amount'));
         $purchaseCharges = Money::round((string) (clone $expenses)->where('type', 'PURCHASE_CHARGE')->sum('amount'));

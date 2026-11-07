@@ -11,6 +11,9 @@
 </div>
 @else
 <div class="page-heading"><div><span class="eyebrow">BUSINESS PERFORMANCE</span><h1>Profit & loss</h1><p>{{ $filters['from'] }} to {{ $filters['to'] }} · {{ $settings['currency']??'LKR' }}</p></div><div class="heading-actions"><a class="btn secondary" href="{{ route('reports.index') }}">All reports</a>@can('reports.profit.pdf')<a class="btn primary" href="{{ route('reports.pdf',['report'=>'profit']+$filters) }}"><x-icon name="download"/>Download PDF</a>@endcan<button class="btn secondary" onclick="window.print()"><x-icon name="printer"/>Print</button></div></div>
+@if(!empty($privacy))
+    @include('sales.partials.privacy-shortcuts', ['surface' => 'reports'])
+@endif
 <x-sales-visibility-note/>
 
 @php

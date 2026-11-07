@@ -22,11 +22,13 @@ use App\Services\SaleService;
 use App\Services\SettingsService;
 use App\Support\Audit;
 use App\Support\Money;
+use App\Support\SalesPrivacy;
 use App\Support\Units;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class SaleController extends Controller
@@ -47,10 +49,32 @@ class SaleController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $data['status']);
         }
+        $privacy = SalesPrivacy::view('sales');
+        if ($ids = SalesPrivacy::selectedIds($query, $privacy)) {
+            $query->whereIn('sales.id', $ids);
+        }
+
         $totals = (clone $query)->where('status', 'ACTIVE')->selectRaw('COUNT(*) as invoices, SUM(sale_amount) as amount, SUM(customer_payable) as payable')->first();
+        if ($ids) {
+            $query->orderBy('customer_payable', SalesPrivacy::direction($privacy))->orderBy('sales.id');
+        }
         $sales = $query->latest('sold_at')->latest('id')->paginate(20)->withQueryString();
 
-        return view('sales.index', compact('sales', 'totals'));
+        return view('sales.index', compact('sales', 'totals', 'privacy'));
+    }
+
+    public function privacyView(Request $request)
+    {
+        abort_unless(SalesPrivacy::available(), 404);
+        $data = $request->validate([
+            'mode' => ['required', Rule::in(array_keys(SalesPrivacy::MODES))],
+            'surface' => ['required', Rule::in(array_keys(SalesPrivacy::SURFACES))],
+        ]);
+        abort_unless(SalesPrivacy::view($data['surface']), 404);
+
+        $request->session()->put(SalesPrivacy::SESSION_KEY, $data['mode']);
+
+        return $request->expectsJson() ? response()->json(['mode' => $data['mode']]) : back();
     }
 
     public function show(Sale $sale)

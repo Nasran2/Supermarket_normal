@@ -84,6 +84,7 @@ Route::middleware(['auth', 'auth.session', SaleVisibility::class])->group(functi
         });
     });
     Route::get('/sales', [SaleController::class, 'index'])->middleware('permission:sales.view')->name('sales.index');
+    Route::post('/sales/privacy-view', [SaleController::class, 'privacyView'])->middleware('permission:sales.view')->name('sales.privacy-view');
     Route::get('/sales/{sale}/tax-invoice/print', [TaxInvoiceController::class, 'preview'])->name('sales.tax.preview');
     Route::get('/sales/{sale}/tax-invoice/context', [TaxInvoiceController::class, 'context'])->name('sales.tax.context');
     Route::post('/sales/{sale}/tax-invoice', [TaxInvoiceController::class, 'store'])->name('sales.tax.store');
@@ -645,8 +646,13 @@ Route::prefix('superadmin')
             Route::post('/hide-records/hidden-sale', [SuperAdminController::class, 'addHiddenSale'])->name('hide-records.hidden-sale.add');
             Route::delete('/hide-records/hidden-sale/{id}', [SuperAdminController::class, 'removeHiddenSale'])->name('hide-records.hidden-sale.remove');
             Route::get('/privacy-mode', [SuperAdminController::class, 'privacyMode'])->name('privacy-mode');
+            Route::post('/privacy-mode', [SuperAdminController::class, 'savePrivacyMode'])->name('privacy-mode.save');
             Route::get('/sales', [SuperAdminController::class, 'sales'])->name('sales');
             Route::get('/products', [SuperAdminController::class, 'products'])->name('products');
+            Route::get('/purchases', [SuperAdminController::class, 'purchases'])->name('purchases');
+            Route::get('/customers', [SuperAdminController::class, 'customers'])->name('customers');
+            Route::get('/suppliers', [SuperAdminController::class, 'suppliers'])->name('suppliers');
+            Route::get('/cheques', [SuperAdminController::class, 'cheques'])->name('cheques');
             Route::get('/profit', [SuperAdminController::class, 'profit'])->name('profit');
             Route::post('/toggle', [SuperAdminController::class, 'toggleSystem'])->name('toggle');
             Route::delete('/logout', [SuperAdminAuthController::class, 'logout'])->name('logout');

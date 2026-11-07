@@ -14,6 +14,9 @@
     <div style="display: flex; flex-direction: column; gap: 24px; min-width: 0;">
         <section class="card customer-purchase-history">
             <div class="card-heading"><div><h2>Purchase history</h2><p class="muted text-sm">{{ $sales->total() }} recorded {{ \Illuminate\Support\Str::plural('sale',$sales->total()) }}</p></div></div>
+            @if(!empty($privacy))
+                @include('sales.partials.privacy-shortcuts', ['surface' => 'customers'])
+            @endif
             <div class="table-wrap">
                 <table style="width: 100%;">
                     <thead><tr><th>Invoice</th><th>Date</th><th>Payment</th><th>Amount collected</th><th>Due</th><th>Status</th></tr></thead>

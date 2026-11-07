@@ -7,13 +7,13 @@ use App\Models\Expense;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
-use App\Models\SaleReturn;
 use App\Services\ExpiryReportService;
 use App\Services\ProfitLossService;
 use App\Services\RegisterService;
 use App\Services\ReportService;
 use App\Support\Cheques;
 use App\Support\Expiry;
+use App\Support\SalesPrivacy;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -38,26 +38,36 @@ class DashboardController extends Controller
         }
 
         $can = fn ($card) => $request->user()->hasPermission('dashboard.'.$card);
-        $summary = collect(['sales', 'profit', 'expenses'])->contains($can) ? $profit->calculate($from, $to) : ['revenue' => '0', 'net' => '0', 'expenses' => '0'];
+        $privacy = SalesPrivacy::view('dashboard');
         $periodSales = Sale::visibleTo()->where('status', 'ACTIVE')->whereBetween('sold_at', [$from.' 00:00:00', $to.' 23:59:59']);
+        if ($ids = SalesPrivacy::selectedIds($periodSales, $privacy)) {
+            $periodSales->whereIn('sales.id', $ids);
+        }
+        $summary = collect(['sales', 'profit', 'expenses'])->contains($can) ? $profit->calculate($from, $to, $ids) : ['revenue' => '0', 'net' => '0', 'expenses' => '0'];
         $transactions = $can('transactions') ? $periodSales->count() : 0;
-        $payments = $can('collections') ? app(ReportService::class)->build('payments', ['from' => $from, 'to' => $to])['query']->get() : collect();
+        $payments = $can('collections') ? app(ReportService::class)->build('payments', ['from' => $from, 'to' => $to], $privacy)['query']->get() : collect();
         $days = $request->input('chart_days') === '30' ? 30 : 7;
+        $chartDates = [today()->subDays($days - 1)->startOfDay(), today()->endOfDay()];
+        $chartIds = SalesPrivacy::selectedIds(Sale::visibleTo()->whereBetween('sold_at', $chartDates), $privacy)?->pluck('id')->all();
         $overview = [];
         if ($can('sales_overview')) {
-            $dailyTotals = Sale::visibleTo()->where('status', 'ACTIVE')->whereBetween('sold_at', [today()->subDays($days - 1)->startOfDay(), today()->endOfDay()])->selectRaw('DATE(sold_at) as day, SUM(sale_amount) as amount')->groupByRaw('DATE(sold_at)')->pluck('amount', 'day');
-            $dailyReturns = SaleReturn::whereHas('sale', fn ($q) => $q->visibleTo())->whereBetween('returned_at', [today()->subDays($days - 1)->startOfDay(), today()->endOfDay()])->selectRaw('DATE(returned_at) as day, SUM(amount) as amount')->groupByRaw('DATE(returned_at)')->pluck('amount', 'day');
-            $overview = [];
             for ($i = $days - 1; $i >= 0; $i--) {
                 $date = today()->subDays($i);
                 $day = $date->toDateString();
-                $overview[] = ['label' => $date->format('d M'), 'amount' => $profit->calculate($day, $day)['revenue']];
+                $overview[] = ['label' => $date->format('d M'), 'amount' => $profit->calculate($day, $day, $chartIds)['revenue']];
             }
         }
         $lowStock = $can('low_stock') ? Product::with('unit')->where('active', true)->where('track_stock', true)->lowStock()->orderBy('stock')->limit(6)->get() : collect();
-        $recentSales = $can('recent_sales') ? Sale::visibleTo()->with('user', 'payments')->latest('sold_at')->limit(6)->get() : collect();
-        $recentExpenses = $can('recent_expenses') ? Expense::visibleSales()->with('category')->where('status', 'ACTIVE')->latest()->limit(5)->get() : collect();
-        $topProducts = $can('top_products') ? SaleItem::whereHas('sale', fn ($q) => $q->visibleTo()->where('status', 'ACTIVE')->whereBetween('sold_at', [today()->subDays($days - 1)->startOfDay(), today()->endOfDay()]))->selectRaw('product_id, name, unit, SUM(quantity) as quantity, SUM(total) as total')->groupBy('product_id', 'name', 'unit')->orderByDesc('total')->limit(5)->get() : collect();
+        $recentSalesQuery = $ids
+            ? (clone $periodSales)->orderBy('customer_payable', SalesPrivacy::direction($privacy))->orderBy('sales.id')
+            : Sale::visibleTo()->latest('sold_at');
+        $recentSales = $can('recent_sales') ? $recentSalesQuery->with('user', 'payments')->limit(6)->get() : collect();
+        $recentExpenses = $can('recent_expenses') ? Expense::visibleSales()->with('category')->where('status', 'ACTIVE')
+            ->when($ids, fn ($q) => $q->where(fn ($q) => $q->whereNull('sale_id')->orWhereIn('sale_id', $ids)))
+            ->latest()->limit(5)->get() : collect();
+        $topProducts = $can('top_products') ? SaleItem::whereHas('sale', fn ($q) => $q->visibleTo()->where('status', 'ACTIVE')->whereBetween('sold_at', $chartDates))
+            ->when($chartIds !== null, fn ($q) => $q->whereIn('sale_id', $chartIds))
+            ->selectRaw('product_id, name, unit, SUM(quantity) as quantity, SUM(total) as total')->groupBy('product_id', 'name', 'unit')->orderByDesc('total')->limit(5)->get() : collect();
         $register = $can('register') ? $registers->current(auth()->id()) : null;
 
         $expiryRows = collect();
@@ -69,6 +79,6 @@ class DashboardController extends Controller
 
         $chequeAlerts = config('features.cheque') && $request->user()->hasPermission('cheques.dashboard') && Cheques::setting('cheque_dashboard') ? Cheque::visibleTo()->with('customer', 'supplier')->dueSoon()->limit(6)->get() : collect();
 
-        return view('dashboard', compact('chequeAlerts', 'expiryRows', 'expiredBatches', 'period', 'from', 'to', 'summary', 'transactions', 'payments', 'days', 'overview', 'lowStock', 'recentSales', 'recentExpenses', 'topProducts', 'register'));
+        return view('dashboard', compact('chequeAlerts', 'expiryRows', 'expiredBatches', 'period', 'from', 'to', 'summary', 'transactions', 'payments', 'days', 'overview', 'lowStock', 'recentSales', 'recentExpenses', 'topProducts', 'register', 'privacy'));
     }
 }

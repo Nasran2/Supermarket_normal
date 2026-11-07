@@ -127,7 +127,11 @@
         <p>{{ $filters['from'] }} to {{ $filters['to'] }} @if($report==='stock')· Current stock balances @endif</p>
     </div>
     <div class="heading-actions"><a class="btn secondary" href="{{ route('reports.index') }}">All reports</a>@can(\App\Services\ReportService::permission($report).'.pdf')<a class="btn primary" href="{{ route('reports.pdf',['report'=>$report]+$filters) }}"><x-icon name="download" />Download PDF</a>@endcan<button class="btn secondary" onclick="window.print()"><x-icon name="printer" />Print</button>@can(\App\Services\ReportService::permission($report).'.export')<a class="btn secondary" href="{{ route('reports.export',['report'=>$report]+$filters) }}"><x-icon name="download" />Export CSV</a>@endcan</div>
-</div>@if($cards && !\App\Support\SecretControl::isHidden('hide_top_summary'))<div class="stat-grid mb-6">@foreach($cards as $label=>$amount)<div class="card stat-card">
+</div>
+@if(!empty($privacy))
+    @include('sales.partials.privacy-shortcuts', ['surface' => 'reports'])
+@endif
+@if($cards && !\App\Support\SecretControl::isHidden('hide_top_summary'))<div class="stat-grid mb-6">@foreach($cards as $label=>$amount)<div class="card stat-card">
         <div class="stat-top">{{ $label }}</div><strong>{{ $settings['currency_symbol']??'Rs.' }} {{ $report === 'stock' ? \App\Support\Money::formatRaw($amount) : \App\Support\Money::display($amount) }}</strong>
     </div>@endforeach</div>@endif
 @if(!in_array($report,['purchases','stock']))

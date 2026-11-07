@@ -8,11 +8,13 @@ use App\Models\Permission;
 use App\Models\Product;
 use App\Models\Role;
 use App\Models\Sale;
+use App\Models\SuperAdmin;
 use App\Models\StockMovement;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\RegisterService;
 use App\Services\SettingsService;
+use App\Support\SalesPrivacy;
 use App\Support\SalesVisibility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -96,6 +98,72 @@ class SalesVisibilityTest extends TestCase
         }
         $this->scope('OWN');
         $this->get(route('sales.index', ['q' => 'INV-OUTSIDE-SCOPE']))->assertOk()->assertViewHas('sales', fn ($rows) => $rows->total() === 0);
+    }
+
+    public function test_sales_privacy_ranks_fixed_bill_counts_across_enabled_screens_and_exports(): void
+    {
+        config(['features.super_admin' => true]);
+        SalesPrivacy::save(['enabled' => true, 'bill_count' => 5]);
+        $this->scope('ALL');
+        foreach ([$this->own, $this->team, $this->other] as $sale) {
+            $sale->update(['status' => 'VOIDED']);
+        }
+        $amounts = [150, 600, 450, 2500, 900, 10, 25, 250, 100, 10];
+        foreach ($amounts as $index => $amount) {
+            $sale = $this->own->replicate()->fill(['invoice' => 'RANK-'.($index + 1), 'checkout_token' => Str::uuid(), 'status' => 'ACTIVE', 'subtotal' => $amount, 'sale_amount' => $amount, 'customer_payable' => $amount]);
+            $sale->save();
+        }
+        $filters = ['from' => '2026-10-09', 'to' => '2026-10-09'];
+        foreach (['high' => [2500, 900, 600, 450, 250], 'low' => [10, 10, 25, 100, 150]] as $mode => $expected) {
+            $matches = fn ($sales) => $sales->pluck('customer_payable')->map(fn ($amount) => (int) $amount)->all() === $expected;
+            $this->postJson(route('sales.privacy-view'), ['mode' => $mode, 'surface' => 'pos'])->assertOk()->assertJson(['mode' => $mode]);
+            $this->get(route('sales.index'))->assertOk()->assertViewHas('sales', $matches)
+                ->assertViewHas('totals', fn ($totals) => (int) $totals->payable === array_sum($expected));
+            $this->get(route('reports.show', ['report' => 'sales'] + $filters))->assertOk()->assertViewHas('records', $matches)
+                ->assertViewHas('cards', fn ($cards) => (int) $cards['Original invoice payable'] === array_sum($expected));
+            $export = $this->get(route('reports.export', ['report' => 'sales'] + $filters))->assertOk()->streamedContent();
+            $this->assertSame(6, count(preg_split('/\R/', trim($export))));
+            $this->assertStringContainsString($mode === 'high' ? 'RANK-4,' : 'RANK-6,', $export);
+            $this->assertStringNotContainsString($mode === 'high' ? 'RANK-6,' : 'RANK-4,', $export);
+            $this->get(route('reports.show', ['report' => 'profit'] + $filters))->assertOk()
+                ->assertViewHas('summary', fn ($summary) => (int) $summary['grossSales'] === array_sum($expected));
+            $this->get(route('manage.show', ['customers', $this->customer->id]))->assertOk()->assertViewHas('sales', $matches);
+            $this->get(route('dashboard'))->assertOk()->assertViewHas('recentSales', $matches)
+                ->assertViewHas('transactions', 5);
+        }
+        $this->get(route('sales.index', ['q' => 'RANK-4']))->assertOk()->assertSee('RANK-4')
+            ->assertViewHas('sales', fn ($sales) => $sales->total() === 1);
+        $this->get(route('reports.pdf', ['report' => 'sales'] + $filters))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->get(route('pos.index'))->assertOk()->assertSee('data-privacy-key="D"', false)->assertSee('data-privacy-key="X"', false);
+
+        SalesPrivacy::save(['enabled' => true, 'bill_count' => 5, 'applies_to' => ['sales']]);
+        $this->postJson(route('sales.privacy-view'), ['mode' => 'high', 'surface' => 'pos'])->assertNotFound();
+        $this->get(route('reports.show', ['report' => 'sales'] + $filters))->assertOk()
+            ->assertViewHas('records', fn ($sales) => $sales->total() === 13)->assertDontSee('data-privacy-toolbar');
+
+        config(['features.super_admin' => false]);
+        $this->get(route('sales.index'))->assertOk()->assertSee('RANK-4')->assertDontSee('data-privacy-toolbar');
+        $this->get(route('pos.index'))->assertOk()->assertDontSee('data-privacy-toolbar');
+    }
+
+    public function test_saving_sales_privacy_requires_super_admin_and_valid_bill_count_and_surfaces(): void
+    {
+        config(['features.super_admin' => true]);
+        $url = route('superadmin.privacy-mode');
+        $settings = ['enabled' => '1', 'bill_count' => '0', 'applies_to' => ['reports', 'invented']];
+        $this->post(route('superadmin.privacy-mode.save'), $settings)->assertRedirect(route('superadmin.login'));
+
+        $this->actingAs(SuperAdmin::create(['username' => 'privacy-qa', 'password' => 'unused']), 'superadmin');
+        $this->get($url)->assertOk()->assertSee('Where Privacy Mode applies');
+        $this->from($url)->post(route('superadmin.privacy-mode.save'), $settings)->assertSessionHasErrors(['bill_count', 'applies_to.1']);
+        $settings['bill_count'] = '5';
+        $settings['applies_to'] = ['reports', 'dashboard'];
+        $this->post(route('superadmin.privacy-mode.save'), $settings)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->assertSame(['enabled' => true] + $settings, SalesPrivacy::settings());
+
+        config(['features.super_admin' => false]);
+        $this->get($url)->assertNotFound();
+        $this->post(route('superadmin.privacy-mode.save'), $settings)->assertNotFound();
     }
 
     public function test_direct_invoice_receipt_edit_and_every_mutation_are_restricted_before_validation(): void

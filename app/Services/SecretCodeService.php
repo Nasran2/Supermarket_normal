@@ -69,11 +69,7 @@ class SecretCodeService
         }
         $s = $this->validate($settings ?? $this->settings());
         $digits = $this->digits($cost, (int) $s['scode_decimals']);
-        $map = [];
-        for ($i = 0; $i <= 9; $i++) {
-            $map[(string) $i] = $s['scode_digit_'.$i];
-        }
-        $code = strtr($digits, $map);
+        $code = $this->encodeDigits($digits, $s);
         $length = match ($s['scode_padding']) {
             'PRICE' => max((int) $s['scode_min_length'], strlen($this->digits($price, (int) $s['scode_decimals']))),
             'FIXED' => (int) $s['scode_min_length'],
@@ -85,6 +81,17 @@ class SecretCodeService
         }
 
         return $s['scode_padding_side'] === 'PREFIX' ? $padding.$code : $code.$padding;
+    }
+
+    public function encodeDigits(string $digits, ?array $settings = null): string
+    {
+        $settings ??= $this->settings();
+        $map = [];
+        for ($i = 0; $i <= 9; $i++) {
+            $map[$i] = $settings['scode_digit_'.$i];
+        }
+
+        return strtr($digits, $map);
     }
 
     private function digits(string $amount, int $decimals): string

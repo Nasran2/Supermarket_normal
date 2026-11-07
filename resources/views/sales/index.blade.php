@@ -1,4 +1,4 @@
-or@extends('layouts.app')
+@extends('layouts.app')
 @section('title', 'Sales')
 @section('content')
 @php($currency = $settings['currency_symbol'] ?? 'Rs.')
@@ -32,6 +32,9 @@ or@extends('layouts.app')
             <p>{{ $sales->total() }} {{ Str::plural('invoice', $sales->total()) }} found</p>
         </div><span class="badge green">{{ $currency }}</span>
     </div>
+    @if($privacy)
+        @include('sales.partials.privacy-shortcuts', ['surface' => 'sales'])
+    @endif
     <form method="GET" class="sales-filters">
         <label class="field">Search invoice or customer<div class="search-field"><x-icon name="search" /><input type="search" name="q" value="{{ request('q') }}" placeholder="Invoice, customer or phone" aria-label="Invoice search"></div></label>
         <label class="field">From<input type="date" name="from" value="{{ request('from') }}"></label><label class="field">To<input type="date" name="to" value="{{ request('to') }}"></label>

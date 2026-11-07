@@ -9,6 +9,7 @@ use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductStockLayer;
 use App\Models\Sale;
+use App\Support\SalesPrivacy;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\Unit;
@@ -153,11 +154,18 @@ class ResourceController extends Controller
         }
 
         if ($resource === 'customers') {
-            $record->loadCount(['sales as completed_sales_count' => fn ($query) => $query->visibleTo()->where('status', 'ACTIVE')]);
-            $record->loadSum(['sales as paid_purchases' => fn ($query) => $query->visibleTo()->where('status', 'ACTIVE')], 'customer_payable');
-            $sales = $record->sales()->visibleTo()->with('payments', 'returns', 'collections')->latest('sold_at')->paginate(10);
+            $privacy = SalesPrivacy::view('customers');
+            $query = $record->sales()->visibleTo()->with('payments', 'returns', 'collections');
+            $ids = SalesPrivacy::selectedIds($query->getQuery(), $privacy);
+            $completed = fn ($query) => $query->visibleTo()->where('status', 'ACTIVE')->when($ids, fn ($q) => $q->whereIn('sales.id', $ids));
+            $record->loadCount(['sales as completed_sales_count' => $completed]);
+            $record->loadSum(['sales as paid_purchases' => $completed], 'customer_payable');
+            if ($ids) {
+                $query->whereIn('sales.id', $ids)->orderBy('customer_payable', SalesPrivacy::direction($privacy))->orderBy('sales.id');
+            }
+            $sales = $query->latest('sold_at')->paginate(10);
 
-            return view('customers.show', compact('record', 'sales'));
+            return view('customers.show', compact('record', 'sales', 'privacy'));
         }
 
         if ($resource === 'products') {
