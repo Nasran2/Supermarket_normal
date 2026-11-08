@@ -12,8 +12,11 @@
     $index = 0;
     $startStep = $errors->hasAny(['customer_id','device_id','brand','model','catalog_model_id','serial','color','faults','reported_issues','reported_issues.*']) ? 0
         : ($errors->hasAny(['checklist','checklist.*','accessories','condition','received_items','condition_tags','device_unlock','unlock_type']) ? 1 : (int) old('intake_step',0));
+    $settings = app(\App\Services\SettingsService::class)->all();
+    $currency = $settings['currency_symbol'] ?? 'Rs.';
+    $draftTracking = 'TRK-'.strtoupper(substr(md5((string) (old('submission') ?? uniqid())), 0, 8));
 @endphp
-<div class="repair-page repair-desk" data-repair-intake data-intake-start="{{ $startStep }}">
+<div class="repair-page repair-desk" data-repair-intake data-intake-start="{{ $startStep }}" data-currency="{{ $currency }}" data-selected-customer-phone="{{ $selectedCustomer?->phone ?? '' }}">
     <header class="repair-heading">
         <div class="repair-heading-copy"><span class="repair-kicker">PHONE REPAIRS</span><h1>Receive a device</h1><p>Register the drop-off and give the customer a tracking receipt.</p></div>
         <a class="btn secondary" href="{{ route('repairs.index') }}"><x-icon name="arrow-left" :size="16"/> Repair jobs</a>
@@ -140,11 +143,163 @@
                 <button class="btn primary" data-intake-save><x-icon name="check" :size="16"/> Save repair</button>
             </div>
         </div>
-        <aside class="card repair-intake-aside">
-            <span class="repair-section-icon"><x-icon name="receipt-text"/></span>
-            <h2>Drop-off summary</h2>
-            <dl><div><dt>Customer</dt><dd data-review="customer">Select a customer</dd></div><div><dt>Device</dt><dd data-review="device">Choose a device</dd></div><div><dt>Reported issue</dt><dd data-review="issue">Add a reported issue</dd></div></dl>
-            <p>The tracking number and receipt are ready after you save.</p>
+        <aside class="repair-intake-aside-container">
+            <div class="repair-bill-slip">
+                <!-- Top Bill Header Banner -->
+                <div class="bill-slip-top">
+                    <div class="bill-badge-row">
+                        <span class="bill-live-pill"><span class="bill-pulse-dot"></span> LIVE BILL PREVIEW</span>
+                        <span class="bill-ref-pill">Draft #{{ date('ymd') }}</span>
+                    </div>
+
+                    <!-- Business Header -->
+                    <div class="bill-store-header">
+                        @if(!empty($settings['logo']))
+                            <img src="{{ asset('storage/'.$settings['logo']) }}" alt="Logo" class="bill-store-logo">
+                        @endif
+                        <h3 class="bill-store-name">{{ $settings['business_name'] ?? config('app.name') }}</h3>
+                        @if(!empty($settings['address']))
+                            <p class="bill-store-sub">{{ $settings['address'] }}</p>
+                        @endif
+                        @if(!empty($settings['phone']) || !empty($settings['mobile']))
+                            <p class="bill-store-sub">Tel: {{ $settings['phone'] ?? $settings['mobile'] }}</p>
+                        @endif
+                    </div>
+
+                    <div class="bill-title-strip">
+                        <span class="bill-title-text">DEVICE INTAKE RECEIPT</span>
+                        <span class="bill-date-text" data-bill="received-date">{{ today()->format('d M Y') }}</span>
+                    </div>
+                </div>
+
+                <!-- Bill Body Content -->
+                <div class="bill-slip-body">
+                    <!-- Customer Information -->
+                    <div class="bill-section">
+                        <div class="bill-section-label">CUSTOMER INFORMATION</div>
+                        <div class="bill-highlight-box">
+                            <div class="bill-customer-name" data-bill="customer-name">{{ $selectedCustomer?->name ?? 'Select customer' }}</div>
+                            <div class="bill-customer-sub" data-bill="customer-phone" @if(!$selectedCustomer?->phone) hidden @endif>{{ $selectedCustomer?->phone ? 'Tel: '.$selectedCustomer->phone : '' }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Device Details -->
+                    <div class="bill-section">
+                        <div class="bill-section-label">DEVICE DETAILS</div>
+                        <div class="bill-device-title" data-bill="device-title">Select device</div>
+                        <div class="bill-meta-grid" data-bill-device-meta hidden>
+                            <div class="bill-meta-item" data-bill-wrap="serial" hidden>
+                                <span class="meta-label">IMEI/SN:</span>
+                                <span class="meta-val font-mono" data-bill="device-serial"></span>
+                            </div>
+                            <div class="bill-meta-item" data-bill-wrap="color" hidden>
+                                <span class="meta-label">Color:</span>
+                                <span class="meta-val" data-bill="device-color"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reported Issues -->
+                    <div class="bill-section">
+                        <div class="bill-section-label">REPORTED ISSUE / FAULT</div>
+                        <div class="bill-issues-container" data-bill="issues-list">
+                            <span class="bill-empty-muted">Add a reported issue</span>
+                        </div>
+                    </div>
+
+                    <!-- Condition (Visible when entered) -->
+                    <div class="bill-section" data-bill-wrap="condition" hidden>
+                        <div class="bill-section-label">DEVICE CONDITION</div>
+                        <div class="bill-condition-text" data-bill="condition-text"></div>
+                    </div>
+
+                    <!-- Items received (Visible when entered) -->
+                    <div class="bill-section" data-bill-wrap="items" hidden>
+                        <div class="bill-section-label">ITEMS RECEIVED WITH DEVICE</div>
+                        <div class="bill-items-text" data-bill="items-text"></div>
+                    </div>
+
+                    <!-- Inspection Checks (Visible when checks recorded) -->
+                    <div class="bill-section" data-bill-wrap="inspection" hidden>
+                        <div class="bill-section-label">INSPECTION RECORD</div>
+                        <div class="bill-inspect-pills" data-bill="inspection-list"></div>
+                    </div>
+
+                    <!-- Financials / Estimation & Timeline -->
+                    <div class="bill-divider-dashed"></div>
+                    <div class="bill-financial-block">
+                        <div class="bill-line-item">
+                            <span>Estimated Cost:</span>
+                            <strong class="bill-price font-mono" data-bill="estimate">{{ $currency }} 0.00</strong>
+                        </div>
+                        <div class="bill-line-item" data-bill-wrap="due-date" hidden>
+                            <span>Expected By:</span>
+                            <strong data-bill="due-date"></strong>
+                        </div>
+                        <div class="bill-line-item" data-bill-wrap="technician" hidden>
+                            <span>Technician:</span>
+                            <strong data-bill="technician"></strong>
+                        </div>
+                        <div class="bill-line-item" data-bill-wrap="warranty" hidden>
+                            <span>Warranty:</span>
+                            <strong data-bill="warranty"></strong>
+                        </div>
+                    </div>
+
+                    <!-- Tracking Barcode Simulation -->
+                    <div class="bill-divider-dashed"></div>
+                    <div class="bill-tracking-slip">
+                        <span class="tracking-kicker">CUSTOMER TRACKING CODE</span>
+                        <div class="tracking-number font-mono" data-bill="tracking-code">{{ $draftTracking }}</div>
+                        <div class="barcode-graphic" aria-hidden="true">
+                            <span class="barcode-line w-2"></span>
+                            <span class="barcode-line w-1"></span>
+                            <span class="barcode-line w-3"></span>
+                            <span class="barcode-line w-1"></span>
+                            <span class="barcode-line w-2"></span>
+                            <span class="barcode-line w-4"></span>
+                            <span class="barcode-line w-1"></span>
+                            <span class="barcode-line w-3"></span>
+                            <span class="barcode-line w-2"></span>
+                            <span class="barcode-line w-1"></span>
+                            <span class="barcode-line w-3"></span>
+                            <span class="barcode-line w-2"></span>
+                            <span class="barcode-line w-4"></span>
+                            <span class="barcode-line w-1"></span>
+                            <span class="barcode-line w-2"></span>
+                            <span class="barcode-line w-3"></span>
+                            <span class="barcode-line w-1"></span>
+                            <span class="barcode-line w-2"></span>
+                        </div>
+                        <small class="tracking-hint">Tracking barcode generated on saving</small>
+                    </div>
+
+                    <!-- Signatures placeholder -->
+                    <div class="bill-signatures-row">
+                        <div class="bill-signature-cell">
+                            <div class="sig-line"></div>
+                            <span>Customer Signature</span>
+                        </div>
+                        <div class="bill-signature-cell">
+                            <div class="sig-line"></div>
+                            <span>Staff Signature</span>
+                        </div>
+                    </div>
+
+                    <!-- Hidden review elements for compatibility -->
+                    <dl style="display:none" aria-hidden="true">
+                        <div><dt>Customer</dt><dd data-review="customer">Select a customer</dd></div>
+                        <div><dt>Device</dt><dd data-review="device">Choose a device</dd></div>
+                        <div><dt>Reported issue</dt><dd data-review="issue">Add a reported issue</dd></div>
+                    </dl>
+
+                    <!-- Footer notice -->
+                    <div class="bill-slip-footer">
+                        <p>Keep this drop-off receipt to collect your device.</p>
+                        <small class="powered-by">Powered by {{ config('app.developer.name', 'Twinsofte') }}</small>
+                    </div>
+                </div>
+            </div>
         </aside>
     </form>
     @can('customers.create')

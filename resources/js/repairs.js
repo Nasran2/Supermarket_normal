@@ -47,22 +47,66 @@ function picker(root) {
       try {
         const rows = await json(root.dataset.repairPicker + '?' + new URLSearchParams({ q: searchText }), { signal: pending.signal });
         const choices = rows.map((row) => {
-          const button = node('button', [row.name, row.phone ?? row.sku, row.stock ? 'Stock ' + row.stock : null].filter(Boolean).join(' · '));
+          const button = document.createElement('button');
           button.type = 'button';
+          button.className = 'repair-picker-item';
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'picker-item-name';
+          nameSpan.textContent = row.name;
+          button.append(nameSpan);
+          if (row.phone || row.sku) {
+            const metaSpan = document.createElement('span');
+            metaSpan.className = 'picker-item-phone';
+            metaSpan.textContent = row.phone ?? row.sku;
+            button.append(metaSpan);
+          }
           button.addEventListener('click', () => choose(row));
           return button;
         });
-        results.replaceChildren(...(choices.length ? choices : [node('p', 'No matches found.')]));
+
+        if (choices.length) {
+          results.replaceChildren(...choices);
+        } else {
+          const emptyDiv = document.createElement('div');
+          emptyDiv.className = 'repair-picker-empty';
+          const p = document.createElement('p');
+          p.textContent = `No matches found for "${searchText}".`;
+          emptyDiv.append(p);
+
+          const createBtn = document.createElement('button');
+          createBtn.type = 'button';
+          createBtn.className = 'btn secondary btn-sm';
+          createBtn.dataset.quickCreateCustomer = 'true';
+          createBtn.dataset.customerName = searchText;
+          createBtn.textContent = `+ New customer "${searchText}"`;
+          emptyDiv.append(createBtn);
+
+          results.replaceChildren(emptyDiv);
+        }
       } catch (error) {
         if (error.name !== 'AbortError') results.replaceChildren(node('p', error.message));
       }
     }, 250);
   }
 
+  results.addEventListener('click', (event) => {
+    const quickBtn = event.target.closest('[data-quick-create-customer]');
+    if (quickBtn) {
+      const dialog = document.getElementById('repair-customer-dialog');
+      if (dialog) {
+        const nameInput = dialog.querySelector('input[name="name"]');
+        if (nameInput) nameInput.value = quickBtn.dataset.customerName || input.value.trim();
+        dialog.showModal();
+        nameInput?.focus();
+        results.hidden = true;
+      }
+    }
+  });
+
   input.addEventListener('input', () => {
     value.value = '';
-    input.setCustomValidity(input.value ? 'Choose a result from the search.' : '');
-    root.dispatchEvent(new CustomEvent('repair:pick', { detail: null }));
+    input.setCustomValidity(input.value ? 'Choose a result from the search or add a new customer.' : '');
+    root.dispatchEvent(new CustomEvent('repair:pick', { detail: input.value.trim() ? { id: '', name: input.value.trim(), phone: '' } : null }));
     search();
   });
   input.addEventListener('keydown', (event) => {
@@ -105,8 +149,211 @@ function intake(root, chooseCustomer) {
   const customChecks = root.querySelector('[data-custom-checks]');
   const customList = root.querySelector('[data-custom-check-list]');
   let request, selectedDevices = [], current = 0;
+  let selectedCustomerPhone = root.dataset.selectedCustomerPhone || '';
   let manual = Boolean(form.elements.brand.value || form.elements.model.value);
   let nextIndex = checks.querySelectorAll('[data-repair-check]').length;
+
+  function updateBillPreview() {
+    // 1. Customer
+    const custName = customerName.value.trim();
+    const custEl = root.querySelector('[data-bill="customer-name"]');
+    const custPhoneEl = root.querySelector('[data-bill="customer-phone"]');
+    if (custEl) {
+      if (custName) {
+        custEl.textContent = custName;
+        custEl.classList.remove('bill-empty-muted');
+      } else {
+        custEl.textContent = 'Select customer';
+        custEl.classList.add('bill-empty-muted');
+      }
+    }
+    if (custPhoneEl) {
+      if (selectedCustomerPhone) {
+        custPhoneEl.textContent = 'Tel: ' + selectedCustomerPhone;
+        custPhoneEl.hidden = false;
+      } else {
+        custPhoneEl.hidden = true;
+      }
+    }
+
+    // 2. Device info
+    const existing = selectedDevices.find((row) => String(row.id) === device.value);
+    const selectedBrand = catalog.find((row) => String(row.id) === brand.value);
+    const model = selectedBrand?.models.find((row) => String(row.id) === catalogModel.value);
+    const description = existing ? [existing.brand, existing.model]
+      : manual ? [form.elements.brand?.value.trim(), form.elements.model?.value.trim()]
+        : model ? [selectedBrand?.name, model?.name] : [];
+    const deviceTitle = description.filter(Boolean).join(' ');
+    const deviceEl = root.querySelector('[data-bill="device-title"]');
+    if (deviceEl) {
+      if (deviceTitle) {
+        deviceEl.textContent = deviceTitle;
+        deviceEl.classList.remove('bill-empty-muted');
+      } else {
+        deviceEl.textContent = 'Select device';
+        deviceEl.classList.add('bill-empty-muted');
+      }
+    }
+
+    // Serial & Color
+    const serialVal = (existing ? existing.serial : form.elements.serial?.value)?.trim();
+    const serialWrap = root.querySelector('[data-bill-wrap="serial"]');
+    const serialEl = root.querySelector('[data-bill="device-serial"]');
+    if (serialWrap && serialEl) {
+      if (serialVal) {
+        serialEl.textContent = serialVal;
+        serialWrap.hidden = false;
+      } else {
+        serialWrap.hidden = true;
+      }
+    }
+    const colorVal = (existing ? existing.color : form.elements.color?.value)?.trim();
+    const colorWrap = root.querySelector('[data-bill-wrap="color"]');
+    const colorEl = root.querySelector('[data-bill="device-color"]');
+    if (colorWrap && colorEl) {
+      if (colorVal) {
+        colorEl.textContent = colorVal;
+        colorWrap.hidden = false;
+      } else {
+        colorWrap.hidden = true;
+      }
+    }
+    const deviceMetaWrap = root.querySelector('[data-bill-device-meta]');
+    if (deviceMetaWrap) {
+      deviceMetaWrap.hidden = !serialVal && !colorVal;
+    }
+
+    // 3. Issues
+    const issueList = issues();
+    const issuesContainer = root.querySelector('[data-bill="issues-list"]');
+    if (issuesContainer) {
+      if (issueList.length) {
+        issuesContainer.replaceChildren(...issueList.map((issue) => {
+          const chip = document.createElement('span');
+          chip.className = 'bill-issue-tag';
+          chip.textContent = issue;
+          return chip;
+        }));
+      } else {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'bill-empty-muted';
+        placeholder.textContent = 'Add a reported issue';
+        issuesContainer.replaceChildren(placeholder);
+      }
+    }
+
+    // 4. Condition
+    const condTags = [...form.querySelectorAll('input[name="condition_tags[]"]:checked')].map((i) => i.value);
+    const condExtra = form.elements.condition?.value.trim();
+    const condList = [...condTags, condExtra].filter(Boolean);
+    const condWrap = root.querySelector('[data-bill-wrap="condition"]');
+    const condEl = root.querySelector('[data-bill="condition-text"]');
+    if (condWrap && condEl) {
+      if (condList.length) {
+        condEl.textContent = condList.join(' · ');
+        condWrap.hidden = false;
+      } else {
+        condWrap.hidden = true;
+      }
+    }
+
+    // 5. Items received
+    const itemTags = [...form.querySelectorAll('input[name="received_items[]"]:checked')].map((i) => i.value);
+    const itemExtra = form.elements.accessories?.value.trim();
+    const itemsList = [...itemTags, itemExtra].filter(Boolean);
+    const itemsWrap = root.querySelector('[data-bill-wrap="items"]');
+    const itemsEl = root.querySelector('[data-bill="items-text"]');
+    if (itemsWrap && itemsEl) {
+      if (itemsList.length) {
+        itemsEl.textContent = itemsList.join(' · ');
+        itemsWrap.hidden = false;
+      } else {
+        itemsWrap.hidden = true;
+      }
+    }
+
+    // 6. Inspection
+    const inspectWrap = root.querySelector('[data-bill-wrap="inspection"]');
+    const inspectEl = root.querySelector('[data-bill="inspection-list"]');
+    if (inspectWrap && inspectEl) {
+      const selectedChecks = [...checks.querySelectorAll('input[type="radio"]:checked')].filter((f) => f.value !== 'Not tested');
+      if (selectedChecks.length) {
+        inspectEl.replaceChildren(...selectedChecks.map((f) => {
+          const checkCard = f.closest('[data-repair-check]');
+          const label = checkCard?.querySelector('[data-check-title]')?.textContent.trim() || 'Check';
+          const pill = document.createElement('span');
+          pill.className = 'bill-inspect-pill ' + (f.value === 'Working' ? 'works' : 'issue');
+          pill.textContent = label + ': ' + f.value;
+          return pill;
+        }));
+        inspectWrap.hidden = false;
+      } else {
+        inspectWrap.hidden = true;
+      }
+    }
+
+    // 7. Estimate
+    const estimateRaw = form.elements.estimate?.value ?? '';
+    const estimateVal = parseFloat(estimateRaw);
+    const estimateEl = root.querySelector('[data-bill="estimate"]');
+    if (estimateEl) {
+      const currency = root.dataset.currency || 'Rs.';
+      if (!isNaN(estimateVal) && estimateVal >= 0 && estimateRaw.trim() !== '') {
+        estimateEl.textContent = currency + ' ' + estimateVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else {
+        estimateEl.textContent = currency + ' 0.00';
+      }
+    }
+
+    // 8. Due date
+    const dueVal = form.elements.due_at?.value;
+    const dueWrap = root.querySelector('[data-bill-wrap="due-date"]');
+    const dueEl = root.querySelector('[data-bill="due-date"]');
+    if (dueWrap && dueEl) {
+      if (dueVal) {
+        const d = new Date(dueVal + 'T00:00:00');
+        dueEl.textContent = !isNaN(d) ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : dueVal;
+        dueWrap.hidden = false;
+      } else {
+        dueWrap.hidden = true;
+      }
+    }
+
+    // 9. Received date
+    const recVal = form.elements.received_at?.value;
+    const recEl = root.querySelector('[data-bill="received-date"]');
+    if (recEl && recVal) {
+      const d = new Date(recVal + 'T00:00:00');
+      recEl.textContent = !isNaN(d) ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : recVal;
+    }
+
+    // 10. Technician
+    const techSelect = form.elements.technician_id;
+    const techWrap = root.querySelector('[data-bill-wrap="technician"]');
+    const techEl = root.querySelector('[data-bill="technician"]');
+    if (techWrap && techEl && techSelect) {
+      const techText = techSelect.selectedOptions[0]?.text?.trim();
+      if (techSelect.value && techText && techText !== 'Unassigned') {
+        techEl.textContent = techText;
+        techWrap.hidden = false;
+      } else {
+        techWrap.hidden = true;
+      }
+    }
+
+    // 11. Warranty
+    const warrantyVal = form.elements.warranty_days?.value?.trim();
+    const warrantyWrap = root.querySelector('[data-bill-wrap="warranty"]');
+    const warrantyEl = root.querySelector('[data-bill="warranty"]');
+    if (warrantyWrap && warrantyEl) {
+      if (warrantyVal && Number(warrantyVal) > 0) {
+        warrantyEl.textContent = warrantyVal + ' days';
+        warrantyWrap.hidden = false;
+      } else {
+        warrantyWrap.hidden = true;
+      }
+    }
+  }
 
   function addCheck(templateSelector, container, label) {
     if (checks.querySelectorAll('[data-repair-check]').length >= 40) return;
@@ -121,6 +368,8 @@ function intake(root, chooseCustomer) {
       row.querySelector('[data-check-title-input]').value = label;
       row.querySelector('[role="group"]').setAttribute('aria-label', label + ' result');
     }
+    const skipRadio = row.querySelector('input[value="Not tested"]');
+    if (skipRadio) skipRadio.checked = true;
     container.append(fragment);
     nextIndex++;
     return row;
@@ -147,13 +396,14 @@ function intake(root, chooseCustomer) {
       : manual ? [form.elements.brand.value.trim(), form.elements.model.value.trim()]
         : model ? [selectedBrand.name, model.name] : [];
     const values = {
-      customer: customerId.value ? customerName.value : 'Select a customer',
+      customer: customerId.value ? customerName.value : (customerName.value.trim() || 'Select a customer'),
       device: description.filter(Boolean).join(' ') || 'Choose a device',
       issue: issues().join(' · ') || 'Add a reported issue',
     };
     for (const [key, value] of Object.entries(values)) {
       root.querySelectorAll('[data-review="' + key + '"]').forEach((element) => { element.textContent = value; });
     }
+    updateBillPreview();
   }
 
   function showStep(step, focus = true) {
@@ -206,6 +456,7 @@ function intake(root, chooseCustomer) {
     root.querySelector('[data-inspection-count]').textContent = recorded
       ? recorded + ' checked' + (faults ? ' · ' + faults + (faults === 1 ? ' issue' : ' issues') : '')
       : 'No checks recorded';
+    updateBillPreview();
   }
 
   function updateDevice() {
@@ -227,7 +478,9 @@ function intake(root, chooseCustomer) {
       'Face ID': ['Face ID'], 'Touch ID': ['Touch ID'], Fingerprint: ['Fingerprint sensor'], Foldable: ['Fingerprint sensor', 'Hinge', 'Cover screen'],
     }[profile] ?? [];
     for (const row of extraList.children) {
-      if (!suggestions.includes(row.dataset.checkLabel) && !row.querySelector(':checked') && !row.querySelector('[data-check-note] input').value) row.remove();
+      const checkedVal = row.querySelector(':checked')?.value;
+      const isUntouched = !checkedVal || checkedVal === 'Not tested';
+      if (!suggestions.includes(row.dataset.checkLabel) && isUntouched && !row.querySelector('[data-check-note] input').value) row.remove();
     }
     const labels = new Set([...checks.querySelectorAll('input[name$="[label]"]')].map((input) => input.value));
     for (const label of suggestions) {
@@ -264,6 +517,9 @@ function intake(root, chooseCustomer) {
   });
   form.addEventListener('input', () => {
     if (issues().length) issueError.hidden = true;
+    summary();
+  });
+  form.addEventListener('change', () => {
     summary();
   });
 
@@ -318,7 +574,15 @@ function intake(root, chooseCustomer) {
     }
   }
 
-  search.addEventListener('repair:pick', (event) => loadHistory(event.detail?.id));
+  search.addEventListener('repair:pick', (event) => {
+    if (event.detail && event.detail.phone !== undefined) {
+      selectedCustomerPhone = event.detail.phone || '';
+    } else if (!event.detail) {
+      selectedCustomerPhone = '';
+    }
+    loadHistory(event.detail?.id);
+    summary();
+  });
   if (customerId.value) loadHistory(customerId.value, device.dataset.selected);
   updateDevice();
   showStep(Number(root.dataset.intakeStart) || 0, false);
@@ -359,7 +623,10 @@ function intake(root, chooseCustomer) {
     button.disabled = true;
     error.hidden = true;
     try {
-      chooseCustomer(await json(add.action, { method: 'POST', body: new FormData(add) }));
+      const created = await json(add.action, { method: 'POST', body: new FormData(add) });
+      selectedCustomerPhone = created.phone || '';
+      chooseCustomer(created);
+      summary();
       add.reset();
       add.closest('dialog').close();
     } catch (failure) {

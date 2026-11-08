@@ -104,9 +104,11 @@ class RepairController extends Controller
     public function customers(Request $request)
     {
         $data = $request->validate(['q' => 'nullable|string|max:100']);
-        $query = '%'.($data['q'] ?? '').'%';
-        $customers = Customer::where('active', true)->where(fn ($q) => $q->where('name', 'like', $query)->orWhere('phone', 'like', $query))
-            ->orderBy('name')->limit(15)->get(['id', 'name', 'phone']);
+        $term = trim($data['q'] ?? '');
+        $query = '%'.$term.'%';
+        $customers = Customer::where('active', true)
+            ->where(fn ($q) => $q->where('name', 'like', $query)->orWhere('phone', 'like', $query)->orWhere('email', 'like', $query))
+            ->orderBy('name')->limit(15)->get(['id', 'name', 'phone', 'email']);
 
         return response()->json($customers);
     }

@@ -10,7 +10,7 @@
     </div>
     <div class="repair-check-choice" role="group" aria-label="{{ !empty($custom) ? 'Custom check result' : ($row['label'] ?? '').' result' }}">
         @foreach(['Working'=>'Works','Not working'=>'Issue','Not tested'=>'Skip'] as $value=>$label)
-            <label><input type="radio" name="checklist[{{ $i }}][result]" value="{{ $value }}" @checked(($row['result']??null)===$value)><span>{{ $label }}</span></label>
+            <label><input type="radio" name="checklist[{{ $i }}][result]" value="{{ $value }}" @checked(($row['result'] ?? 'Not tested') === $value)><span>{{ $label }}</span></label>
         @endforeach
     </div>
     <div class="repair-check-note" data-check-note @if(empty($row['fault']) && ($row['result']??null)!=='Not working') hidden @endif>

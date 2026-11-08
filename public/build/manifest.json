@@ -20,7 +20,7 @@
     "name": "units"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DV3vrb1L.css",
+    "file": "assets/app-DihfeQI1.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -29,7 +29,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-BBEE3nc0.js",
+    "file": "assets/app-DDPAGuBp.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,

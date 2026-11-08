@@ -34,10 +34,17 @@ body.phone-repair-theme {
 .repair-badge:is([data-status="READY"],[data-status="COMPLETED"],[data-status="DELIVERED"]) { background: #e0f6e9; color: #176248; }
 .repair-badge:is([data-status="WAITING_APPROVAL"],[data-status="WAITING_PARTS"]) { background: #fff0d1; color: #784800; }
 .repair-badge:is([data-status="CANCELLED"],[data-status="UNREPAIRABLE"]) { background: #fde5e6; color: #8d2937; }
-.repair-picker { position: relative; min-width: 0; }
-.repair-picker-results { position: absolute; z-index: 12; left: 0; right: 0; top: 100%; max-height: 15rem; overflow: auto; border-radius: .5rem; background: #fff; border: 1px solid var(--line); box-shadow: 0 8px 20px #172b3b21; }
-.repair-picker-results > * { display: block; width: 100%; padding: .6rem; text-align: left; }
-.repair-picker-results button:hover, .repair-picker-results button:focus-visible { background: #e6f1fa; }
+.repair-picker { position: relative; min-width: 0; z-index: 25; }
+.repair-picker:focus-within { z-index: 50; }
+.repair-picker-results { position: absolute; z-index: 9999; left: 0; right: 0; top: calc(100% + 4px); max-height: 18rem; overflow-y: auto; border-radius: .65rem; background: #ffffff; border: 1px solid #cbd5e1; box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.18), 0 4px 8px -2px rgba(15, 23, 42, 0.08); }
+.repair-picker-item { display: flex !important; align-items: center; justify-content: space-between; width: 100%; padding: .75rem 1rem !important; text-align: left; border: none; background: transparent; color: #1e293b; font-size: .875rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: background-color 0.15s ease; }
+.repair-picker-item:last-child { border-bottom: none; }
+.repair-picker-item:hover, .repair-picker-item:focus-visible { background: #f0fdf4 !important; color: #15803d; outline: none; }
+.picker-item-name { font-weight: 600; color: #0f172a; }
+.picker-item-phone { font-size: .78rem; color: #64748b; font-family: ui-monospace, monospace; }
+.repair-picker-empty { padding: .85rem 1rem; text-align: center; }
+.repair-picker-empty p { margin: 0 0 .5rem 0; color: #64748b; font-size: .83rem; }
+.repair-picker-empty .btn { font-size: .78rem; padding: .35rem .75rem; margin: 0 auto; display: inline-flex; align-items: center; gap: 4px; }
 .repair-history { list-style: none; padding: 0; margin: 0; }
 .repair-history li { padding: .55rem 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .repair-dialog { margin: auto; width: min(34rem, calc(100% - 2rem)); max-height: calc(100% - 2rem); overflow: auto; }
@@ -70,15 +77,18 @@ body.phone-repair-theme {
 .repair-step-number { display: grid; place-items: center; width: 1.5rem; aspect-ratio: 1; flex: 0 0 auto; background: #d5e2ed; color: #31546c; border-radius: 50%; font-size: .74rem; }
 .repair-stepper button[aria-current] .repair-step-number { background: #145f91; color: #fff; }
 .repair-stepper button[data-complete="true"] .repair-step-number { background: #d8efe3; color: #216144; }
-.repair-intake-form { display: grid; grid-template-columns: minmax(0, 1fr) 16.5rem; gap: 1rem; align-items: start; }
+.repair-intake-form { display: grid; grid-template-columns: minmax(0, 1fr) clamp(19rem, 25vw, 22.5rem); gap: 1.25rem; align-items: start; }
 .repair-intake-main { display: grid; gap: .85rem; min-width: 0; }
-.repair-desk .repair-panel { border-radius: .95rem; padding: clamp(.95rem, 2vw, 1.35rem); box-shadow: 0 2px 8px #27425807; }
+.repair-desk .repair-panel { border-radius: .95rem; padding: clamp(.95rem, 2vw, 1.35rem); box-shadow: 0 2px 8px #27425807; overflow: visible !important; position: relative; }
+.repair-desk [data-intake-panel="0"] .repair-panel:nth-child(1) { z-index: 30; }
+.repair-desk [data-intake-panel="0"] .repair-panel:nth-child(2) { z-index: 20; }
+.repair-desk [data-intake-panel="0"] .repair-panel:nth-child(3) { z-index: 10; }
 .repair-section-title { display: flex; align-items: flex-start; gap: .7rem; }
-.repair-section-title h2, .repair-intake-aside h2 { margin: .08rem 0 0; font-size: 1.06rem; font-weight: 740; line-height: 1.3; }
+.repair-section-title h2 { margin: .08rem 0 0; font-size: 1.06rem; font-weight: 740; line-height: 1.3; }
 .repair-section-title p { font-size: .86rem; }
 .repair-section-icon { display: inline-grid; place-items: center; width: 2.4rem; height: 2.4rem; flex: 0 0 auto; color: #155983; background: #e8f2f9; border-radius: .7rem; }
 .repair-section-icon .icon { width: 1.15rem; height: 1.15rem; }
-.repair-customer-search, .repair-inline-search { display: flex; gap: .65rem; align-items: end; flex-wrap: wrap; }
+.repair-customer-search, .repair-inline-search { display: flex; gap: .65rem; align-items: end; flex-wrap: wrap; position: relative; z-index: 40; }
 .repair-customer-search .repair-picker, .repair-inline-search .field { flex: 1 1 13rem; min-width: 0; }
 .repair-intake-fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); align-items: start; }
 .repair-intake-form .field { min-width: 0; }
@@ -98,14 +108,69 @@ body.phone-repair-theme {
 .repair-chip span { display: block; padding: .45rem .7rem; border-radius: 99px; border: 1px solid #dbe6ee; background: #f6f9fc; color: #34556b; font-size: .83rem; line-height: 1.3; }
 .repair-chip input:checked + span { background: #dceefa; border-color: #8bb7d4; color: #104d75; box-shadow: inset 0 0 0 1px #8bb7d4; }
 .repair-chip input:focus-visible + span, .repair-check-choice input:focus-visible + span { outline: 2px solid #145f91; outline-offset: 2px; }
-.repair-intake-aside { position: sticky; top: 5.5rem; padding: 1.12rem; border-radius: .95rem; display: grid; gap: .7rem; }
-.repair-intake-aside dl, .repair-review-data { display: grid; gap: .6rem; margin: 0; }
-.repair-intake-aside dl > div { border-top: 1px solid #e4ebf1; padding-top: .5rem; }
-.repair-intake-aside dt, .repair-review-data dt { color: var(--muted); font-size: .75rem; }
-.repair-intake-aside dd, .repair-review-data dd { margin: .1rem 0 0; font-size: .86rem; font-weight: 650; overflow-wrap: anywhere; }
-.repair-intake-aside p { margin: 0; padding-top: .55rem; border-top: 1px solid #e4ebf1; color: var(--muted); font-size: .79rem; line-height: 1.45; }
+
+/* Authentic Live Bill Preview / Drop-off Receipt Slip */
+.repair-intake-aside-container { position: sticky; top: 5.5rem; z-index: 10; }
+.repair-bill-slip { background: #ffffff; border-radius: 12px; border: 1px solid #dae5ee; box-shadow: 0 12px 30px -6px rgba(15, 23, 42, 0.1), 0 4px 6px -2px rgba(15, 23, 42, 0.04); overflow: hidden; font-size: .82rem; color: #1e293b; display: flex; flex-direction: column; }
+.bill-slip-top { background: #f8fafc; padding: .9rem 1rem .75rem; border-bottom: 1px solid #e2e8f0; }
+.bill-badge-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
+.bill-live-pill { display: inline-flex; align-items: center; gap: 6px; font-size: .7rem; font-weight: 750; color: #15803d; background: #dcfce7; padding: .2rem .55rem; border-radius: 99px; letter-spacing: .03em; }
+.bill-pulse-dot { width: 7px; height: 7px; border-radius: 50%; background-color: #22c55e; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); animation: bill-pulse 1.8s infinite; }
+@keyframes bill-pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+.bill-ref-pill { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .7rem; font-weight: 600; color: #475569; background: #e2e8f0; padding: .2rem .5rem; border-radius: 4px; }
+.bill-store-header { text-align: center; padding: .2rem 0 .4rem; }
+.bill-store-logo { max-height: 28px; max-width: 90px; object-fit: contain; margin: 0 auto .3rem; display: block; }
+.bill-store-name { font-size: .95rem; font-weight: 750; margin: 0; color: #0f172a; letter-spacing: -.01em; }
+.bill-store-sub { margin: .15rem 0 0; font-size: .72rem; color: #64748b; line-height: 1.3; }
+.bill-title-strip { display: flex; align-items: center; justify-content: space-between; margin-top: .6rem; padding-top: .45rem; border-top: 1px dashed #cbd5e1; }
+.bill-title-text { font-weight: 750; font-size: .78rem; color: #1e3a5f; letter-spacing: .03em; }
+.bill-date-text { font-size: .73rem; color: #64748b; font-weight: 500; }
+.bill-slip-body { padding: .9rem 1rem; display: flex; flex-direction: column; gap: .75rem; }
+.bill-section { display: flex; flex-direction: column; gap: .2rem; }
+.bill-section-label { font-size: .67rem; font-weight: 750; text-transform: uppercase; color: #94a3b8; letter-spacing: .05em; }
+.bill-highlight-box { background: #f8fafc; border: 1px solid #edf2f7; border-radius: 7px; padding: .45rem .6rem; }
+.bill-customer-name { font-size: .88rem; font-weight: 700; color: #0f172a; word-break: break-word; }
+.bill-customer-sub { font-size: .74rem; color: #64748b; margin-top: .1rem; }
+.bill-device-title { font-size: .88rem; font-weight: 650; color: #0f172a; word-break: break-word; }
+.bill-meta-grid { display: flex; flex-direction: column; gap: .2rem; margin-top: .2rem; font-size: .75rem; }
+.bill-meta-item { display: flex; align-items: center; gap: .35rem; }
+.bill-meta-item .meta-label { color: #64748b; }
+.bill-meta-item .meta-val { font-weight: 600; color: #1e293b; }
+.bill-empty-muted { color: #94a3b8; font-style: italic; font-size: .79rem; }
+.bill-issues-container { display: flex; flex-wrap: wrap; gap: .3rem; }
+.bill-issue-tag { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: .72rem; font-weight: 600; padding: .18rem .45rem; border-radius: 4px; }
+.bill-condition-text, .bill-items-text { font-size: .78rem; color: #334155; line-height: 1.35; }
+.bill-inspect-pills { display: flex; flex-wrap: wrap; gap: .3rem; }
+.bill-inspect-pill { font-size: .69rem; padding: .15rem .45rem; border-radius: 4px; font-weight: 600; }
+.bill-inspect-pill.works { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+.bill-inspect-pill.issue { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.bill-divider-dashed { border-top: 1px dashed #cbd5e1; margin: .1rem 0; }
+.bill-financial-block { display: flex; flex-direction: column; gap: .35rem; }
+.bill-line-item { display: flex; align-items: center; justify-content: space-between; font-size: .79rem; color: #475569; }
+.bill-line-item strong { color: #0f172a; font-weight: 650; }
+.bill-line-item .bill-price { font-size: .95rem; font-weight: 800; color: #047857; }
+.bill-tracking-slip { text-align: center; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 7px; padding: .55rem; }
+.tracking-kicker { display: block; font-size: .64rem; font-weight: 750; color: #64748b; letter-spacing: .06em; }
+.tracking-number { font-size: .92rem; font-weight: 750; color: #0f172a; letter-spacing: .08em; margin: .15rem 0 .3rem; }
+.barcode-graphic { display: flex; justify-content: center; align-items: center; gap: 2px; height: 22px; margin: 0 auto; }
+.barcode-line { background: #1e293b; height: 100%; display: inline-block; }
+.barcode-line.w-1 { width: 1.5px; }
+.barcode-line.w-2 { width: 2.5px; }
+.barcode-line.w-3 { width: 3.5px; }
+.barcode-line.w-4 { width: 4.5px; }
+.tracking-hint { display: block; font-size: .67rem; color: #94a3b8; margin-top: .25rem; }
+.bill-signatures-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .3rem; padding-top: .3rem; }
+.bill-signature-cell { text-align: center; }
+.bill-signature-cell .sig-line { border-top: 1px solid #94a3b8; margin-bottom: .25rem; }
+.bill-signature-cell span { font-size: .67rem; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: .03em; }
+.bill-slip-footer { text-align: center; border-top: 1px dashed #e2e8f0; padding-top: .5rem; margin-top: .1rem; }
+.bill-slip-footer p { font-size: .71rem; color: #64748b; margin: 0; }
+.bill-slip-footer .powered-by { font-size: .64rem; color: #94a3b8; display: block; margin-top: .15rem; }
+
 .repair-review-data { grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
 .repair-review-data > div { background: #f1f7fb; padding: .65rem .72rem; border-radius: .55rem; }
+.repair-review-data dt { color: var(--muted); font-size: .75rem; }
+.repair-review-data dd { margin: .1rem 0 0; font-size: .86rem; font-weight: 650; overflow-wrap: anywhere; }
 .repair-intake-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .6rem; padding: .35rem 0 .55rem; }
 .repair-inspect-summary { display: flex; align-items: center; justify-content: space-between; gap: .65rem; flex-wrap: wrap; padding: .56rem .75rem; background: #edf5fa; border-radius: .55rem; color: #28516b; font-size: .8rem; font-weight: 650; }
 .repair-inspect-summary i { display: inline-block; width: .46rem; height: .46rem; margin-left: .45rem; border-radius: 50%; background: #348268; }
@@ -138,7 +203,7 @@ body.phone-repair-theme {
 .repair-desk :is(h1,h2)[tabindex="-1"]:focus { outline: none; }
 @media(max-width: 1000px) {
   .repair-intake-form { grid-template-columns: minmax(0, 1fr); }
-  .repair-intake-aside { display: none; }
+  .repair-intake-aside-container { position: static; margin-top: 1rem; }
 }
 @media(max-width: 650px) {
   .repair-catalog-layout { grid-template-columns: minmax(0, 1fr); }
