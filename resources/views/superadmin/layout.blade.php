@@ -160,7 +160,7 @@
     </style>
     @stack('head')
 </head>
-<body>
+<body class="{{ \App\Support\Repairs::enabled() ? 'phone-repair-theme' : '' }}">
     <div class="nav-overlay" id="nav-overlay"></div>
     <aside class="sidebar" id="sidebar">
         <a class="brand" href="{{ route('superadmin.dashboard') }}">
@@ -246,6 +246,9 @@
                 <span>Suppliers (Real Data)</span>
             </a>
 
+            @if(\App\Support\Repairs::enabled())
+                <a href="{{ route('superadmin.repairs.settings') }}" class="nav-link {{ request()->routeIs('superadmin.repairs.*') ? 'active' : '' }}"><x-icon name="settings-2"/>Repair settings</a>
+            @endif
             @if(config('features.cheque'))
             <a href="{{ route('superadmin.cheques') }}"
                class="nav-link {{ request()->routeIs('superadmin.cheques') ? 'active' : '' }}">

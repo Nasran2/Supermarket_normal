@@ -157,7 +157,7 @@ class StockLayerService
         return $rows;
     }
 
-    public function plan(Product $p, string $quantity, ?string $price, array &$reserved, bool $lock = false, ?Sale $editing = null, ?int $layerId = null, array $returnCredits = [], ?string $expiresAt = null, bool $expiredConfirmed = false): array
+    public function plan(Product $p, string $quantity, ?string $price, array &$reserved, bool $lock = false, ?Sale $editing = null, ?int $layerId = null, array $returnCredits = [], ?string $expiresAt = null, bool $expiredConfirmed = false, bool $anyPrice = false): array
     {
         if (! $p->track_stock) {
             if ($layerId !== null || ($price !== null && Money::compare($price, $p->price) !== 0)) {
@@ -202,14 +202,14 @@ class StockLayerService
         $layers = $query->get();
         $eligible = $layers->filter(fn ($l) => Money::compare(Money::quantity($l->remaining_quantity, $credits[$l->id] ?? '0'), 0) > 0);
         $prices = $eligible->pluck('selling_price')->unique();
-        if ($price === null) {
+        if (! $anyPrice && $price === null) {
             if ($prices->count() !== 1) {
                 $this->fail($prices->isEmpty() ? $p->name.' is out of stock.' : 'Choose a selling price for '.$p->name.'.');
             }
             $price = $prices->first();
         }
-        $price = Money::round($price);
-        if (Expiry::tracks($p) && Expiry::setting('expiry_selection_mode') !== 'FEFO' && $expiresAt === null && $eligible->where('selling_price', $price)->pluck('expires_at')->unique()->count() > 1) {
+        $price = $anyPrice ? $p->price : Money::round($price);
+        if (! $anyPrice && Expiry::tracks($p) && Expiry::setting('expiry_selection_mode') !== 'FEFO' && $expiresAt === null && $eligible->where('selling_price', $price)->pluck('expires_at')->unique()->count() > 1) {
             $this->fail('Choose an expiry batch for '.$p->name.'.');
         }
         $available = '0.000';
@@ -218,7 +218,7 @@ class StockLayerService
         $cost = BigDecimal::zero();
         $hasLandedCost = false;
         foreach ($layers as $layer) {
-            if (Money::compare($layer->selling_price, $price) !== 0) {
+            if (! $anyPrice && Money::compare($layer->selling_price, $price) !== 0) {
                 continue;
             }
             $qty = Money::quantity(Money::quantity($layer->remaining_quantity, $credits[$layer->id] ?? '0'), '-'.($reserved[$layer->id] ?? '0'));
@@ -251,6 +251,9 @@ class StockLayerService
             $left = Money::quantity($left, '-'.$take);
         }
         if (Money::compare($left, 0) > 0) {
+            if ($anyPrice) {
+                $this->fail('Insufficient usable stock for '.$p->name.'.');
+            }
             $this->fail((Expiry::tracks($p) ? 'Only '.\App\Support\Units::quantity($available, $p->unit).' are available in the selected expiry batch of '.$p->name.'. Add the remaining quantity from another batch separately.' : 'Only '.\App\Support\Units::quantity($available, $p->unit).' of '.$p->name.' are available at '.Money::display($price).'. Choose another price for the remaining quantity.'));
         }
         $total = $hasLandedCost ? Money::sum(array_column($allocations, 'cost_total')) : (string) $cost->toScale(2, RoundingMode::HALF_UP);
@@ -265,25 +268,28 @@ class StockLayerService
         if (! $item->track_stock) {
             return;
         }
+        $this->deductAllocations($p, $allocations, $reason, $ref, $user, $item->stock_price);
+        $item->allocations()->createMany($allocations);
+        Audit::record('stock.sale.allocate', $item, [], ['allocations' => $allocations]);
+    }
+
+    public function deductAllocations(Product $p, array $allocations, string $reason, string $ref, int $user, ?string $price = null, ?int $repairJob = null): void
+    {
         $moves = [];
         foreach ($allocations as $row) {
-            $layer = ProductStockLayer::whereKey($row['stock_layer_id'])->lockForUpdate()->firstOrFail();
-            if ($layer->product_id !== $p->id || $layer->status !== 'ACTIVE' || Money::compare($layer->selling_price, $item->stock_price) !== 0 || Money::compare($layer->remaining_quantity, $row['quantity']) < 0) {
-                $this->fail('Stock changed. Review this sale again.');
+            $layer = $p->stockLayers()->whereKey($row['stock_layer_id'])->lockForUpdate()->firstOrFail();
+            if ($layer->status !== 'ACTIVE' || ($price !== null && Money::compare($layer->selling_price, $price) !== 0)
+                || Money::compare($layer->remaining_quantity, $row['quantity']) < 0
+                || $layer->expires_at?->toDateString() !== ($row['expires_at'] ?? null)) {
+                $this->fail('Stock changed. Review the stock selection and try again.');
             }
-            $values = ['remaining_quantity' => Money::quantity($layer->remaining_quantity, '-'.$row['quantity'])];
-            if ($layer->remaining_cost_total !== null) {
-                $values['remaining_cost_total'] = Money::sub($layer->remaining_cost_total, $row['cost_total']);
-            }
-            $layer->update($values);
-            if ($layer->expires_at?->toDateString() !== ($row['expires_at'] ?? null)) {
-                $this->fail('The expiry date changed. Review this sale again.');
-            }
-            $item->allocations()->create($row);
+            $layer->update([
+                'remaining_quantity' => Money::quantity($layer->remaining_quantity, '-'.$row['quantity']),
+                'remaining_cost_total' => $layer->remaining_cost_total === null ? null : Money::sub($layer->remaining_cost_total, $row['cost_total']),
+            ]);
             $moves[] = [$layer, '-'.$row['quantity'], '-'.$row['cost_total']];
         }
-        $this->movement($p, $moves, $reason, $ref, $user);
-        Audit::record('stock.sale.allocate', $item, [], ['allocations' => $allocations]);
+        $this->movement($p, $moves, $reason, $ref, $user, $repairJob);
     }
 
     /** Preserve legacy sale snapshots; this bridge is only used when an old sale is edited/returned. */
@@ -340,13 +346,13 @@ class StockLayerService
         return (string) $cost->toScale(2, RoundingMode::HALF_UP);
     }
 
-    public function movement(Product $p, array $moves, string $reason, string $reference, int $user): void
+    public function movement(Product $p, array $moves, string $reason, string $reference, int $user, ?int $repairJob = null): void
     {
         $qty = '0.000';
         foreach ($moves as [$layer, $change]) {
             $qty = Money::quantity($qty, $change);
         }
-        $movement = app(StockService::class)->move($p, $qty, $reason, $reference, $user, false);
+        $movement = app(StockService::class)->move($p, $qty, $reason, $reference, $user, false, $repairJob);
         foreach ($moves as $entry) {
             [$layer,$change] = $entry;
             StockLayerMovement::create(['stock_movement_id' => $movement->id, 'stock_layer_id' => $layer->id, 'quantity' => $change, 'cost_total' => $entry[2] ?? Money::mul($change, $layer->cost_price), 'cost_price' => $layer->cost_price, 'selling_price' => $layer->selling_price]);

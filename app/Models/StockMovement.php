@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class StockMovement extends Model
 {
-    protected $fillable = ['product_id', 'user_id', 'quantity', 'balance', 'reason', 'reference'];
+    protected $fillable = ['product_id', 'user_id', 'quantity', 'balance', 'reason', 'reference', 'repair_job_id'];
 
     protected $casts = ['quantity' => 'decimal:3', 'balance' => 'decimal:3'];
 
@@ -26,6 +26,12 @@ class StockMovement extends Model
 
     public function scopeVisibleSales(Builder $query): Builder
     {
+        if (! \App\Support\Repairs::enabled() || ! auth()->user()?->hasPermission('repairs.view')) {
+            $query->whereNull('stock_movements.repair_job_id');
+        } else {
+            $query->where(fn ($q) => $q->whereNull('stock_movements.repair_job_id')
+                ->orWhereIn('stock_movements.repair_job_id', RepairJob::visibleTo()->select('id')));
+        }
         if (SalesVisibility::mode() === 'ALL') {
             return $query;
         }

@@ -188,6 +188,13 @@ class ResourceService
                     } else {
                         unset($values['track_expiry']);
                     }
+                    if (\App\Support\Repairs::enabled()) {
+                        foreach (['available_for_pos', 'available_for_repairs'] as $availability) {
+                            if (array_key_exists($availability, $data)) {
+                                $values[$availability] = (bool) $data[$availability];
+                            }
+                        }
+                    }
                     $values['track_stock'] = $data['track_stock'] ?? ($id ? $record->track_stock : true);
                     $values['default_discount_type'] = $data['default_discount_type'] ?? ($id ? $record->default_discount_type : 'NONE');
                     $values['default_discount_value'] = $values['default_discount_type'] === 'NONE' ? '0.00' : Money::round((string) ($data['default_discount_value'] ?? ($id ? $record->default_discount_value : 0)));

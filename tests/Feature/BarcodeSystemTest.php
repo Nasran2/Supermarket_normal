@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductStockLayer;
 use App\Models\Role;
 use App\Models\Supplier;
+use App\Models\SuperAdmin;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\BarcodePresetService;
@@ -299,6 +300,45 @@ class BarcodeSystemTest extends TestCase
         config(['features.barcode' => false]);
         $this->getJson(route('pos.products', ['q' => 'SCAN-ONLY', 'scan' => 1]))->assertOk()->assertExactJson([]);
         $this->get(route('pos.index'))->assertOk()->assertSee('data-barcode="0"', false)->assertDontSee('Scan a barcode');
+    }
+
+    public function test_camera_lookup_and_ui_require_both_flags_and_the_pos_scanner_setting(): void
+    {
+        $product = $this->product(['barcode' => 'CAMERA-CODE128']);
+        $this->layer($product);
+        app(RegisterService::class)->open($this->admin->id, '0');
+        $camera = route('pos.products', ['q' => $product->barcode, 'camera_scan' => 1]);
+        $manual = route('pos.products', ['q' => $product->barcode, 'scan' => 1]);
+        $guide = route('documentation.show', 'make-a-sale');
+
+        foreach ([[false, false], [false, true], [true, false], [true, true]] as [$barcode, $enabled]) {
+            config(['features.barcode' => $barcode, 'features.camera_barcode' => $enabled]);
+            if ($barcode && $enabled) {
+                $this->getJson($camera)->assertOk()->assertJsonPath('0.id', $product->id);
+                $this->get(route('pos.index'))->assertOk()->assertSee('Scan with Camera');
+                $this->get($guide)->assertOk()->assertSee('Click Scan with Camera');
+            } else {
+                $this->getJson($camera)->assertNotFound();
+                $this->get(route('pos.index'))->assertOk()->assertDontSee('Scan with Camera');
+                $this->get($guide)->assertOk()->assertDontSee('Click Scan with Camera');
+            }
+            $this->getJson($manual)->assertOk()->assertJsonCount($barcode ? 1 : 0);
+        }
+
+        app(SettingsService::class)->put('pos', ['barcode_enabled' => false]);
+        $this->getJson($camera)->assertNotFound();
+        $this->get(route('pos.index'))->assertOk()->assertDontSee('Scan with Camera');
+
+        $role = Role::create(['name' => 'No POS access']);
+        $user = User::factory()->create(['role_id' => $role->id]);
+        app(SettingsService::class)->put('pos', ['barcode_enabled' => true]);
+        $this->flushSession();
+        $this->actingAs($user)->getJson($camera)->assertForbidden();
+
+        config(['features.camera_barcode' => false]);
+        $this->flushSession();
+        $this->actingAs(new SuperAdmin(['username' => 'camera-super', 'active' => true]), 'superadmin')
+            ->getJson($camera)->assertNotFound();
     }
 
     public function test_purchase_suggestions_use_received_base_quantities_and_prices(): void

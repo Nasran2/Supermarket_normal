@@ -118,6 +118,9 @@ class Permissions
         }
         $add('cheques.edit', 'Cheques', 'Edit cheque details', 'Correct pending cheque information with an audit trail.', ['cheques.create']);
         $add('cheques.resolve_return', 'Cheques', 'Resolve returned cheques', 'Record replacement cheques or cleared payments against a returned cheque.', ['cheques.return']);
+        foreach (Repairs::PERMISSIONS as $action => $label) {
+            $add('repairs.'.$action, 'Phone repairs', $label, $label.'.');
+        }
         foreach (Hr::permissions() as $name => [$group, $label]) {
             $add($name, $group, $label, $label.'.', []);
         }
@@ -127,7 +130,7 @@ class Permissions
 
     public static function visible(): array
     {
-        return array_filter(self::all(), fn ($info, $name) => (config('sms.enabled') || ! str_starts_with($name, 'sms.')) && (Units::enabled() || ! Units::permission($name)) && (config('features.cheque') || ! str_starts_with($name, 'cheques.')) && (config('features.barcode') || ! str_starts_with($name, 'barcode.')) && (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
+        return array_filter(self::all(), fn ($info, $name) => (Repairs::enabled() || ! str_starts_with($name, 'repairs.')) && (config('sms.enabled') || ! str_starts_with($name, 'sms.')) && (Units::enabled() || ! Units::permission($name)) && (config('features.cheque') || ! str_starts_with($name, 'cheques.')) && (config('features.barcode') || ! str_starts_with($name, 'barcode.')) && (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
     }
 
     public static function info(string $name): array

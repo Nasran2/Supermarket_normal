@@ -24,6 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(SecurityHeaders::class);
+        $middleware->trimStrings(except: ['device_unlock']);
+        $middleware->prependToPriorityList(\Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class, \App\Http\Middleware\RepairEnabled::class);
         $middleware->alias(['sms-feature' => EnsureSmsEnabled::class, 'permission' => PermissionMiddleware::class, 'barcode-feature' => EnsureBarcodeFeatureEnabled::class, 'cheque-feature' => EnsureChequeFeatureEnabled::class, 'unit-feature' => EnsureUnitFeatureEnabled::class, 'unit-resources' => GuardUnitResources::class, 'superadmin.enabled' => SuperAdminEnabled::class, 'system.active' => SystemActive::class]);
         $middleware->appendToGroup('web', [DemoMode::class, BusinessContext::class, SystemActive::class]);
         // Acquire the demo lock and restore overdue data before binding records.
@@ -33,5 +35,5 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectUsersTo(fn (\Illuminate\Http\Request $request) => \Illuminate\Support\Facades\Auth::guard('superadmin')->check() ? route('superadmin.dashboard') : route('dashboard'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->dontFlash(['device_unlock']);
     })->create();

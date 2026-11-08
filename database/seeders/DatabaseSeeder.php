@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
             if ($role->wasRecentlyCreated) {
                 $allowed = match ($name) {
                     'Administrator' => $names,
-                    'Manager' => array_values(array_filter($names, fn ($n) => ! str_starts_with($n, 'users.') && ! str_starts_with($n, 'roles.'))),
+                    'Manager' => array_values(array_filter($names, fn ($n) => ! str_starts_with($n, 'users.') && ! str_starts_with($n, 'roles.') && ! str_starts_with($n, 'repairs.'))),
                     default => ['dashboard.view', 'pos.access', 'sales.create', 'register.view', 'register.open', 'register.close', 'customers.create', 'sales.receipt', 'sms.receipt', 'pos.discount', 'pos.override_price', 'pos.split_payment', 'pos.due_sale', 'dashboard.register']
                 };
                 $role->permissions()->sync(Permission::whereIn('name', $allowed)->pluck('id'));

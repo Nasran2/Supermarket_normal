@@ -1,10 +1,14 @@
 @extends('layouts.app')
 @section('title','Customer profile')
 @section('content')
+@can('repairs.view')
+    <div class="repair-actions mb-4"><a class="btn secondary" href="{{ route('repairs.index',['customer_id'=>$record->id]) }}">Customer repairs</a>
+    @can('repairs.create')<a class="btn secondary" href="{{ route('repairs.create',['customer'=>$record->id]) }}">Receive a device</a>@endcan</div>
+@endcan
 @php($currency = $settings['currency_symbol']??'Rs.')
 <div class="page-heading"><div class="customer-profile-identity"><span class="customer-avatar large">{{ mb_strtoupper(mb_substr($record->name,0,1)) }}</span><div><span class="eyebrow">CUS-{{ str_pad($record->id,5,'0',STR_PAD_LEFT) }}</span><h1>{{ $record->name }}</h1><span class="badge {{ $record->active?'green':'slate' }}">{{ $record->active?'Active customer':'Inactive customer' }}</span></div></div><div class="heading-actions"><a class="btn secondary" href="{{ route('manage.index','customers') }}"><x-icon name="arrow-left"/>Customers</a>@can('customers.ledger')<a class="btn secondary" href="{{ route('manage.customers.ledger', $record->id) }}"><x-icon name="file-text"/>Ledger</a>@endcan @can('customers.edit')<a class="btn primary" href="{{ route('manage.edit',['customers',$record->id]) }}"><x-icon name="pencil"/>Edit customer</a>@endcan</div></div>
 <div class="customer-profile-stats">
-    <div class="card customer-profile-due"><span class="eyebrow">OUTSTANDING DUE</span><strong>{{ $currency }} {{ \App\Support\Money::displayCustomerAmount($record->due_balance) }}</strong><div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;"><span>{{ \App\Support\Money::compare($record->due_balance,0)>0?'Opening balance + unpaid invoices':'No outstanding balance' }}</span>@if(\App\Support\Money::compare($record->due_balance,0)>0)@can('customers.collect_payment')<button class="btn primary" onclick="document.getElementById('payment-modal').showModal()">Collect Payment</button>@endcan @endif</div></div>
+    <div class="card customer-profile-due"><span class="eyebrow">OUTSTANDING DUE</span><strong>{{ $currency }} {{ \App\Support\Money::displayCustomerAmount($record->due_balance) }}</strong><div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;"><span>{{ \App\Support\Money::compare($record->due_balance,0)>0?'Opening balance and unpaid invoices':'No outstanding balance' }}</span>@if(\App\Support\Money::compare($record->pos_due_balance,0)>0)@can('customers.collect_payment')<button class="btn primary" onclick="document.getElementById('payment-modal').showModal()">Collect Payment</button>@endcan @endif</div></div>
     <div class="card customer-profile-stat"><span>Invoiced purchases</span><strong>{{ $currency }} {{ \App\Support\Money::displayCustomerAmount($record->paid_purchases??0) }}</strong><small>Completed POS sales, including customer fees</small></div>
     <div class="card customer-profile-stat"><span>Completed purchases</span><strong>{{ $record->completed_sales_count }}</strong><small>Voided sales are excluded</small></div>
 </div>
@@ -97,7 +101,7 @@
             </div>
             
             <label class="field">Payment Amount ({{ $currency }})
-                <input type="number" step="0.01" name="amount" min="0.01" max="{{ $record->due_balance }}" required id="payment-amount">
+                <input type="number" step="0.01" name="amount" min="0.01" max="{{ $record->pos_due_balance }}" required id="payment-amount">
             </label>
 
             @include('cheques.editor',['side'=>'receive'])

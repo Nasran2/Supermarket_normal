@@ -31,7 +31,7 @@
 <section class="card sms-panel">
     <div class="sms-section-heading"><div><span class="eyebrow">02 / NOTIFICATIONS</span><h2>Message types & templates</h2><p>Switch off what you don’t need. Edit the wording of every message.</p></div></div>
     <div class="sms-template-grid">
-    @foreach(config('sms.types') as $kind => $definition)
+    @foreach(app(\App\Services\SmsSettingsService::class)->types() as $kind => $definition)
         @continue(str_starts_with($kind, 'CHEQUE') && !config('features.cheque'))
         @php($key = strtolower($kind))
         <article class="sms-template-card" data-sms-template-card>

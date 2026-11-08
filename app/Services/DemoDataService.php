@@ -23,6 +23,7 @@ class DemoDataService
         'purchase_returns', 'purchase_return_items', 'supplier_returns',
         'return_stock_allocations', 'return_account_allocations', 'return_settlements',
         'expiry_writeoffs', 'expenses', 'stock_movements', 'stock_adjustments', 'stock_adjustment_items',
+        'repair_devices', 'repair_jobs', 'repair_events', 'repair_parts', 'repair_payments', 'repair_costs', 'repair_attachments',
         'product_stock_layers', 'sale_stock_allocations', 'stock_layer_movements',
         'cheques', 'cheque_events', 'cheque_resolutions', 'cheque_resolution_items', 'barcode_print_jobs', 'document_sequences', 'audit_logs', 'hr_staff', 'hr_employment_events',
         'hr_attendances', 'hr_leaves', 'hr_payrolls', 'hr_payments',

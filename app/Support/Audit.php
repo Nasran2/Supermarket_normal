@@ -10,7 +10,7 @@ final class Audit
     private static function clean(array $data): array
     {
         foreach ($data as $key => $value) {
-            if (in_array($key, ['password', 'password_confirmation', 'current_password', 'remember_token', 'checkout_token', 'quote_hash'], true)) {
+            if (in_array($key, ['device_unlock', 'password', 'password_confirmation', 'current_password', 'remember_token', 'checkout_token', 'quote_hash'], true)) {
                 unset($data[$key]);
             } elseif (is_array($value)) {
                 $data[$key] = self::clean($value);

@@ -21,7 +21,7 @@ class SaleService
 {
     public function __construct(private SettingsService $settings, private SplitPaymentService $payments, private StockService $stock, private RegisterService $registers) {}
 
-    public function quote(array $data, User $user, bool $lock = false, ?Sale $editing = null, bool $historicalExchange = false, array $returnCredits = [], ?array $taxSettings = null): array
+    public function quote(array $data, User $user, bool $lock = false, ?Sale $editing = null, bool $historicalExchange = false, array $returnCredits = [], ?array $taxSettings = null, array $originalProductIds = []): array
     {
         abort_if(count($data['payments'] ?? []) > 1 && ! $user->hasPermission('pos.split_payment'), 403);
         abort_if(! empty($data['allow_due']) && ! $user->hasPermission('pos.due_sale'), 403);
@@ -40,6 +40,7 @@ class SaleService
                 }
             }
         }
+        $originalProductIds = $editing?->items->pluck('product_id')->all() ?? $originalProductIds;
         $reserved = [];
         $lines = [];
         $subtotal = '0.00';
@@ -50,7 +51,7 @@ class SaleService
         $referenceSubtotal = '0.00';
         foreach ($data['items'] as $item) {
             $p = $products->get($item['product_id']);
-            if (! $p || ! $p->active || ! $p->unit->active) {
+            if (! $p || ! $p->active || ! $p->unit->active || (! $p->available_for_pos && ! $historicalExchange && ! in_array($p->id, $originalProductIds, true))) {
                 throw ValidationException::withMessages(['items' => 'One or more products are unavailable.']);
             }
             $q = (string) $item['quantity'];

@@ -23,6 +23,12 @@ final class Navigation
             return route('reports.index');
         }
 
+        foreach (['repairs.view' => 'repairs.index', 'repairs.reports' => 'repairs.reports', 'repairs.settings' => 'repairs.settings'] as $permission => $route) {
+            if ($user->hasPermission($permission) && ($permission !== 'repairs.reports' || ! SecretControl::isHidden('disable_reports'))) {
+                return route($route);
+            }
+        }
+
         if (Hr::enabled()) {
             foreach (['hr.view' => 'hr.index', 'hr.staff.view' => 'hr.staff.index', 'hr.attendance.view' => 'hr.attendance', 'hr.leave.view' => 'hr.leave', 'hr.payroll.view' => 'hr.payroll.index', 'hr.payments.view' => 'hr.payments', 'hr.setup.view' => 'hr.setup'] as $permission => $route) {
                 if ($user->hasPermission($permission)) {

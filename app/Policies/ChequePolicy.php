@@ -13,6 +13,11 @@ class ChequePolicy
         if (! $user->hasPermission('cheques.'.$action)) {
             return false;
         }
+        if ($cheque->repair_job_id) {
+            return ! in_array($action, ['transfer', 'reverse_transfer', 'resolve_return'], true)
+                && $user->hasPermission('repairs.view')
+                && \App\Models\RepairJob::visibleTo($user)->whereKey($cheque->repair_job_id)->exists();
+        }
         if ($cheque->sale_id) {
             return SalesVisibility::canSee($cheque->sale, $user);
         }

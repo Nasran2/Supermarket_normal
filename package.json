@@ -14,6 +14,7 @@
     "vite": "^7.0.7"
   },
   "dependencies": {
+    "@zxing/library": "0.21.3",
     "lucide": "^1.52.0"
   }
 }

@@ -12,7 +12,7 @@
     <p class="muted text-xs">Collections include customer fees and due payments, less refunds and cash change. Returns keep the original processing fees. Voided sales are excluded.</p>
     <h3>Cash drawer</h3>
     <dl class="shift-cash-details">
-        @foreach(['Opening cash'=>$register->opening_cash,'Cash sales collected'=>$summary['cash'],'Cash in'=>$summary['in'],'Cash out'=>$summary['out'],'Cash expenses'=>$summary['expenses'],'Expected cash'=>$register->closed_at?$register->expected_cash:$summary['expected']] as $label=>$value)<div><dt>{{ $label }}</dt><dd>{{ $currency }} {{ \App\Support\Money::display($value) }}</dd></div>@endforeach
+        @foreach(['Opening cash'=>$register->opening_cash,'Net cash collected'=>$summary['cash'],'Cash in'=>$summary['in'],'Cash out'=>$summary['out'],'Cash expenses'=>$summary['expenses'],'Expected cash'=>$register->closed_at?$register->expected_cash:$summary['expected']] as $label=>$value)<div><dt>{{ $label }}</dt><dd>{{ $currency }} {{ \App\Support\Money::display($value) }}</dd></div>@endforeach
         @if($register->closed_at)@foreach(['Actual cash counted'=>$register->actual_cash,'Cash difference'=>$register->difference] as $label=>$value)<div class="shift-reconciliation"><dt>{{ $label }}</dt><dd>{{ $currency }} {{ \App\Support\Money::display($value) }}</dd></div>@endforeach @endif
     </dl>
     <details class="shift-sales" open><summary>All sales in this register <span>{{ $sales->count() }}</span></summary><div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Time</th><th>Methods</th><th>Sale total</th><th>Collected</th><th>Status</th></tr></thead><tbody>

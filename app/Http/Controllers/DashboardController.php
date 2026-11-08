@@ -79,6 +79,9 @@ class DashboardController extends Controller
 
         $chequeAlerts = config('features.cheque') && $request->user()->hasPermission('cheques.dashboard') && Cheques::setting('cheque_dashboard') ? Cheque::visibleTo()->with('customer', 'supplier')->dueSoon()->limit(6)->get() : collect();
 
-        return view('dashboard', compact('chequeAlerts', 'expiryRows', 'expiredBatches', 'period', 'from', 'to', 'summary', 'transactions', 'payments', 'days', 'overview', 'lowStock', 'recentSales', 'recentExpenses', 'topProducts', 'register', 'privacy'));
+        $repairStats = $request->user()->hasPermission('repairs.view') && ! \App\Support\SecretControl::isHidden('hide_top_summary')
+            ? app(\App\Services\Repair\RepairReporting::class)->dashboard() : [];
+
+        return view('dashboard', compact('repairStats', 'chequeAlerts', 'expiryRows', 'expiredBatches', 'period', 'from', 'to', 'summary', 'transactions', 'payments', 'days', 'overview', 'lowStock', 'recentSales', 'recentExpenses', 'topProducts', 'register', 'privacy'));
     }
 }

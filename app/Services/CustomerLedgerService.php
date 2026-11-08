@@ -67,6 +67,28 @@ class CustomerLedgerService
                 $add($a->reversed_at, 'Return Credit Reversal', $a->saleReturn?->reference ?? 'Return', $a->amount, '0.00');
             }
         }
+        if (\App\Support\Repairs::enabled()) {
+            foreach (\App\Models\RepairJob::visibleTo()->where('customer_id', $customer->id)->with('payments')->get() as $job) {
+                $reference = $job->invoiceNumber();
+                if ($job->invoiced_at) {
+                    $add($job->invoiced_at, 'Repair invoice', $reference, $job->total, '0.00');
+                }
+                foreach ($job->payments as $payment) {
+                    $date = $job->invoiced_at && $payment->created_at->lessThan($job->invoiced_at) ? $job->invoiced_at : $payment->created_at;
+                    if (! $job->invoiced_at || $payment->created_at->lessThan($job->invoiced_at)) {
+                        $add($payment->created_at, 'Repair deposit activity', $reference.' · '.$payment->kind.' · '.Money::formatRaw($payment->amount), '0.00', '0.00');
+                    }
+                    if ($job->invoiced_at) {
+                        $add($date, 'Repair '.strtolower($payment->kind), $reference.' · '.$payment->method_name,
+                            Money::compare($payment->amount, 0) < 0 ? Money::sub('0', $payment->amount) : '0.00',
+                            Money::compare($payment->amount, 0) > 0 ? $payment->amount : '0.00');
+                    }
+                    if (Money::compare($payment->credit, 0) > 0) {
+                        $add($date, 'Repair credit', $reference, '0.00', $payment->credit);
+                    }
+                }
+            }
+        }
         $entries = $entries->sortBy('date')->values();
         $balance = '0.00';
         $opening = '0.00';

@@ -173,7 +173,7 @@ $walkthroughs = [
 ];
 
 // New written guides remain complete without borrowing unrelated screen images.
-foreach (require __DIR__.'/documentation-updates.php' as $slug => $guide) {
+foreach ((require __DIR__.'/documentation-updates.php') + (require __DIR__.'/documentation-repairs.php') as $slug => $guide) {
     $walkthroughs['guides'][$slug] = array_fill(0, count($guide['steps']), []);
 }
 $walkthroughs['guides']['store-settings'] = array_pad($walkthroughs['guides']['store-settings'], 9, []);

@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    public $withinTransaction = false;
+
     public function up(): void
     {
         Schema::create('category_product', function (Blueprint $table) {
@@ -30,17 +32,12 @@ return new class extends Migration
             DB::table('category_product')->insert($inserts);
         });
 
-        try {
-            DB::statement('ALTER TABLE `products` DROP FOREIGN KEY `products_category_id_foreign`');
-        } catch (\Throwable $e) {
-            // Foreign key may not exist or was already removed
-        }
-
-        if (Schema::hasColumn('products', 'category_id')) {
-            Schema::table('products', function (Blueprint $table) {
-                $table->dropColumn('category_id');
-            });
-        }
+        Schema::table('products', function (Blueprint $table) {
+            $table->dropForeign(['category_id']);
+        });
+        Schema::table('products', function (Blueprint $table) {
+            $table->dropColumn('category_id');
+        });
     }
 
     public function down(): void

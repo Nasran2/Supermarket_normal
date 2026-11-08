@@ -78,7 +78,7 @@ class SaleRevisionService
             foreach ($sale->items as $item) {
                 app(StockLayerService::class)->restore($products[$item->product_id], $item, $item->base_quantity ?? $item->quantity, 'SALE EDIT RESTORE', $sale->invoice, $user->id);
             }
-            $quote = $this->sales->quote($data, $user, true, taxSettings: $sale->tax);
+            $quote = $this->sales->quote($data, $user, true, taxSettings: $sale->tax, originalProductIds: $sale->items->pluck('product_id')->all());
             if (! hash_equals($quote['quote_hash'], $data['quote_hash'])) {
                 throw ValidationException::withMessages(['payment' => 'Prices, stock or payment rules changed. Review payment again before saving.']);
             }

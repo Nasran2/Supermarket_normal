@@ -24,7 +24,10 @@ class SmsController extends Controller
         $customers = Customer::withDueBalances()->where('active', true)
             ->when($data['q'] ?? '', fn ($query, $q) => $query->where(fn ($query) => $query->where('name', 'like', '%'.$q.'%')->orWhere('phone', 'like', '%'.$q.'%')))
             ->orderBy('name')->paginate(50)->withQueryString();
-        $history = SmsMessage::when(! $request->user()->isAdministrator(), fn ($query) => $query->where('user_id', $request->user()->id));
+        $history = SmsMessage::when(! \App\Support\Repairs::sms() || ! $request->user()->hasPermission('repairs.view'),
+            fn ($query) => $query->whereNull('repair_job_id'),
+            fn ($query) => $query->where(fn ($q) => $q->whereNull('repair_job_id')
+                ->orWhereIn('repair_job_id', \App\Models\RepairJob::visibleTo()->select('id'))))->when(! $request->user()->isAdministrator(), fn ($query) => $query->where('user_id', $request->user()->id));
         $summary = (clone $history)->selectRaw("COUNT(*) AS total, SUM(CASE WHEN status='SENT' THEN 1 ELSE 0 END) AS sent, SUM(CASE WHEN status IN ('PENDING','SENDING') THEN 1 ELSE 0 END) AS pending, SUM(CASE WHEN status IN ('FAILED','UNKNOWN') THEN 1 ELSE 0 END) AS attention")->first();
         $messages = $history->when($data['status'] ?? '', fn ($query, $status) => $status === 'attention' ? $query->whereIn('status', ['FAILED', 'UNKNOWN']) : $query->where('status', $status))
             ->latest('id')->paginate(20, ['*'], 'history_page')->withQueryString();

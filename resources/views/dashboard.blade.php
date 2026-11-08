@@ -6,6 +6,7 @@ $periodLabels = ['today' => 'day', 'yesterday' => 'day', 'this_week' => 'week', 
 $periodText = $periodLabels[$period] ?? 'day';
 $dateDisplay = \Carbon\Carbon::parse($from)->format('d M Y');
 if ($from !== $to) $dateDisplay .= ' - ' . \Carbon\Carbon::parse($to)->format('d M Y');
+$repairLinks = ['Overdue'=>['due'=>'overdue'], 'Ready'=>['status'=>'READY'], 'Unpaid'=>['due'=>'unpaid'], 'In progress'=>['status'=>'IN_PROGRESS']];
 @endphp
 <div class="page-heading">
     <div>
@@ -40,6 +41,17 @@ if ($from !== $to) $dateDisplay .= ' - ' . \Carbon\Carbon::parse($to)->format('d
     @include('sales.partials.privacy-shortcuts', ['surface' => 'dashboard'])
 @endif
 <x-sales-visibility-note />
+@if($repairStats)
+    <section class="card repair-panel repair-stack mb-5">
+        <div class="card-heading"><div><h2>Repair desk</h2><p class="muted">Jobs needing attention and today’s collections.</p></div><a class="btn secondary" href="{{ route('repairs.index') }}">Open repairs</a></div>
+        <dl class="repair-fields repair-data">
+            @foreach($repairStats as $label=>$amount)
+                @continue(in_array($label,['Collected today','Revenue today']) && !auth()->user()->hasPermission('repairs.pay') && !auth()->user()->hasPermission('repairs.reports'))
+                <div><dt>{{ $label }}</dt><dd>@if(isset($repairLinks[$label]))<a class="text-link" href="{{ route('repairs.index',$repairLinks[$label]) }}">{{ $amount }}</a>@else{{ $amount }}@endif</dd></div>
+            @endforeach
+        </dl>
+    </section>
+@endif
 @if(!\App\Support\SecretControl::isHidden('hide_top_summary'))
 @php
     $dashSellMult = class_exists(\App\Support\SecretControl::class) ? \App\Support\SecretControl::sellingPriceMultiplier() : 1.0;

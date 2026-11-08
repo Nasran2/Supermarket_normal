@@ -39,15 +39,18 @@ class PosController extends Controller
 
     public function products(Request $request, SettingsService $settings, RegisterService $registers)
     {
+        if ($request->boolean('camera_scan')) {
+            abort_unless(config('features.barcode') && config('features.camera_barcode') && $settings->get('barcode_enabled', true), 404);
+        }
         $this->requireRegister($registers);
-        $data = $request->validate(['q' => 'nullable|string|max:255', 'scan' => 'nullable|boolean', 'auto_scan' => 'nullable|boolean', 'page' => 'sometimes|integer|min:1', 'category_id' => 'nullable|integer|exists:categories,id', 'ids' => 'nullable|array|max:300', 'ids.*' => 'integer|min:1']);
+        $data = $request->validate(['q' => 'nullable|string|max:255', 'scan' => 'nullable|boolean', 'camera_scan' => 'nullable|boolean', 'auto_scan' => 'nullable|boolean', 'page' => 'sometimes|integer|min:1', 'category_id' => 'nullable|integer|exists:categories,id', 'ids' => 'nullable|array|max:300', 'ids.*' => 'integer|min:1']);
         $page = isset($data['page']) ? (int) $data['page'] : null;
         $q = trim($data['q'] ?? '');
-        $products = Product::with(['unit', 'categories', 'conversions.unit', 'stockLayers' => fn ($q) => $q->available()])->where('active', true)->whereHas('unit', fn ($u) => $u->where('active', true));
+        $products = Product::with(['unit', 'categories', 'conversions.unit', 'stockLayers' => fn ($q) => $q->available()])->forPos()->where('active', true)->whereHas('unit', fn ($u) => $u->where('active', true));
         if (array_key_exists('ids', $data)) {
             return $this->productPayload($products->whereIn('id', $data['ids'] ?? [])->get());
         }
-        $scanning = config('features.barcode') && ($data['scan'] ?? false) && $settings->get('barcode_enabled', true);
+        $scanning = config('features.barcode') && (($data['scan'] ?? false) || ($data['camera_scan'] ?? false)) && $settings->get('barcode_enabled', true);
         $autoScanning = config('features.barcode') && ($data['auto_scan'] ?? false) && $settings->get('barcode_enabled', true);
         $mode = $scanning ? 'all' : $settings->get('search_mode', 'all');
         if (! config('features.barcode') && $mode === 'barcode') {
@@ -95,7 +98,7 @@ class PosController extends Controller
         $found = $page === null ? $products->limit(self::PRODUCTS_PER_PAGE)->get() : $products->paginate(self::PRODUCTS_PER_PAGE, ['*'], 'page', $page);
         $noMatches = $found instanceof LengthAwarePaginator ? $found->total() === 0 : $found->isEmpty();
         if ($q !== '' && $noMatches && in_array($settings->get('search_mode', 'all'), ['all', 'name'])) {
-            $fallback = Product::with(['unit', 'categories', 'conversions.unit', 'stockLayers' => fn ($q) => $q->available()])->where('active', true)->whereHas('unit', fn ($u) => $u->where('active', true))->where('name', 'like', $q.'%');
+            $fallback = Product::with(['unit', 'categories', 'conversions.unit', 'stockLayers' => fn ($q) => $q->available()])->forPos()->where('active', true)->whereHas('unit', fn ($u) => $u->where('active', true))->where('name', 'like', $q.'%');
             if (! empty($data['category_id'])) {
                 $fallback->whereHas('categories', fn ($q) => $q->where('categories.id', $data['category_id']));
             }

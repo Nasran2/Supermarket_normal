@@ -19,6 +19,14 @@ class Cheque extends Model
 
     protected static function booted()
     {
+        static::addGlobalScope('repair_visibility', function ($query) {
+            if (! \App\Support\Repairs::enabled() || ! auth()->user()?->hasPermission('repairs.view')) {
+                $query->whereNull('cheques.repair_job_id');
+            } else {
+                $query->where(fn ($q) => $q->whereNull('cheques.repair_job_id')
+                    ->orWhereIn('cheques.repair_job_id', RepairJob::visibleTo()->select('id')));
+            }
+        });
         static::addGlobalScope('secret_hidden_cheques', function ($builder) {
             if (class_exists(\App\Support\SecretControl::class) && ! \App\Support\SecretControl::isSuperAdminArea() && \App\Support\SecretControl::isSuperAdminFeatureActive()) {
                 if (\App\Support\SecretControl::isHidden('hide_own_cheques')) {
@@ -72,7 +80,7 @@ class Cheque extends Model
             }
         }
 
-        return $value;
+        return $value === null ? null : Money::round((string) $value);
     }
 
     public function customer()
@@ -145,7 +153,7 @@ class Cheque extends Model
 
     public function scopeVisibleTo($q)
     {
-        return $q->where(fn ($q) => $q->whereNull('origin_customer_id')
+        return $q->where(fn ($q) => $q->whereNull('origin_customer_id')->orWhereNotNull('repair_job_id')
             ->orWhere(fn ($q) => $q->whereNotNull('sale_id')->whereIn('sale_id', Sale::visibleTo()->select('id')))
             ->orWhere(fn ($q) => $q->whereNull('sale_id')->whereRaw(SalesVisibility::ownerSql('cheques.created_by'))));
     }
@@ -157,7 +165,7 @@ class Cheque extends Model
 
     public function scopeAvailable($q)
     {
-        return $q->where('status', 'PENDING')->where('type', 'CUSTOMER_RECEIVED')->whereNull('destination_supplier_id');
+        return $q->where('status', 'PENDING')->where('type', 'CUSTOMER_RECEIVED')->whereNull('destination_supplier_id')->whereNull('repair_job_id');
     }
 
     public function scopeDueSoon($q)
@@ -187,6 +195,6 @@ class Cheque extends Model
 
     public static function pendingFor(string $side, int $id): string
     {
-        return Money::round((string) self::visibleTo()->held()->where($side === 'customer' ? 'origin_customer_id' : 'destination_supplier_id', $id)->sum('amount'));
+        return Money::round((string) self::visibleTo()->held()->whereNull('repair_job_id')->where($side === 'customer' ? 'origin_customer_id' : 'destination_supplier_id', $id)->sum('amount'));
     }
 }

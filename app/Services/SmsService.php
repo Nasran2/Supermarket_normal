@@ -95,6 +95,11 @@ class SmsService
 
             return $message->fresh();
         }
+        if ($message->repair_job_id && ! \App\Models\RepairJob::whereKey($message->repair_job_id)->where('sms_opt_in', true)->whereHas('customer', fn ($q) => $q->where('active', true))->exists()) {
+            SmsMessage::whereKey($message->id)->where('status', 'PENDING')->update(['status' => 'CANCELLED', 'error' => 'Customer consent is unavailable.']);
+
+            return $message->fresh();
+        }
         $this->ready($message->kind);
         if (str_starts_with($message->kind, 'CHEQUE') && (! config('features.cheque') || ! Cheque::dueSoon()->whereKey($message->cheque_id)->exists())) {
             SmsMessage::whereKey($message->id)->where('status', 'PENDING')->update(['status' => 'CANCELLED', 'error' => 'Cheque no longer requires a reminder.']);

@@ -44,13 +44,13 @@ class SmsSettingsController extends Controller
             'cheque_reminder_time' => 'required|date_format:H:i',
             'sending_enabled' => 'sometimes|boolean',
         ];
-        foreach (config('sms.types') as $kind => $definition) {
+        foreach ($settings->types() as $kind => $definition) {
             $key = strtolower($kind);
             $rules[$key.'_enabled'] = 'sometimes|boolean';
             $rules[$key.'_template'] = 'sometimes|required|string|max:1000';
         }
         $data = $request->validate($rules);
-        foreach (config('sms.types') as $kind => $definition) {
+        foreach ($settings->types() as $kind => $definition) {
             $key = strtolower($kind).'_template';
             if (isset($data[$key])) {
                 app(SmsTemplateService::class)->validate($kind, $data[$key], $key);

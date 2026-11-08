@@ -11,6 +11,8 @@ class DocumentationService
     {
         return match ($feature) {
             'hr' => Hr::enabled(),
+            'phone_rep' => \App\Support\Repairs::enabled(),
+            'repair_sms' => \App\Support\Repairs::sms(),
             'demo' => Demo::enabled(),
             'scode' => SecretCodeService::enabled(),
             default => (bool) config('features.'.$feature, false),

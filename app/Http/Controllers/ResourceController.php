@@ -52,7 +52,7 @@ class ResourceController extends Controller
         if ($resource === 'customers') {
             $query->withDueBalances();
             if ($request->filled('balance')) {
-                $query->whereRaw('(opening_due - opening_due_paid + '.Customer::invoiceDueSql().') '.($request->input('balance') === 'due' ? '>' : '=').' 0');
+                $query->whereRaw('(opening_due - opening_due_paid + '.Customer::invoiceDueSql().' + '.Customer::repairDueSql().') '.($request->input('balance') === 'due' ? '>' : '=').' 0');
             }
         }
         if ($resource === 'expenses') {
@@ -86,7 +86,8 @@ class ResourceController extends Controller
 
         if ($resource === 'customers') {
             $balanceQuery = Customer::withDueBalances()->toBase();
-            $stats = DB::query()->fromSub($balanceQuery, 'customer_balances')->selectRaw('COUNT(*) as total, SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_count, SUM(CASE WHEN opening_due - opening_due_paid + invoice_due > 0 THEN 1 ELSE 0 END) as due_count, SUM(opening_due - opening_due_paid + invoice_due) as total_due')->first();
+            $balance = 'opening_due - opening_due_paid + invoice_due'.(\App\Support\Repairs::enabled() ? ' + repair_due' : '');
+            $stats = DB::query()->fromSub($balanceQuery, 'customer_balances')->selectRaw("COUNT(*) as total, SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_count, SUM(CASE WHEN $balance > 0 THEN 1 ELSE 0 END) as due_count, SUM($balance) as total_due")->first();
 
             return view('customers.index', compact('resource', 'def', 'rows', 'stats'));
         }

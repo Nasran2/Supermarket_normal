@@ -6,6 +6,7 @@
 @if(config('features.barcode'))@can('barcode.manage_settings')<a class="card settings-card" href="{{ route('barcode.settings') }}"><span class="tile-icon"><x-icon name="barcode"/></span><h2>Barcode</h2><p>Generation, scanning and label printing defaults.</p></a>@endcan @endif
 @if(\App\Support\Expiry::enabled())@can('expiry.manage_settings')<a class="card settings-card" href="{{ route('settings.edit','expiry') }}"><span class="tile-icon"><x-icon name="calendar"/></span><h2>Expiry dates</h2><p>Batch dates, cashier selection and expiry warnings.</p></a>@endcan @endif
 @if(config('features.cheque'))@can('cheques.manage_settings')<a class="card settings-card" href="{{ route('cheques.settings') }}"><span class="tile-icon"><x-icon name="landmark" :size="24"/></span><h2>Cheque settings & bank accounts</h2><p>Manage cheque preferences and bank accounts.</p><x-icon name="arrow-up-right" class="tile-arrow"/></a>@endcan @endif
+@can('repairs.settings')<a class="card settings-card" href="{{ route('repairs.settings') }}"><span class="tile-icon"><x-icon name="settings-2"/></span><h2>Repair settings</h2><p>Set the printed intake and warranty terms.</p></a>@endcan
 @if(config('sms.enabled'))
 @can('sms.settings')<a class="card settings-card" href="{{ route('settings.sms') }}"><span class="tile-icon"><x-icon name="send" :size="24"/></span><h2>SMS settings</h2><p>Textit account credentials and admin cheque reminders.</p><x-icon name="arrow-up-right" class="tile-arrow"/></a>@endcan
 @endif

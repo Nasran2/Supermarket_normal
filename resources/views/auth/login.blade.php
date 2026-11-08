@@ -39,7 +39,7 @@
         }
     </style>
 </head>
-<body class="supermarket-bg min-h-screen flex items-center justify-center p-6 font-sans antialiased text-gray-800">
+<body class="supermarket-bg min-h-screen flex items-center justify-center p-6 font-sans antialiased text-gray-800 {{ \App\Support\Repairs::enabled() ? 'phone-repair-theme' : '' }}">
 
     <!-- Background decorative arcs -->
     <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
@@ -159,6 +159,7 @@
                 </p>
             </div>
         </div>
+        @if(\App\Support\Repairs::enabled())<p class="text-center mt-5"><a class="text-link" href="{{ route('repairs.track') }}">Track your repair</a></p>@endif
     </main>
 
     <script>

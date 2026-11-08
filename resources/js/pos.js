@@ -4,6 +4,8 @@ import { setupTaxBills } from './pos-tax-bills.js';
 import { draftStore } from './pos-draft.js';
 import { sellingPriceOptions, priceOptionForItem, stockChoiceKey } from './pos-price-options.js';
 import { createProductScanner, exactProductMatch } from './pos-scanner.js';
+import { setupCameraScanner } from './pos-camera.js';
+import { alternateRetailCode } from './pos-camera-decoder.js';
 const pos = document.getElementById('pos');
 const $ = (id) => document.getElementById(id),
   money = (v) => {
@@ -15,6 +17,15 @@ const $ = (id) => document.getElementById(id),
   };
 const editSeed = $('sale-edit-seed') ? JSON.parse($('sale-edit-seed').textContent) : null;
 const editMode = !!editSeed;
+function newId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  // Keep the POS usable on local HTTP networks and older browsers.
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 let pendingCompletion = null;
 let products = [],
   cart = [],
@@ -24,7 +35,7 @@ let products = [],
   orderVersion = 0,
   scanNumber = 0,
   quoteNumber = 0,
-  token = crypto.randomUUID(),
+  token = newId(),
   pending = false,
   orderLoading = false,
   checkoutAttempted = false,
@@ -122,7 +133,7 @@ function resetOrder() {
   quote = null;
   pendingCompletion = null;
   checkoutAttempted = false;
-  token = crypto.randomUUID();
+  token = newId();
   billDiscount = { type: 'AMOUNT', value: '0' };
   $('discount').value = '0';
   $('customer').value = defaultCustomer;
@@ -160,7 +171,7 @@ async function restoreDraft() {
     cart = [];
     billDiscount = { type: 'AMOUNT', value: '0' };
     checkoutAttempted = false;
-    token = crypto.randomUUID();
+    token = newId();
     $('customer').value = defaultCustomer;
     updateCustomerDue();
     render(false);
@@ -168,7 +179,7 @@ async function restoreDraft() {
   }
   token = saved.token;
   checkoutAttempted = !!saved.attempted;
-  cart = saved.items.map((item) => ({ ...item, line_key: item.line_key || crypto.randomUUID() }));
+  cart = saved.items.map((item) => ({ ...item, line_key: item.line_key || newId() }));
   billDiscount = saved.billDiscount || { type: 'AMOUNT', value: '0' };
   $('customer').value = [...$('customer').options].some((o) => o.value === saved.customer)
     ? saved.customer
@@ -203,7 +214,7 @@ async function restoreDraft() {
       const unit = group?.units.find((u) => u.id === item.unit_id);
       return {
         ...item,
-        line_key: item.line_key || crypto.randomUUID(),
+        line_key: item.line_key || newId(),
         track_expiry: fresh?.track_expiry ?? false,
         show_expiry: fresh?.show_expiry ?? false,
         expiry_label: group?.expiry_label ?? item.expires_at,
@@ -366,10 +377,13 @@ function clearProductSearch(resetCategory = false) {
   }
   if (!document.querySelector('dialog[open]')) $('product-search').focus({ preventScroll: true });
 }
-async function fetchProducts(params) {
+async function fetchProducts(params, signal) {
   const response = await fetch(`${pos.dataset.productsUrl}?${new URLSearchParams(params)}`, {
     headers: { Accept: 'application/json' },
+    signal,
   });
+  if (response.status === 404 && params.camera_scan)
+    throw new Error('Camera scanning is unavailable. Reload the POS.');
   if (!response.ok) throw new Error('Unable to load products. Please sign in again or retry.');
   return response.json();
 }
@@ -500,6 +514,7 @@ function add(p) {
         `<button type="button" class="price-choice" data-price-choice="${index}"><span class="price-choice-rate"><small>Selling price${unitsEnabled() ? ' / ' + escape(unitLabel(p.unit)) : ''}</small><strong>${moneyHTML(group.stock_price)}</strong>${p.track_expiry && p.show_expiry ? `<small>Expiry: ${escape(group.expiry_label)} · ${escape(group.expiry_status)}</small>${['Urgent', 'Expiring soon'].includes(group.expiry_status) ? `<small class="text-warning">Expires in ${group.days_remaining} days</small>` : ''}${group.recommended ? '<small>Recommended — earliest expiry</small>' : ''}` : ''}${group.reference ? `<small class="price-choice-source">${escape(group.reference)}</small>` : ''}${group.received ? `<small class="price-choice-received">${escape(group.received)}</small>` : ''}</span><span class="price-choice-stock"><strong>${Number(group.quantity).toLocaleString()}${unitLabel(p.unit) ? ' ' + escape(unitLabel(p.unit)) : ''}</strong><small>Available stock</small><span class="price-choice-add">Add to cart <kbd>${index + 1}</kbd></span></span></button>`,
     )
     .join('');
+  priceDialog.returnValue = '';
   priceDialog.showModal();
   $('price-choice-options').querySelector('button').focus();
   return true;
@@ -534,7 +549,7 @@ function addPrice(p, group) {
     }
     cart.push({
       ...p,
-      line_key: crypto.randomUUID(),
+      line_key: newId(),
       expires_at: group.expires_at ?? null,
       expired_confirmed: group.expired === true,
       expiry_label: group.expiry_label,
@@ -564,8 +579,8 @@ function addPrice(p, group) {
 function selectPrice(index) {
   const group = choosingPrices[index];
   if (!group) return;
-  addPrice(choosingProduct, group);
-  priceDialog.close();
+  const added = addPrice(choosingProduct, group);
+  priceDialog.close(added ? 'added' : '');
   $('product-search').focus({ preventScroll: true });
 }
 $('price-choice-options').addEventListener('click', (event) => {
@@ -643,16 +658,31 @@ document.querySelectorAll('[data-category]').forEach((button) =>
   }),
 );
 const scanProduct = createProductScanner({
-  lookup: (code) => fetchProducts({ q: code, scan: '1' }),
+  lookup: (code, { signal } = {}) =>
+    fetchProducts(signal ? { q: code, camera_scan: '1' } : { q: code, scan: '1' }, signal),
   add: async (product, context) => {
     if (priceDialog.open)
       await new Promise((resolve) =>
         priceDialog.addEventListener('close', resolve, { once: true }),
       );
-    return context.version === orderVersion && add(product);
+    if (context.version !== orderVersion || context.signal?.aborted) return false;
+    if (context.signal) {
+      context.name = product.name;
+      message.textContent = '';
+    }
+    const added = add(product);
+    if (context.signal && priceDialog.open) {
+      await new Promise((resolve) => priceDialog.addEventListener('close', resolve, { once: true }));
+      return priceDialog.returnValue === 'added';
+    }
+    return added;
   },
   missing: (code, context) => {
-    if (context.version !== orderVersion) return;
+    if (context.version !== orderVersion || context.signal?.aborted) return;
+    if (context.signal) {
+      context.error = 'No product matches this barcode. Check the label or search by name.';
+      return;
+    }
     message.textContent =
       'No exact barcode or SKU match. Select a product from the results or check the code.';
     if (context.scan === scanNumber && !$('product-search').value) {
@@ -661,9 +691,26 @@ const scanProduct = createProductScanner({
     }
   },
   error: (failure, context) => {
-    if (context.version === orderVersion) message.textContent = failure.message;
+    if (context.version !== orderVersion || context.signal?.aborted) return;
+    if (context.signal) context.error = failure.message;
+    else message.textContent = failure.message;
   },
 });
+const cameraButton = $('open-camera-scanner');
+if (cameraButton) {
+  setupCameraScanner(cameraButton, $('camera-scanner'), async (barcode, signal) => {
+    const context = { signal, version: orderVersion, alternate: alternateRetailCode(barcode) };
+    const added = await scanProduct(barcode.value, context);
+    return {
+      added,
+      text: added
+        ? `Added ${context.name} to the cart.`
+        : context.error ||
+          (context.name && message.textContent) ||
+          'Item was not added. Try scanning again.',
+    };
+  });
+}
 $('product-search').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && pos.dataset.barcode === '1') {
     e.preventDefault();
@@ -1086,7 +1133,7 @@ function loadInvoice() {
   billDiscount = structuredClone(editSeed.billDiscount);
   $('customer').value = editSeed.customer;
   $('edit-notes').value = editSeed.notes || '';
-  token = crypto.randomUUID();
+  token = newId();
   checkoutAttempted = false;
   quote = null;
   payments = [];

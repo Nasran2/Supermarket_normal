@@ -74,7 +74,8 @@ class Customer extends Model
 
     public function scopeWithDueBalances(Builder $query): Builder
     {
-        return $query->select('customers.*')->selectRaw(self::invoiceDueSql().' AS invoice_due');
+        return $query->select('customers.*')->selectRaw(self::invoiceDueSql().' AS invoice_due')
+            ->when(\App\Support\Repairs::enabled(), fn ($q) => $q->selectRaw(self::repairDueSql().' AS repair_due'));
     }
 
     public function getInvoiceDueAttribute(): string
@@ -87,6 +88,35 @@ class Customer extends Model
     }
 
     public function getDueBalanceAttribute(): string
+    {
+        return Money::add($this->pos_due_balance, $this->repair_due);
+    }
+
+    public static function repairDueSql(): string
+    {
+        if (! \App\Support\Repairs::enabled()) {
+            return '0';
+        }
+        $owner = SalesVisibility::ownerSql('repair_jobs.user_id');
+        $user = auth()->user();
+        if ($user instanceof User && $user->hasPermission('repairs.view') && SalesVisibility::mode($user) !== 'ALL') {
+            $owner .= ' OR repair_jobs.technician_id = '.(int) $user->id;
+        }
+
+        return "COALESCE((SELECT SUM(total - credited - paid) FROM repair_jobs
+            WHERE repair_jobs.customer_id = customers.id AND invoiced_at IS NOT NULL AND ($owner)), 0)";
+    }
+
+    public function getRepairDueAttribute(): string
+    {
+        if (! \App\Support\Repairs::enabled()) {
+            return '0.00';
+        }
+
+        return Money::round((string) ($this->attributes['repair_due'] ?? self::withDueBalances()->whereKey($this->id)->value('repair_due') ?? '0'));
+    }
+
+    public function getPosDueBalanceAttribute(): string
     {
         $openingRemaining = Money::sub($this->opening_due ?? '0.00', $this->opening_due_paid ?? '0.00');
 

@@ -57,6 +57,10 @@
     @if(\App\Support\Expiry::enabled())
     <label class="customer-active-setting"><input type="hidden" name="track_expiry" value="0"><input id="track-expiry" type="checkbox" name="track_expiry" value="1" @checked(old('track_expiry', $record->exists ? $record->track_expiry : \App\Support\Expiry::setting('expiry_default_tracking')))><span><strong>Track expiry</strong><small>Use this for products where stock batches have expiry dates.</small></span></label>
     @endif
+    @if(\App\Support\Repairs::enabled())
+        <label class="customer-active-setting"><input type="hidden" name="available_for_pos" value="0"><input type="checkbox" name="available_for_pos" value="1" @checked(old('available_for_pos',$record->available_for_pos))><span><strong>Available for POS Sale</strong><small>Include this product in the checkout catalog.</small></span></label>
+        <label class="customer-active-setting"><input type="hidden" name="available_for_repairs" value="0"><input type="checkbox" name="available_for_repairs" value="1" @checked(old('available_for_repairs',$record->available_for_repairs))><span><strong>Available for Repairs</strong><small>Include this product in repair jobs when stock tracking is enabled.</small></span></label>
+    @endif
     <label class="customer-active-setting"><input type="hidden" name="track_stock" value="0"><input id="track-stock" type="checkbox" name="track_stock" value="1" @checked(old('track_stock',$record->exists?$record->track_stock:true))><span><strong>Maintain stock</strong><small>Enabled by default. Switch off for products you sell without keeping a stock count.</small></span></label>
     <p class="notice" id="stock-tracking-note" hidden>Stock is not maintained. This product can be sold without available stock. Enter its cost and selling price below.</p>
     <div class="product-stock-fields">

@@ -26,7 +26,7 @@ class StockService
         }
     }
 
-    public function move(Product $product, string $quantity, string $reason, string $reference, int $userId, bool $trackLayers = true): StockMovement
+    public function move(Product $product, string $quantity, string $reason, string $reference, int $userId, bool $trackLayers = true, ?int $repairJob = null): StockMovement
     {
         if ($trackLayers) {
             return DB::transaction(function () use ($product, $quantity, $reason, $reference, $userId) {
@@ -43,6 +43,6 @@ class StockService
         }
         $product->update(['stock' => $balance]);
 
-        return StockMovement::create(['product_id' => $product->id, 'user_id' => $userId, 'quantity' => $quantity, 'balance' => $balance, 'reason' => $reason, 'reference' => $reference]);
+        return StockMovement::create(['product_id' => $product->id, 'user_id' => $userId, 'quantity' => $quantity, 'balance' => $balance, 'reason' => $reason, 'reference' => $reference, 'repair_job_id' => $repairJob]);
     }
 }

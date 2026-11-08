@@ -47,8 +47,16 @@ class PaymentActivityService
         $events = $checkouts->unionAll($collections)->unionAll($refunds)->unionAll($accounts)->unionAll($returnEvents);
 
         if (config('features.cheque')) {
-            $cleared = Cheque::visibleTo()->leftJoin('customers as c', 'c.id', '=', 'cheques.origin_customer_id')->join('users as u', 'u.id', '=', 'cheques.passed_by')->where('cheques.type', 'CUSTOMER_RECEIVED')->where('cheques.status', 'PASSED')->selectRaw("cheques.id as entry_id,'Cheque passed' as kind,cheques.passed_at as occurred_at,(SELECT id FROM payment_methods WHERE type='CHEQUE' ORDER BY id LIMIT 1) as payment_method_id,'Cheque' as method_name,cheques.sale_id as sale_id,cheques.cheque_number as bill,COALESCE(c.name,'Customer') as customer,c.id as customer_id,u.name as cashier,0 as allocated,cheques.amount as received,0 as change_amount,cheques.amount as collected,0 as refunded,0 as charges,0 as customer_charges,0 as business_charges,cheques.reference")->toBase();
+            $cleared = Cheque::visibleTo()->leftJoin('customers as c', 'c.id', '=', 'cheques.origin_customer_id')->join('users as u', 'u.id', '=', 'cheques.passed_by')->whereNull('cheques.repair_job_id')->where('cheques.type', 'CUSTOMER_RECEIVED')->where('cheques.status', 'PASSED')->selectRaw("cheques.id as entry_id,'Cheque passed' as kind,cheques.passed_at as occurred_at,(SELECT id FROM payment_methods WHERE type='CHEQUE' ORDER BY id LIMIT 1) as payment_method_id,'Cheque' as method_name,cheques.sale_id as sale_id,cheques.cheque_number as bill,COALESCE(c.name,'Customer') as customer,c.id as customer_id,u.name as cashier,0 as allocated,cheques.amount as received,0 as change_amount,cheques.amount as collected,0 as refunded,0 as charges,0 as customer_charges,0 as business_charges,cheques.reference")->toBase();
             $events->unionAll($cleared);
+        }
+
+        if (\App\Support\Repairs::enabled()) {
+            $repairEntries = DB::table('repair_payments as p')->join('repair_jobs as j', 'j.id', '=', 'p.repair_job_id')
+                ->join('customers as c', 'c.id', '=', 'j.customer_id')->join('users as u', 'u.id', '=', 'p.user_id')
+                ->whereIn('j.id', \App\Models\RepairJob::visibleTo()->select('id'))
+                ->selectRaw("p.id as entry_id, 'Repair payment' as kind, p.created_at as occurred_at, p.payment_method_id, p.method_name, NULL as sale_id, NULL as bill, c.name as customer, c.id as customer_id, u.name as cashier, 0 as allocated, CASE WHEN p.amount > 0 THEN p.amount ELSE 0 END as received, 0 as change_amount, CASE WHEN p.amount > 0 THEN p.amount ELSE 0 END as collected, CASE WHEN p.amount < 0 THEN -p.amount ELSE 0 END as refunded, 0 as charges, 0 as customer_charges, 0 as business_charges, p.reference");
+            $events->unionAll($repairEntries);
         }
 
         return DB::query()->fromSub($events, 'activity')

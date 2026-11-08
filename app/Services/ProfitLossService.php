@@ -40,6 +40,14 @@ class ProfitLossService
         $cogs = Money::sub(Money::sub((string) $sales->sum('cost_total'), (string) $returns->sum('historical_cost_total')), (string) $exchangeReversals->sum('cost_total'));
         $cogs = Money::add($cogs, (string) $cancellations->sum('historical_cost_total'));
         $cogs = Money::sub($cogs, $linkedCost);
+        $repairs = \App\Support\Repairs::enabled() && $selectedSales === null
+            ? app(\App\Services\Repair\RepairReporting::class)->financial(compact('from', 'to')) : null;
+        if ($repairs) {
+            $grossSales = Money::add($grossSales, $repairs['billed']);
+            $salesReturns = Money::add($salesReturns, $repairs['credits']);
+            $revenue = Money::add($revenue, $repairs['revenue']);
+            $cogs = Money::add($cogs, $repairs['cogs']);
+        }
         $gross = Money::sub($revenue, $cogs);
         $expenses = SalesVisibility::apply(Expense::visibleSales(), 'expenses.user_id')->whereBetween('expense_date', [$from, $to]);
         $expenses->where(fn ($q) => $q->where('status', 'ACTIVE')->orWhere(fn ($q) => $q->where('status', 'REVERSED')->where(fn ($q) => $q->where('type', 'RETURN_WRITEOFF')->orWhere(fn ($q) => $q->where('type', 'AUTOMATIC')->whereHas('sale', fn ($q) => $q->where('status', 'RETURN_CANCELLED'))))));
@@ -57,9 +65,9 @@ class ProfitLossService
         $noReceiptCredit = Money::sub((string) (clone $returns)->sum('unverified_amount'), (string) (clone $cancellations)->sum('unverified_amount'));
         $estimatedRecovery = Money::sub((string) (clone $returns)->sum('estimated_cost_total'), (string) (clone $cancellations)->sum('estimated_cost_total'));
         $noReceiptAdjustments = Money::sub($noReceiptCredit, $estimatedRecovery);
-        $totalExpenses = Money::sum([$manual, $processing, $purchaseCharges, $returnWriteoffs, $noReceiptAdjustments]);
+        $totalExpenses = Money::sum([$manual, $processing, $purchaseCharges, $returnWriteoffs, $noReceiptAdjustments, $repairs['expenses'] ?? '0']);
         $net = Money::sub($gross, $totalExpenses);
 
-        return compact('grossSales', 'salesReturns', 'revenue', 'cogs', 'gross', 'manual', 'processing', 'purchaseCharges', 'returnWriteoffs', 'noReceiptCredit', 'estimatedRecovery', 'noReceiptAdjustments', 'net') + ['expenses' => $totalExpenses];
+        return compact('grossSales', 'salesReturns', 'revenue', 'cogs', 'gross', 'manual', 'processing', 'purchaseCharges', 'returnWriteoffs', 'noReceiptCredit', 'estimatedRecovery', 'noReceiptAdjustments', 'net') + ['expenses' => $totalExpenses] + ($repairs ? ['repairExpenses' => $repairs['expenses']] : []);
     }
 }

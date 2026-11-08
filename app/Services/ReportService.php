@@ -129,7 +129,7 @@ class ReportService
                     }
                 }
                 if (config('features.cheque')) {
-                    $cleared = Cheque::visibleTo()->where('type', 'CUSTOMER_RECEIVED')->where('status', 'PASSED')->whereBetween('passed_at', [$start, $end])->selectRaw("(SELECT id FROM payment_methods WHERE type='CHEQUE' ORDER BY id LIMIT 1) as payment_method_id, 'Cheque' as method_name, 'CHEQUE' as method_type, 0 as base, 0 as customer_fees, 0 as business_fees, amount as collections");
+                    $cleared = Cheque::visibleTo()->whereNull('repair_job_id')->where('type', 'CUSTOMER_RECEIVED')->where('status', 'PASSED')->whereBetween('passed_at', [$start, $end])->selectRaw("(SELECT id FROM payment_methods WHERE type='CHEQUE' ORDER BY id LIMIT 1) as payment_method_id, 'Cheque' as method_name, 'CHEQUE' as method_type, 0 as base, 0 as customer_fees, 0 as business_fees, amount as collections");
                     if ($ids) {
                         $cleared->whereIn('sale_id', $ids);
                     }
@@ -142,6 +142,13 @@ class ReportService
                     $base->unionAll($cleared);
                 }
                 $base->unionAll($collections)->unionAll($refunds)->unionAll($events);
+                if (\App\Support\Repairs::enabled() && $ids === null) {
+                    $repairs = app(\App\Services\Repair\RepairReporting::class)->payments()->whereBetween('created_at', [$start, $end])
+                        ->when($filters['payment_method_id'] ?? null, fn ($q, $method) => $q->where('payment_method_id', $method))
+                        ->when($filters['user_id'] ?? null, fn ($q, $user) => $q->where('user_id', $user))
+                        ->selectRaw('payment_method_id, method_name, method_type, 0 as base, 0 as customer_fees, 0 as business_fees, amount as collections');
+                    $base->unionAll($repairs);
+                }
             }
             $query = DB::query()->fromSub($base->toBase(), 'tenders')->selectRaw('payment_method_id, method_name, method_type, COUNT(*) as transactions, SUM(base) as base, SUM(customer_fees) as customer_fees, SUM(business_fees) as business_fees, SUM(collections) as collections')->groupBy('payment_method_id', 'method_name', 'method_type')->orderBy('method_name');
             $headers = ['Payment method', 'Type', 'Entries including collections / refunds', 'Original allocated sales', 'Customer-paid charges', 'Business-paid charges', 'Net collections'];
@@ -360,6 +367,23 @@ class ReportService
             $headers = ['Date', 'Reference', 'Category', 'Description', 'Amount', 'Type', 'Status', 'Method', 'Recorded by'];
             $map = fn ($e) => [$e->expense_date->format('Y-m-d'), $e->reference ?? 'EXP-'.$e->id, $e->category->name, $e->description, Money::display($e->amount), $e->type, $e->status, $e->method?->name ?? '—', $e->user->name];
             $cards = ['Active expenses' => (string) (clone $query)->where('status', 'ACTIVE')->sum('amount')];
+            if (\App\Support\Repairs::enabled()) {
+                $reference = DB::getDriverName() === 'sqlite' ? "'EXP-' || e.id" : "CONCAT('EXP-', e.id)";
+                $pos = DB::table('expenses as e')->whereIn('e.id', (clone $query)->reorder()->select('expenses.id')->toBase())
+                    ->join('expense_categories as category', 'category.id', '=', 'e.expense_category_id')
+                    ->join('users as actor', 'actor.id', '=', 'e.user_id')->leftJoin('payment_methods as method', 'method.id', '=', 'e.payment_method_id')
+                    ->selectRaw("e.expense_date as date, COALESCE(e.reference, $reference) as reference, category.name as category_name, e.description, e.amount, e.type, e.status, method.name as method_name, actor.name as actor_name");
+                $repairReference = DB::getDriverName() === 'sqlite' ? "'REP-' || c.repair_job_id" : "CONCAT('REP-', c.repair_job_id)";
+                $direct = DB::table('repair_costs as c')->whereIn('c.repair_job_id', \App\Models\RepairJob::visibleTo()->select('id'))
+                    ->join('users as actor', 'actor.id', '=', 'c.user_id')->leftJoin('payment_methods as method', 'method.id', '=', 'c.payment_method_id')
+                    ->whereBetween('c.created_at', [$start, $end])
+                    ->when($filters['user_id'] ?? null, fn ($q, $actor) => $q->where('c.user_id', $actor))
+                    ->when($filters['payment_method_id'] ?? null, fn ($q, $method) => $q->where('c.payment_method_id', $method))
+                    ->selectRaw("DATE(c.created_at) as date, $repairReference as reference, 'Repairs' as category_name, c.description, c.amount, 'REPAIR' as type, 'ACTIVE' as status, method.name as method_name, actor.name as actor_name");
+                $cards['Active expenses'] = Money::add($cards['Active expenses'], (string) (clone $direct)->sum('c.amount'));
+                $query = DB::query()->fromSub($pos->unionAll($direct), 'expense_entries')->orderByDesc('date')->orderByDesc('reference');
+                $map = fn ($e) => [$e->date, $e->reference, $e->category_name, $e->description, Money::display($e->amount), $e->type, $e->status, $e->method_name ?? '—', $e->actor_name];
+            }
         } elseif ($kind === 'stock') {
             $canCost = (auth()->user()?->hasPermission('products.view_cost') ?? false) 
                 && ! (class_exists(\App\Support\SecretControl::class) && (\App\Support\SecretControl::isHidden('hide_stock_money') || \App\Support\SecretControl::isHidden('hide_exact_purchase_cost') || \App\Support\SecretControl::isHidden('hide_all_price_data')));
@@ -649,8 +673,17 @@ class ReportService
             $returnEvents = DB::table('return_settlements as r')->leftJoin('sale_returns as sr', 'sr.id', '=', 'r.sale_return_id')->leftJoin('purchase_returns as pr', 'pr.id', '=', 'r.purchase_return_id')->leftJoin('supplier_returns as sup', 'sup.id', '=', 'r.supplier_return_id')->whereIn('r.kind', ['PURCHASE_RETURN_REFUND', 'PURCHASE_RETURN_PAYMENT', 'SUPPLIER_RETURN_REFUND', 'REVERSAL'])->where(fn ($q) => $q->whereNull('sr.id')->orWhereIn('sr.id', SaleReturn::visibleTo()->select('id')))->selectRaw('r.kind as type, r.id as reference_id, COALESCE(sr.reference,pr.reference,sup.reference) as reference,r.created_at as date,r.payment_method_id,CASE WHEN r.amount>0 THEN r.amount ELSE 0 END as in_amount,CASE WHEN r.amount<0 THEN -r.amount ELSE 0 END as out_amount');
             $unionQuery = $sp->unionAll($cp)->unionAll($sc)->unionAll($sr)->unionAll($pp)->unionAll($xp)->unionAll($returnEvents);
             if (config('features.cheque')) {
-                $cleared = Cheque::visibleTo()->where('status', 'PASSED')->whereIn('type', ['CUSTOMER_RECEIVED', 'OWN_CHEQUE'])->selectRaw("'Cheque passed' as type,id as reference_id,cheque_number as reference,passed_at as date,(SELECT id FROM payment_methods WHERE type='CHEQUE' ORDER BY id LIMIT 1) as payment_method_id,CASE WHEN type='CUSTOMER_RECEIVED' THEN amount ELSE 0 END as in_amount,CASE WHEN type='OWN_CHEQUE' THEN amount ELSE 0 END as out_amount")->toBase();
+                $cleared = Cheque::visibleTo()->whereNull('repair_job_id')->where('status', 'PASSED')->whereIn('type', ['CUSTOMER_RECEIVED', 'OWN_CHEQUE'])->selectRaw("'Cheque passed' as type,id as reference_id,cheque_number as reference,passed_at as date,(SELECT id FROM payment_methods WHERE type='CHEQUE' ORDER BY id LIMIT 1) as payment_method_id,CASE WHEN type='CUSTOMER_RECEIVED' THEN amount ELSE 0 END as in_amount,CASE WHEN type='OWN_CHEQUE' THEN amount ELSE 0 END as out_amount")->toBase();
                 $unionQuery->unionAll($cleared);
+            }
+            if (\App\Support\Repairs::enabled()) {
+                $label = DB::getDriverName() === 'sqlite' ? "'Repair ' || kind" : "CONCAT('Repair ', kind)";
+                $repairPayments = app(\App\Services\Repair\RepairReporting::class)->payments()
+                    ->selectRaw("$label as type, repair_job_id as reference_id, reference, created_at as date, payment_method_id, CASE WHEN amount > 0 THEN amount ELSE 0 END as in_amount, CASE WHEN amount < 0 THEN -amount ELSE 0 END as out_amount");
+                $repairCosts = \App\Models\RepairCost::whereIn('repair_job_id', \App\Models\RepairJob::visibleTo()->select('id'))
+                    ->whereNotNull('payment_method_id')
+                    ->selectRaw("'Repair expense' as type, repair_job_id as reference_id, description as reference, created_at as date, payment_method_id, 0 as in_amount, amount as out_amount");
+                $unionQuery->unionAll($repairPayments->toBase())->unionAll($repairCosts->toBase());
             }
             if (Schema::hasTable('hr_payments')) {
                 $hrDate = DB::getDriverName() === 'sqlite' ? "date || ' 00:00:00'" : "CONCAT(date, ' 00:00:00')";
@@ -701,7 +734,13 @@ class ReportService
                 'Closing balance' => (string) $closing,
             ];
         } elseif ($kind === 'audit') {
-            $query = SalesVisibility::apply(AuditLog::with('user')->when(! \App\Support\Units::enabled(), fn ($q) => $q->where('action', 'not like', 'units.%')->where('action', 'not like', 'unit-presets.%')->where('action', '!=', 'unit.default'))->where('action', 'not like', 'hr.%')->when(! config('features.barcode'), fn ($q) => $q->where('action', 'not like', 'barcode.%')->where('action', '!=', 'settings.barcode')), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
+            $query = SalesVisibility::apply(AuditLog::with('user')->when(! \App\Support\Units::enabled(), fn ($q) => $q->where('action', 'not like', 'units.%')->where('action', 'not like', 'unit-presets.%')->where('action', '!=', 'unit.default'))->where('action', 'not like', 'hr.%')->when(! \App\Support\Repairs::enabled(), fn ($q) => $q->where('action', 'not like', 'repair.%'))->when(! config('features.barcode'), fn ($q) => $q->where('action', 'not like', 'barcode.%')->where('action', '!=', 'settings.barcode')), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
+            $query->where(function ($q) {
+                $q->where('subject_type', '!=', \App\Models\RepairJob::class);
+                if (\App\Support\Repairs::enabled() && auth()->user()?->hasPermission('repairs.view')) {
+                    $q->orWhereIn('subject_id', \App\Models\RepairJob::visibleTo()->select('id'));
+                }
+            })->where(fn ($q) => $q->where('subject_type', '!=', Cheque::class)->orWhereIn('subject_id', Cheque::visibleTo()->select('id')));
             if (SalesVisibility::mode() !== 'ALL') {
                 $subjects = [Sale::class => Sale::visibleTo()->select('id')];
                 foreach ([SaleReturn::class, SaleCollection::class, SaleRevision::class] as $subject) {

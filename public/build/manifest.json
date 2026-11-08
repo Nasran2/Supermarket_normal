@@ -20,7 +20,7 @@
     "name": "units"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CVCIxvno.css",
+    "file": "assets/app-DV3vrb1L.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -29,7 +29,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DDTg7wqz.js",
+    "file": "assets/app-BBEE3nc0.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -73,8 +73,14 @@
       "_barcode-layout-BGx-9NiP.js"
     ]
   },
+  "resources/js/pos-camera-zxing.js": {
+    "file": "assets/pos-camera-zxing-MDvkaiiZ.js",
+    "name": "pos-camera-zxing",
+    "src": "resources/js/pos-camera-zxing.js",
+    "isDynamicEntry": true
+  },
   "resources/js/pos.js": {
-    "file": "assets/pos-CLbCvBmP.js",
+    "file": "assets/pos-DjEIJC_U.js",
     "name": "pos",
     "src": "resources/js/pos.js",
     "isEntry": true,
@@ -82,6 +88,9 @@
       "_units-C18jATk4.js",
       "_pos-tax-bills-CtkVSWt9.js",
       "_pos-price-options-BXcz7Ggt.js"
+    ],
+    "dynamicImports": [
+      "resources/js/pos-camera-zxing.js"
     ]
   },
   "resources/js/product-units.js": {

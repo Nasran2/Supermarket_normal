@@ -14,6 +14,8 @@ return [
     |
     */
 
+    'phone_rep' => filter_var(env('PHONE_REP', false), FILTER_VALIDATE_BOOLEAN),
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

@@ -43,12 +43,12 @@ class SuperAdmin extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
-        return true;
+        return ! str_starts_with($permission, 'repairs.') || \App\Support\Repairs::enabled();
     }
 
     public function hasAnyPermission(array $permissions): bool
     {
-        return true;
+        return collect($permissions)->contains(fn ($permission) => $this->hasPermission($permission));
     }
 }
 

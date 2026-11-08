@@ -15,7 +15,10 @@ export function createProductScanner({ lookup, add, missing, error }) {
     if (!value) return Promise.resolve(false);
     queue = queue.then(async () => {
       try {
-        const product = exactProductMatch(await lookup(value), value);
+        let product = exactProductMatch(await lookup(value, context), value);
+        if (!product && context?.alternate && !context.signal?.aborted) {
+          product = exactProductMatch(await lookup(context.alternate, context), context.alternate);
+        }
         if (!product) {
           missing(value, context);
           return false;

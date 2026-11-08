@@ -129,7 +129,7 @@ class ChequeController extends Controller
 
     public function create()
     {
-        return view('cheques.create', ['customers' => Customer::where('active', true)->withDueBalances()->get()->filter(fn ($c) => Money::compare($c->due_balance, 0) > 0), 'purchases' => Purchase::with('supplier')->where('status', 'ACTIVE')->where('payment_tracking', true)->get()->filter(fn ($p) => Money::compare($p->due_amount, 0) > 0)]);
+        return view('cheques.create', ['customers' => Customer::where('active', true)->withDueBalances()->get()->filter(fn ($c) => Money::compare($c->pos_due_balance, 0) > 0), 'purchases' => Purchase::with('supplier')->where('status', 'ACTIVE')->where('payment_tracking', true)->get()->filter(fn ($p) => Money::compare($p->due_amount, 0) > 0)]);
     }
 
     public function store(ChequeRequest $r, ChequeService $cheques)

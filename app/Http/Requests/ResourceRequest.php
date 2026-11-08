@@ -143,6 +143,10 @@ class ResourceRequest extends FormRequest
                 $r['opening_layers.*.expires_at'] = ['nullable', 'date_format:Y-m-d'];
                 $r['opening_layers.*.batch_number'] = ['nullable', 'string', 'max:100'];
             }
+            if (\App\Support\Repairs::enabled()) {
+                $r['available_for_pos'] = ['sometimes', 'boolean'];
+                $r['available_for_repairs'] = ['sometimes', 'boolean'];
+            }
             $r['track_stock'] = ['sometimes', 'boolean'];
             $r['default_discount_type'] = ['sometimes', 'in:NONE,AMOUNT,PERCENT'];
             $r['default_discount_value'] = ['sometimes', 'numeric', 'min:0', 'max:'.($this->input('default_discount_type') === 'PERCENT' ? 100 : 999999999), 'decimal:0,2'];

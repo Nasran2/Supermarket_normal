@@ -33,7 +33,7 @@ class CustomerPaymentService
                     throw ValidationException::withMessages(['allocations' => 'Allocate exactly the received payment amount.']);
                 }
             }
-            if (Money::compare((string) $request->amount, $customer->due_balance) > 0) {
+            if (Money::compare((string) $request->amount, $customer->pos_due_balance) > 0) {
                 throw ValidationException::withMessages(['amount' => 'Payment exceeds the outstanding customer due.']);
             }
             $amount = $request->input('amount');

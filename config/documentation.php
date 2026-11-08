@@ -1362,6 +1362,8 @@ array_splice($product['steps'], 4, 0, [$discount, $expiry]);
 unset($product);
 $guides['make-a-sale']['steps'][1]['notes'][] = ['requires' => ['expiry'], 'text' => 'For expiry-tracked products, choose the selling price and expiry date together. In earliest-expiry mode, the system uses valid batches at the selected price. Expired stock is blocked by default.'];
 $guides['make-a-sale']['steps'][2]['text'] .= ' A product default discount is added automatically. Check any line discount under that item; a fixed amount is for the whole line, not each unit.';
+$guides['make-a-sale']['steps'][0]['notes'][] = ['requires' => ['barcode', 'camera_barcode'], 'text' => 'Click Scan with Camera beside the POS search box and allow camera access. Center one barcode horizontally and hold it steady. Choose a price or batch if prompted. Move the label out of the frame for about a second before scanning it again. Close the scanner when finished.'];
+$guides['make-a-sale']['steps'][0]['notes'][] = ['requires' => ['barcode', 'camera_barcode'], 'text' => 'Open the POS over HTTPS or localhost. If access is blocked, allow the camera in browser settings and retry. For blurry labels, add light, adjust the distance, or switch to the rear camera. Use Torch when available. If a code is unknown or stock is unavailable, check the product record or search by name.'];
 $guides['receive-a-purchase']['steps'][2]['notes'][] = ['requires' => ['expiry'], 'text' => 'For expiry-tracked products, enter the date on the received batch and the batch number when used. A different date creates a separate stock batch.'];
 $guides['return-with-bill']['steps'][2]['notes'][] = ['requires' => ['expiry'], 'text' => 'A dated return uses its original batch. If it is now expired, choose the approved write-off or supplier-return action instead of Restock.'];
 $guides['return-without-bill']['steps'][3]['notes'][] = ['requires' => ['expiry'], 'text' => 'If the product tracks expiry, read and enter its packaging date before restocking. An unknown expiry normally cannot be restocked.' ];
@@ -1386,4 +1388,4 @@ $guides['customer-and-supplier-accounts']['steps'][3]['notes'][] = ['requires' =
 $guides['saved-carts-and-discounts']['steps'][1]['notes'][] = ['requires' => ['unit'], 'text' => 'The item popup also lets you choose an available selling unit and its conversion.'];
 $guides['manage-cheques']['steps'][3]['notes'][] = ['text' => 'The dashboard shows Cheques Due Soon only when there are visible pending cheques due within the alert period or already overdue. With no matching cheques, the panel is hidden.'];
 
-return $guides;
+return $guides + require __DIR__.'/documentation-repairs.php';

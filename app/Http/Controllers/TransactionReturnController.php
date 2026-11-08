@@ -231,7 +231,7 @@ class TransactionReturnController extends Controller
     {
         $this->permission($kind, 'create');
         $request->validate(['q' => 'nullable|string|max:150', 'ids' => 'nullable|array|max:100', 'ids.*' => 'integer|min:1', 'category_id' => 'nullable|integer']);
-        $q = Product::with(['unit', 'conversions.unit', 'stockLayers' => fn ($q) => $q->available()])->where('active', true)->whereHas('unit', fn ($q) => $q->where('active', true));
+        $q = Product::with(['unit', 'conversions.unit', 'stockLayers' => fn ($q) => $q->available()])->when($kind === 'sales', fn ($q) => $q->forPos())->where('active', true)->whereHas('unit', fn ($q) => $q->where('active', true));
         if ($request->has('ids')) {
             $q->whereIn('id', $request->ids);
         } elseif ($request->filled('q')) {

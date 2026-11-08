@@ -39,6 +39,9 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
+        if (str_starts_with($permission, 'repairs.') && ! \App\Support\Repairs::enabled()) {
+            return false;
+        }
         if (Units::permission($permission) && ! Units::enabled()) {
             return false;
         }

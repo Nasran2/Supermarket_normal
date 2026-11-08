@@ -658,3 +658,7 @@ Route::prefix('superadmin')
             Route::delete('/logout', [SuperAdminAuthController::class, 'logout'])->name('logout');
         });
     });
+
+if (\App\Support\Repairs::enabled()) {
+    require __DIR__.'/repairs.php';
+}

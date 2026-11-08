@@ -7,11 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
-    protected $fillable = ['track_expiry', 'track_stock', 'default_discount_type', 'default_discount_value', 'name', 'sku', 'barcode', 'barcode_type', 'unit_id', 'supplier_id', 'cost', 'price', 'stock', 'low_stock', 'active', 'image', 'created_by', 'updated_by'];
+    protected $fillable = ['available_for_pos', 'available_for_repairs', 'track_expiry', 'track_stock', 'default_discount_type', 'default_discount_value', 'name', 'sku', 'barcode', 'barcode_type', 'unit_id', 'supplier_id', 'cost', 'price', 'stock', 'low_stock', 'active', 'image', 'created_by', 'updated_by'];
 
-    protected $attributes = ['track_stock' => true, 'default_discount_type' => 'NONE', 'default_discount_value' => '0.00'];
+    protected $attributes = ['available_for_pos' => true, 'available_for_repairs' => false, 'track_stock' => true, 'default_discount_type' => 'NONE', 'default_discount_value' => '0.00'];
 
-    protected $casts = ['track_expiry' => 'boolean', 'track_stock' => 'boolean', 'default_discount_value' => 'decimal:2', 'active' => 'boolean', 'cost' => 'decimal:2', 'price' => 'decimal:2', 'stock' => 'decimal:3', 'low_stock' => 'decimal:3'];
+    protected $casts = ['available_for_pos' => 'boolean', 'available_for_repairs' => 'boolean', 'track_expiry' => 'boolean', 'track_stock' => 'boolean', 'default_discount_value' => 'decimal:2', 'active' => 'boolean', 'cost' => 'decimal:2', 'price' => 'decimal:2', 'stock' => 'decimal:3', 'low_stock' => 'decimal:3'];
 
     protected static function booted()
     {
@@ -30,6 +30,10 @@ class Product extends Model
         $attributes = parent::getArrayableAttributes();
         if (! config('features.barcode')) {
             unset($attributes['barcode'], $attributes['barcode_type']);
+        }
+
+        if (! \App\Support\Repairs::enabled()) {
+            unset($attributes['available_for_pos'], $attributes['available_for_repairs']);
         }
 
         return $attributes;
@@ -59,6 +63,11 @@ class Product extends Model
             return 'SKU-' . ($this->attributes['id'] ?? 'item');
         }
         return $value;
+    }
+
+    public function scopeForPos($query)
+    {
+        return $query->where('available_for_pos', true);
     }
 
     public static function sellableStockSql(): string

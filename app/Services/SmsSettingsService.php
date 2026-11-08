@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Setting;
 use App\Models\SmsMessage;
 use App\Support\Audit;
+use App\Support\Repairs;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -18,6 +19,30 @@ class SmsSettingsService
         return Setting::where('group', 'sms')->pluck('value', 'key')->map(fn ($value) => json_decode($value, true))->all();
     }
 
+    public function types(): array
+    {
+        return array_filter(config('sms.types'), fn ($kind) => ! str_starts_with($kind, 'REPAIR_') || \App\Support\Repairs::sms(), ARRAY_FILTER_USE_KEY);
+    }
+
+    public function repairTypes(): array
+    {
+        return array_filter($this->types(), fn ($kind) => str_starts_with($kind, 'REPAIR_'), ARRAY_FILTER_USE_KEY);
+    }
+
+    public function saveRepairPreferences(bool $enabled, array $events): void
+    {
+        DB::transaction(function () use ($enabled, $events) {
+            app(SettingsService::class)->put('repairs', ['repair_sms_enabled' => $enabled]);
+            foreach ($events as $kind => $allowed) {
+                Setting::updateOrCreate(['key' => 'sms_'.strtolower($kind).'_enabled'], ['group' => 'sms', 'value' => json_encode((bool) $allowed)]);
+                if (! $enabled || ! $allowed) {
+                    SmsMessage::where('kind', $kind)->where('status', 'PENDING')
+                        ->update(['status' => 'CANCELLED', 'error' => 'This repair notification was disabled.']);
+                }
+            }
+        });
+    }
+
     public function formValues(): array
     {
         $stored = $this->stored();
@@ -29,7 +54,7 @@ class SmsSettingsService
             'cheque_reminder_time' => $stored['sms_cheque_reminder_time'] ?? config('sms.cheque_reminder_time', '08:00'),
             'password_configured' => filled($stored['sms_password'] ?? config('sms.password')),
         ];
-        foreach (config('sms.types') as $kind => $definition) {
+        foreach ($this->types() as $kind => $definition) {
             $key = strtolower($kind);
             $values[$key.'_enabled'] = $stored['sms_'.$key.'_enabled'] ?? $definition['enabled'];
             $values[$key.'_template'] = $stored['sms_'.$key.'_template'] ?? $definition['template'];
@@ -41,6 +66,9 @@ class SmsSettingsService
     public function allows(?string $kind = null): bool
     {
         if (! config('sms.enabled')) {
+            return false;
+        }
+        if ($kind && str_starts_with($kind, 'REPAIR_') && ! Repairs::smsEnabled()) {
             return false;
         }
         $values = $this->formValues();
@@ -105,7 +133,7 @@ class SmsSettingsService
                 'sms_cheque_reminder_time' => $data['cheque_reminder_time'],
             ];
             $notificationKeys = ['sending_enabled'];
-            foreach (array_keys(config('sms.types')) as $kind) {
+            foreach (array_keys($this->types()) as $kind) {
                 $notificationKeys[] = strtolower($kind).'_enabled';
                 $notificationKeys[] = strtolower($kind).'_template';
             }
@@ -117,7 +145,7 @@ class SmsSettingsService
             foreach ($values as $key => $value) {
                 Setting::updateOrCreate(['key' => $key], ['group' => 'sms', 'value' => json_encode($value)]);
             }
-            foreach ([...array_keys(config('sms.types')), 'TEST'] as $kind) {
+            foreach ([...array_keys($this->types()), 'TEST'] as $kind) {
                 if (! $this->allows($kind)) {
                     SmsMessage::where('kind', $kind)->where('status', 'PENDING')->update(['status' => 'CANCELLED', 'error' => 'This message type was disabled in SMS settings.']);
                 }

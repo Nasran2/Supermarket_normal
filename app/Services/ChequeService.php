@@ -260,6 +260,9 @@ class ChequeService
             $prefix = ['pass' => 'passed', 'return' => 'returned', 'cancel' => 'cancelled'][$action];
             $c->update(['status' => $status, $prefix.'_by' => $userId, $prefix.'_at' => now(), 'return_reason' => $action === 'return' ? ($data['reason'] ?? null) : $c->return_reason]);
             $this->event($c, $status, $userId, $data['notes'] ?? null, ['reason' => $data['reason'] ?? null]);
+            if ($c->repair_job_id) {
+                app(\App\Services\Repair\RepairAccounting::class)->settleCheque($c, $user, $data['reason'] ?? null);
+            }
 
             return $c->fresh();
         }, 3);
@@ -271,7 +274,7 @@ class ChequeService
 
         return DB::transaction(function () use ($original, $userId, $reason) {
             $c = Cheque::visibleTo()->whereKey($original->id)->lockForUpdate()->firstOrFail();
-            if ($c->status !== 'TRANSFERRED') {
+            if ($c->repair_job_id || $c->status !== 'TRANSFERRED') {
                 $this->fail('Only a pending transferred cheque can have its transfer reversed.');
             }
             Purchase::whereKey($c->purchase_id)->lockForUpdate()->firstOrFail();

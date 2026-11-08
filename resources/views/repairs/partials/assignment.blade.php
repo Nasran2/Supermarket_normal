@@ -1,0 +1,3 @@
+<label class="field">Technician<select name="technician_id"><option value="">Unassigned</option>@foreach($technicians as $person)<option value="{{ $person->id }}" @selected(old('technician_id',$job?->technician_id)==$person->id)>{{ $person->name }}</option>@endforeach</select></label>
+<label class="field">Priority<select name="priority">@foreach(['LOW','NORMAL','HIGH','URGENT'] as $priority)<option value="{{ $priority }}" @selected(old('priority',$job?->priority??'NORMAL')===$priority)>{{ ucfirst(strtolower($priority)) }}</option>@endforeach</select></label>
+<label class="field">Warranty days<input name="warranty_days" type="number" min="0" max="3650" value="{{ old('warranty_days',$job?->warranty_days??0) }}" required></label>

@@ -45,6 +45,18 @@ class Sidebar
             $group('Purchases', 'package-open', $purchaseLinks),
             $group('Daily register', 'wallet', $registerLinks),
         ];
+        if (Repairs::enabled()) {
+            $repairLinks = [
+                $link('Repair jobs', 'repairs.index', [], 'repairs.view', request()->routeIs('repairs.index', 'repairs.show')),
+                $link('Receive device', 'repairs.create', [], ['repairs.view', 'repairs.create'], request()->routeIs('repairs.create')),
+            ];
+            if (! $reportsHidden) {
+                $repairLinks[] = $link('Repair reports', 'repairs.reports', [], 'repairs.reports', request()->routeIs('repairs.reports'));
+            }
+            $repairLinks[] = $link('Device catalog', 'repairs.catalog', [], 'repairs.settings', request()->routeIs('repairs.catalog*'));
+            $repairLinks[] = $link('Repair settings', 'repairs.settings', [], 'repairs.settings', request()->routeIs('repairs.settings*'));
+            $workspace[] = $group('Phone repairs', 'settings-2', $repairLinks);
+        }
         $products = $resource('products', 'Products', 'package', 'product');
         foreach ([$link('Stock adjustments', 'adjustments.index', [], 'stock-adjustments.view', request()->is('stock-adjustments*') && ! request()->routeIs('adjustments.create')), $link('New adjustment', 'adjustments.create', [], 'stock-adjustments.create', request()->routeIs('adjustments.create')), $link('Low stock', 'manage.index', ['resource' => 'products', 'low_stock' => 1], 'products.view')] as $child) {
             if ($user->hasPermission($child['permissions'][0])) {
@@ -102,6 +114,9 @@ class Sidebar
                 continue;
             }
             $settings[] = $link($title, 'settings.edit', $key, $permission, request()->route('group') === $key);
+        }
+        if (Repairs::enabled()) {
+            $settings[] = $link('Repair settings', 'repairs.settings', [], 'repairs.settings', request()->routeIs('repairs.settings'));
         }
         if (config('sms.enabled')) {
             $settings[] = $link('SMS', 'settings.sms', [], 'sms.settings', request()->routeIs('settings.sms*'));

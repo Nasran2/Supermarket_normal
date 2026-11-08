@@ -1,3 +1,4 @@
+import './repairs.js';
 import './sms-templates.js';
 import './sms.js';
 import './branding.js';
@@ -12,6 +13,9 @@ import {
   ShoppingCart,
   LayoutDashboard,
   ScanLine,
+  Camera,
+  SwitchCamera,
+  Flashlight,
   ReceiptText,
   PackageOpen,
   Wallet,
@@ -86,6 +90,9 @@ const icons = {
   ShoppingCart,
   LayoutDashboard,
   ScanLine,
+  Camera,
+  SwitchCamera,
+  Flashlight,
   ReceiptText,
   PackageOpen,
   Wallet,

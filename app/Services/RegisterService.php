@@ -46,12 +46,23 @@ class RegisterService
         $in = Money::round((string) ($register->movement_in ?? 0));
         $out = Money::round((string) ($register->movement_out ?? 0));
         $expenses = Money::round((string) ($register->cash_expenses ?? 0));
+        // Physical drawer totals include posted cash even if its originating workspace is disabled.
+        $repairEntries = \App\Models\RepairPayment::where('register_id', $register->id);
+        $repairCash = (string) (clone $repairEntries)->where('method_type', 'CASH')->sum('amount');
+        $repairCosts = (string) \App\Models\RepairCost::where('register_id', $register->id)->sum('amount');
+        $cash = Money::add($cash, $repairCash);
+        $expenses = Money::add($expenses, $repairCosts);
         $expected = Money::sub(Money::sub(Money::add(Money::add($register->opening_cash, $cash), $in), $out), $expenses);
 
         $summary = compact('cash', 'pos_cash', 'due_cash', 'in', 'out', 'expenses', 'expected') + ['collections' => Money::sub(Money::add(Money::sub((string) ($register->total_collections ?? 0), (string) ($register->total_change ?? 0)), (string) ($register->due_collections ?? 0)), (string) ($register->total_refunds ?? 0)), 'transactions' => $register->transactions_count,
             'due_collections' => Money::round((string) ($register->due_collections ?? 0)), 'refunds' => Money::round((string) ($register->total_refunds ?? 0)), 'returns' => Money::round((string) ($register->returned_amount ?? 0))];
         $customerReversals = ReturnSettlement::where('register_id', $register->id)->whereNotNull('sale_return_id')->where('kind', 'REVERSAL');
         $summary['collections'] = Money::add($summary['collections'], (string) (clone $customerReversals)->sum('amount'));
+        if (\App\Support\Repairs::enabled()) {
+            $summary['collections'] = Money::add($summary['collections'], (string) (clone $repairEntries)->sum('amount'));
+            $summary['refunds'] = Money::sub($summary['refunds'], (string) (clone $repairEntries)->where('kind', 'REFUND')->sum('amount'));
+            $summary['repair_cash'] = Money::round($repairCash);
+        }
         if (config('features.cheque')) {
             $summary['cheque_pending'] = Money::add((string) $register->payments()->where('settlement_status', 'PENDING')->sum('amount_paid'), (string) $register->collections()->where('settlement_status', 'PENDING')->sum('amount'));
         }
@@ -66,13 +77,16 @@ class RegisterService
         $paymentTotals = [];
         $dueTotals = $register->collections()->selectRaw('method_type, COUNT(*) as entries, SUM(amount) as amount')->groupBy('method_type')->get()->keyBy('method_type');
         $refundTotals = $register->returns()->where('refund_amount', '>', 0)->selectRaw('method_type, COUNT(*) as entries, SUM(refund_amount) as amount')->groupBy('method_type')->get()->keyBy('method_type');
+        $repairTotals = \App\Support\Repairs::enabled()
+            ? $repairEntries->selectRaw('method_type, COUNT(*) as entries, SUM(amount) as collected')->groupBy('method_type')->get()->keyBy('method_type')
+            : collect();
         foreach (['CASH' => 'Cash', 'CARD' => 'Card', 'QR' => 'QR payment', 'BANK_TRANSFER' => 'Online transfer', 'OTHER' => 'Other payments'] as $type => $name) {
             $row = $totals->get($type);
-            if ($type === 'OTHER' && ! $row && ! $dueTotals->has($type) && ! $refundTotals->has($type)) {
+            if ($type === 'OTHER' && ! $row && ! $dueTotals->has($type) && ! $refundTotals->has($type) && ! $repairTotals->has($type)) {
                 continue;
             }
-            $paymentTotals[] = ['type' => $type, 'name' => $name, 'entries' => (int) ($row?->entries ?? 0) + (int) ($dueTotals->get($type)?->entries ?? 0) + (int) ($refundTotals->get($type)?->entries ?? 0),
-                'base_amount' => Money::round((string) ($row?->base_amount ?? 0)), 'collected' => Money::sub(Money::add((string) ($row?->collected ?? 0), (string) ($dueTotals->get($type)?->amount ?? 0)), (string) ($refundTotals->get($type)?->amount ?? 0)),
+            $paymentTotals[] = ['type' => $type, 'name' => $name, 'entries' => (int) ($row?->entries ?? 0) + (int) ($dueTotals->get($type)?->entries ?? 0) + (int) ($refundTotals->get($type)?->entries ?? 0) + (int) ($repairTotals->get($type)?->entries ?? 0),
+                'base_amount' => Money::round((string) ($row?->base_amount ?? 0)), 'collected' => Money::sum([(string) ($row?->collected ?? 0), (string) ($dueTotals->get($type)?->amount ?? 0), Money::sub('0', (string) ($refundTotals->get($type)?->amount ?? 0)), (string) ($repairTotals->get($type)?->collected ?? 0)]),
                 'customer_fees' => Money::round((string) ($row?->customer_fees ?? 0)), 'business_fees' => Money::round((string) ($row?->business_fees ?? 0))];
         }
         $reversalTotals = (clone $customerReversals)->selectRaw('method_type,SUM(amount) as amount')->groupBy('method_type')->get()->keyBy('method_type');
