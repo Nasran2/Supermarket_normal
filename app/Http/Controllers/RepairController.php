@@ -164,7 +164,15 @@ class RepairController extends Controller
         $suppliers = Supplier::where('active', true)->orderBy('name')->get(['id', 'name']);
         $technicians = $this->technicians();
 
-        return response()->view('repairs.show', ['job' => $repair] + compact('events', 'methods', 'banks', 'suppliers', 'technicians', 'chequeMethod', 'heldCheques'))->header('Cache-Control', 'no-store');
+        $customerDeviceCount = RepairDevice::where('customer_id', $repair->customer_id)->count();
+        $customerOngoingCount = RepairJob::where('customer_id', $repair->customer_id)
+            ->whereNotIn('status', ['COMPLETED', 'DELIVERED', 'CANCELLED', 'UNREPAIRABLE'])
+            ->count();
+        $customerTotalJobs = RepairJob::where('customer_id', $repair->customer_id)->count();
+        $customerDue = $repair->customer->due_balance ?? '0.00';
+        $partsTotal = Money::sum($repair->parts->where('state', 'CONSUMED')->map(fn ($p) => Money::mul($p->price, $p->quantity)));
+
+        return response()->view('repairs.show', ['job' => $repair] + compact('events', 'methods', 'banks', 'suppliers', 'technicians', 'chequeMethod', 'heldCheques', 'customerDeviceCount', 'customerOngoingCount', 'customerTotalJobs', 'customerDue', 'partsTotal'))->header('Cache-Control', 'no-store');
     }
 
     public function update(Request $request, RepairJob $repair, RepairWorkflow $workflow)
