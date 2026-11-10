@@ -297,14 +297,27 @@ body.phone-repair-theme {
   flex-wrap: wrap;
 }
 
-.btn-danger-soft {
+.repair-job-card-view .btn.btn-sm,
+.repair-dialog .btn.btn-sm {
+  min-height: 30px;
+  padding: .32rem .68rem;
+  font-size: .78rem;
+  border-radius: 7px;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-danger-soft,
+.btn.danger-soft {
   background: #fef2f2 !important;
   color: #dc2626 !important;
   border: 1px solid #fecaca !important;
   font-weight: 600;
 }
 
-.btn-danger-soft:hover {
+.btn-danger-soft:hover,
+.btn.danger-soft:hover {
   background: #fee2e2 !important;
   color: #b91c1c !important;
 }
@@ -987,6 +1000,14 @@ body.phone-repair-theme {
   vertical-align: middle;
 }
 
+.job-data-table :is(th, td).text-center {
+  text-align: center;
+}
+
+.job-data-table :is(th, td).text-right {
+  text-align: right;
+}
+
 .job-data-table tr:last-child td {
   border-bottom: none;
 }
@@ -1014,7 +1035,8 @@ body.phone-repair-theme {
   font-weight: 650;
   padding: .12rem .4rem;
   border-radius: 4px;
-  margin-top: .15rem;
+  margin-left: .35rem;
+  vertical-align: middle;
 }
 
 .part-state-tag.consumed { background: #dcfce7; color: #166534; }
@@ -1026,7 +1048,20 @@ body.phone-repair-theme {
   align-items: center;
   justify-content: flex-end;
   flex-wrap: nowrap;
-  gap: .35rem;
+  gap: .4rem;
+  width: max-content;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.table-actions form {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.table-actions .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Cost Summary Card */

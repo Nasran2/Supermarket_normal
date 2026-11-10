@@ -318,10 +318,10 @@
                             <tr>
                                 <th style="width: 36px;">#</th>
                                 <th>Part / Description</th>
-                                <th class="text-center" style="width: 70px;">Qty</th>
-                                <th class="text-right">Unit Price</th>
-                                <th class="text-right">Total</th>
-                                <th class="text-right" style="width: 120px;">Action</th>
+                                <th class="text-center" style="width: 64px;">Qty</th>
+                                <th class="text-right no-wrap">Unit Price</th>
+                                <th class="text-right no-wrap">Total</th>
+                                <th class="text-right no-wrap">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -330,12 +330,12 @@
                                     <td>{{ $loop->iteration }}</td>
                                     <td>
                                         <strong>{{ $part->name }}</strong>
-                                        <div class="part-state-tag {{ strtolower($part->state) }}">{{ ucfirst(strtolower($part->state)) }}</div>
+                                        <span class="part-state-tag {{ strtolower($part->state) }}">{{ ucfirst(strtolower($part->state)) }}</span>
                                     </td>
-                                    <td class="text-center">{{ (float)$part->quantity }}</td>
-                                    <td class="text-right font-mono">{{ $currency }} {{ Money::displayPrice($part->price) }}</td>
-                                    <td class="text-right font-mono"><strong>{{ $currency }} {{ Money::displayPrice(Money::mul($part->price, $part->quantity)) }}</strong></td>
-                                    <td class="text-right">
+                                    <td class="text-center no-wrap">{{ (float)$part->quantity }}</td>
+                                    <td class="text-right font-mono no-wrap">{{ $currency }} {{ Money::displayPrice($part->price) }}</td>
+                                    <td class="text-right font-mono no-wrap"><strong>{{ $currency }} {{ Money::displayPrice(Money::mul($part->price, $part->quantity)) }}</strong></td>
+                                    <td class="text-right no-wrap">
                                         @if($editable && $canParts && $part->state !== 'REMOVED')
                                             <div class="table-actions">
                                                 @if($part->state === 'PLANNED')
