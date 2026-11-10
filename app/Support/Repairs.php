@@ -2,7 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\RepairJob;
 use App\Services\SettingsService;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 
 final class Repairs
 {
@@ -53,5 +56,52 @@ final class Repairs
             'COMPLETED' => ['DELIVERED'],
             default => [],
         };
+    }
+
+    /**
+     * Generate the next sequential tracking number for a repair date: TR-YYYYMMDD001.
+     */
+    public static function nextTracking(CarbonInterface|string|null $date = null, bool $lock = false): string
+    {
+        $prefix = 'TR-'.Carbon::parse($date ?? today())->format('Ymd');
+        $query = RepairJob::where('tracking', 'like', $prefix.'%');
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+        $maxSeq = $query->pluck('tracking')->map(function (string $code) use ($prefix) {
+            $suffix = substr($code, strlen($prefix));
+
+            return ctype_digit($suffix) ? (int) $suffix : 0;
+        })->max() ?? 0;
+
+        $seq = $maxSeq + 1;
+        $tracking = $prefix.str_pad((string) $seq, 3, '0', STR_PAD_LEFT);
+        while (RepairJob::where('tracking', $tracking)->exists()) {
+            $seq++;
+            $tracking = $prefix.str_pad((string) $seq, 3, '0', STR_PAD_LEFT);
+        }
+
+        return $tracking;
+    }
+
+    /**
+     * Return highest existing sequence number per YYYYMMDD prefix for live draft previews.
+     *
+     * @return array<string, int>
+     */
+    public static function trackingMaxByDate(): array
+    {
+        $map = [];
+        foreach (RepairJob::where('tracking', 'like', 'TR-%')->pluck('tracking') as $code) {
+            if (preg_match('/^TR-(\d{8})(\d+)$/', $code, $m)) {
+                $ymd = $m[1];
+                $seq = (int) $m[2];
+                if ($seq > ($map[$ymd] ?? 0)) {
+                    $map[$ymd] = $seq;
+                }
+            }
+        }
+
+        return $map;
     }
 }

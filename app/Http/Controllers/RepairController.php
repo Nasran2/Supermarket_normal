@@ -55,8 +55,9 @@ class RepairController extends Controller
             ? $data['device'] : null;
 
         $catalog = RepairBrand::where('active', true)->orderBy('name')->with(['models' => fn ($query) => $query->where('active', true)->orderBy('name')->select('id', 'brand_id', 'name', 'inspection')])->get(['id', 'name']);
+        $trackingMaxByDate = Repairs::trackingMaxByDate();
 
-        return view('repairs.intake', ['technicians' => $this->technicians()] + compact('selectedCustomer', 'selectedDevice', 'catalog'));
+        return view('repairs.intake', ['technicians' => $this->technicians()] + compact('selectedCustomer', 'selectedDevice', 'catalog', 'trackingMaxByDate'));
     }
 
     public function store(Request $request, RepairWorkflow $workflow)
@@ -395,7 +396,9 @@ class RepairController extends Controller
         $result = null;
         $searched = $request->isMethod('post');
         if ($searched) {
-            $tracking = strtoupper($request->validate(['tracking' => 'required|string|regex:/^[a-fA-F0-9]{32}$/D'])['tracking']);
+            $tracking = strtoupper(trim($request->validate([
+                'tracking' => ['required', 'string', 'regex:/^(?:TR-[0-9]{11,}|[a-fA-F0-9]{32})$/Di'],
+            ])['tracking']));
             $job = RepairJob::select('id', 'status', 'due_at')->where('tracking', $tracking)->first();
             if ($job) {
                 $result = [

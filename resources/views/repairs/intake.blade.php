@@ -10,13 +10,14 @@
     ];
     $previousChecks = collect(old('checklist', []))->filter(fn ($row) => is_array($row) && is_string($row['label'] ?? null))->keyBy('label');
     $index = 0;
-    $startStep = $errors->hasAny(['customer_id','device_id','brand','model','catalog_model_id','serial','color','faults','reported_issues','reported_issues.*']) ? 0
+    $startStep = $errors->hasAny(['customer_id','received_at','device_id','brand','model','catalog_model_id','serial','color','faults','reported_issues','reported_issues.*']) ? 0
         : ($errors->hasAny(['checklist','checklist.*','accessories','condition','received_items','condition_tags','device_unlock','unlock_type']) ? 1 : (int) old('intake_step',0));
     $settings = app(\App\Services\SettingsService::class)->all();
     $currency = $settings['currency_symbol'] ?? 'Rs.';
-    $draftTracking = 'TRK-'.strtoupper(substr(md5((string) (old('submission') ?? uniqid())), 0, 8));
+    $receivedDate = old('received_at', today()->toDateString());
+    $draftTracking = Repairs::nextTracking($receivedDate);
 @endphp
-<div class="repair-page repair-desk" data-repair-intake data-intake-start="{{ $startStep }}" data-currency="{{ $currency }}" data-selected-customer-phone="{{ $selectedCustomer?->phone ?? '' }}">
+<div class="repair-page repair-desk" data-repair-intake data-intake-start="{{ $startStep }}" data-currency="{{ $currency }}" data-selected-customer-phone="{{ $selectedCustomer?->phone ?? '' }}" data-tracking-max="{{ json_encode($trackingMaxByDate ?? []) }}">
     <header class="repair-heading">
         <div class="repair-heading-copy"><span class="repair-kicker">PHONE REPAIRS</span><h1>Receive a device</h1><p>Register the drop-off and give the customer a tracking receipt.</p></div>
         <a class="btn secondary" href="{{ route('repairs.index') }}"><x-icon name="arrow-left" :size="16"/> Repair jobs</a>
@@ -41,6 +42,11 @@
                             <div data-picker-results class="repair-picker-results" hidden></div>
                         </div>
                         @can('customers.create')<button type="button" class="btn secondary" data-repair-open="repair-customer-dialog"><x-icon name="plus" :size="16"/> New customer</button>@endcan
+                    </div>
+                    <div class="repair-fields repair-intake-fields">
+                        <label class="field">Received / job date <small class="muted">(defaults to today)</small>
+                            <input type="date" name="received_at" value="{{ $receivedDate }}" max="{{ today()->toDateString() }}" required>
+                        </label>
                     </div>
                     <div data-repair-history class="repair-intake-history" aria-live="polite" hidden></div>
                 </div>
@@ -125,10 +131,9 @@
                         <label class="field">Expected by <span class="muted">Optional</span><input type="date" name="due_at" value="{{ old('due_at') }}"></label>
                         <label class="field">Estimated cost <span class="muted">Optional</span><input type="number" step=".01" min="0" name="estimate" value="{{ old('estimate') }}"></label>
                     </div>
-                    <details class="repair-fold" @if($errors->hasAny(['received_at','technician_id','priority','warranty_days','notes']) || old('notes')) open @endif><summary>Assignment, warranty and staff notes <small>Optional</small></summary>
+                    <details class="repair-fold" @if($errors->hasAny(['technician_id','priority','warranty_days','notes']) || old('notes')) open @endif><summary>Assignment, warranty and staff notes <small>Optional</small></summary>
                         <div class="repair-stack">
                             <div class="repair-fields repair-intake-fields">
-                                <label class="field">Received date<input type="date" name="received_at" value="{{ old('received_at',today()->toDateString()) }}" required></label>
                                 @include('repairs.partials.assignment', ['job'=>null])
                             </div>
                             <label class="field">Staff-only notes<textarea name="notes" rows="2" maxlength="4000">{{ old('notes') }}</textarea></label>
@@ -149,7 +154,7 @@
                 <div class="bill-slip-top">
                     <div class="bill-badge-row">
                         <span class="bill-live-pill"><span class="bill-pulse-dot"></span> LIVE BILL PREVIEW</span>
-                        <span class="bill-ref-pill">Draft #{{ date('ymd') }}</span>
+                        <span class="bill-ref-pill" data-bill="draft-ref">{{ $draftTracking }}</span>
                     </div>
 
                     <!-- Business Header -->
@@ -168,7 +173,7 @@
 
                     <div class="bill-title-strip">
                         <span class="bill-title-text">DEVICE INTAKE RECEIPT</span>
-                        <span class="bill-date-text" data-bill="received-date">{{ today()->format('d M Y') }}</span>
+                        <span class="bill-date-text" data-bill="received-date">{{ \Carbon\Carbon::parse($receivedDate)->format('d M Y') }}</span>
                     </div>
                 </div>
 

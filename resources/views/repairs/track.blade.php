@@ -7,8 +7,8 @@
 <main class="repair-public repair-stack">
     <header><span class="eyebrow">{{ $settings['business_name'] ?? config('app.name') }}</span><h1>Track a repair</h1><p class="muted">Use the tracking number printed on your intake receipt.</p></header>
     <form class="card repair-panel repair-stack" method="post" action="{{ route('repairs.track') }}">@csrf
-        <label class="field">Tracking number<input name="tracking" value="{{ old('tracking') }}" minlength="32" maxlength="32" pattern="[0-9a-fA-F]{32}" autocomplete="off" autocapitalize="characters" spellcheck="false" required></label>
-        @error('tracking')<p class="text-danger" role="alert">Enter the 32-character tracking number from your receipt.</p>@enderror
+        <label class="field">Tracking number<input name="tracking" value="{{ old('tracking') }}" maxlength="32" pattern="(?:[Tt][Rr]-[0-9]{11,}|[0-9a-fA-F]{32})" placeholder="e.g. TR-20261110001" autocomplete="off" autocapitalize="characters" spellcheck="false" required></label>
+        @error('tracking')<p class="text-danger" role="alert">Enter the tracking number from your receipt (e.g. TR-20261110001).</p>@enderror
         <div><button class="btn primary">Check status</button></div>
     </form>
     @if($result)

@@ -44,7 +44,7 @@ class RepairWorkflow
             }
             $checklist = array_values(array_filter($data['checklist'] ?? [], fn ($row) => filled($row['label'] ?? null) && (filled($row['result'] ?? null) || filled($row['fault'] ?? null))));
             $job = RepairJob::create(Arr::only($data, ['submission', 'accessories', 'condition', 'faults', 'notes', 'received_at', 'due_at', 'technician_id', 'priority', 'warranty_days', 'estimate', 'device_unlock']) + [
-                'tracking' => strtoupper(bin2hex(random_bytes(16))), 'status' => 'RECEIVED', 'user_id' => $user->id,
+                'tracking' => Repairs::nextTracking($data['received_at'] ?? today(), lock: true), 'status' => 'RECEIVED', 'user_id' => $user->id,
                 'customer_id' => $customer->id, 'device_id' => $device->id, 'checklist' => $checklist,
                 'unlock_type' => filled($data['device_unlock'] ?? null) ? $data['unlock_type'] : null,
                 'sms_opt_in' => Repairs::sms() && (bool) ($data['sms_opt_in'] ?? false),

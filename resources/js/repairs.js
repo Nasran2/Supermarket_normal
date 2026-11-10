@@ -175,6 +175,7 @@ function intake(root, chooseCustomer) {
   const customList = root.querySelector('[data-custom-check-list]');
   let request, selectedDevices = [], current = 0;
   let selectedCustomerPhone = root.dataset.selectedCustomerPhone || '';
+  const trackingMax = JSON.parse(root.dataset.trackingMax || '{}');
   let manual = Boolean(form.elements.brand.value || form.elements.model.value);
   let nextIndex = checks.querySelectorAll('[data-repair-check]').length;
 
@@ -344,12 +345,21 @@ function intake(root, chooseCustomer) {
       }
     }
 
-    // 9. Received date
+    // 9. Received date & sequential tracking code preview (TR-YYYYMMDD001)
     const recVal = form.elements.received_at?.value;
     const recEl = root.querySelector('[data-bill="received-date"]');
     if (recEl && recVal) {
       const d = new Date(recVal + 'T00:00:00');
       recEl.textContent = !isNaN(d) ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : recVal;
+    }
+    if (recVal && /^\d{4}-\d{2}-\d{2}$/.test(recVal)) {
+      const ymd = recVal.replaceAll('-', '');
+      const seq = (Number(trackingMax[ymd] || 0) + 1);
+      const code = 'TR-' + ymd + String(seq).padStart(3, '0');
+      const codeEl = root.querySelector('[data-bill="tracking-code"]');
+      const refEl = root.querySelector('[data-bill="draft-ref"]');
+      if (codeEl) codeEl.textContent = code;
+      if (refEl) refEl.textContent = code;
     }
 
     // 10. Technician

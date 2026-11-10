@@ -323,19 +323,20 @@ body.phone-repair-theme {
 /* Hero Row */
 .job-hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.55fr);
   gap: 1rem;
 }
 
 .card.tracking-hero-card,
 .tracking-hero-card {
   background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%) !important;
-  border-radius: 14px;
-  padding: 1.35rem 1.6rem;
+  border-radius: 14px !important;
+  padding: 1.15rem 1.4rem;
   color: #ffffff !important;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: .75rem;
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
@@ -345,12 +346,13 @@ body.phone-repair-theme {
 .tracking-hero-content {
   display: flex;
   flex-direction: column;
-  gap: .35rem;
+  gap: .3rem;
   z-index: 2;
+  min-width: 0;
 }
 
 .tracking-hero-kicker {
-  font-size: .78rem;
+  font-size: .74rem;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: #a5b4fc !important;
@@ -360,14 +362,16 @@ body.phone-repair-theme {
 .tracking-hero-number-wrap {
   display: flex;
   align-items: center;
-  gap: .75rem;
+  gap: .65rem;
+  flex-wrap: nowrap;
 }
 
 .tracking-hero-number {
-  font-size: 1.7rem;
+  font-size: clamp(1.08rem, 1.7vw, 1.38rem);
   font-weight: 800;
   color: #ffffff !important;
-  letter-spacing: .06em;
+  letter-spacing: .04em;
+  white-space: nowrap;
 }
 
 .tracking-copy-btn {
@@ -987,6 +991,16 @@ body.phone-repair-theme {
   border-bottom: none;
 }
 
+.job-data-table.job-table-compact th,
+.job-data-table.job-table-compact td {
+  padding: .55rem .55rem;
+  font-size: .78rem;
+}
+
+.job-data-table .no-wrap {
+  white-space: nowrap;
+}
+
 .table-empty-row {
   text-align: center;
   color: #94a3b8;
@@ -1008,9 +1022,10 @@ body.phone-repair-theme {
 .part-state-tag.removed { background: #f1f5f9; color: #64748b; text-decoration: line-through; }
 
 .table-actions {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: nowrap;
   gap: .35rem;
 }
 

@@ -109,7 +109,7 @@
             </div>
             <div class="tracking-hero-graphic" aria-hidden="true">
                 <div class="phone-3d-glow"></div>
-                <x-icon name="smartphone" :size="64"/>
+                <x-icon name="smartphone" :size="48"/>
             </div>
         </div>
 
@@ -708,11 +708,10 @@
                 </div>
 
                 <div class="job-table-responsive">
-                    <table class="job-data-table">
+                    <table class="job-data-table job-table-compact">
                         <thead>
                             <tr>
-                                <th>#</th>
-                                <th>Date &amp; Time</th>
+                                <th>Date</th>
                                 <th>Method</th>
                                 <th class="text-right">Amount</th>
                                 <th class="text-center">Status</th>
@@ -722,34 +721,35 @@
                         <tbody>
                             @forelse($job->payments->sortByDesc('id') as $payment)
                                 <tr>
-                                    <td>{{ $loop->iteration }}</td>
-                                    <td>
+                                    <td class="no-wrap">
                                         <div>{{ $payment->created_at->format('d M Y') }}</div>
                                         <small class="text-muted">{{ $payment->created_at->format('h:i A') }}</small>
                                     </td>
                                     <td>{{ $payment->method_name }}</td>
-                                    <td class="text-right font-mono">
+                                    <td class="text-right font-mono no-wrap">
                                         <strong>{{ $currency }} {{ Money::displayPayment($payment->amount) }}</strong>
                                     </td>
-                                    <td class="text-center">
+                                    <td class="text-center no-wrap">
                                         <span class="payment-badge {{ strtolower($payment->kind) }}">
                                             {{ ucfirst(strtolower($payment->kind)) }}
                                         </span>
                                     </td>
-                                    <td class="text-right">
-                                        <a href="{{ route('repairs.print', [$job, 'payment', 'payment' => $payment->id, 'size' => '80mm']) }}" target="_blank" class="btn btn-sm secondary" title="Print payment receipt">
-                                            <x-icon name="printer" :size="13"/>
-                                        </a>
-                                        @if($canCorrect && !$closedWithoutInvoice && in_array($payment->kind, ['ADVANCE', 'PAYMENT', 'CORRECTION']) && $payment->method_type !== 'CHEQUE' && !$payment->reversal)
-                                            <button type="button" class="btn btn-sm secondary" data-repair-open="repair-correction-{{ $payment->id }}" title="Correct payment">
-                                                <x-icon name="pencil" :size="13"/>
-                                            </button>
-                                        @endif
+                                    <td class="text-right no-wrap">
+                                        <div class="table-actions">
+                                            <a href="{{ route('repairs.print', [$job, 'payment', 'payment' => $payment->id, 'size' => '80mm']) }}" target="_blank" class="btn btn-sm secondary" title="Print payment receipt">
+                                                <x-icon name="printer" :size="13"/>
+                                            </a>
+                                            @if($canCorrect && !$closedWithoutInvoice && in_array($payment->kind, ['ADVANCE', 'PAYMENT', 'CORRECTION']) && $payment->method_type !== 'CHEQUE' && !$payment->reversal)
+                                                <button type="button" class="btn btn-sm secondary" data-repair-open="repair-correction-{{ $payment->id }}" title="Correct payment">
+                                                    <x-icon name="pencil" :size="13"/>
+                                                </button>
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="table-empty-row">No payments recorded for this repair.</td>
+                                    <td colspan="5" class="table-empty-row">No payments recorded for this repair.</td>
                                 </tr>
                             @endforelse
                         </tbody>

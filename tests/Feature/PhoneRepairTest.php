@@ -348,4 +348,28 @@ class PhoneRepairTest extends TestCase
             ->assertOk()->assertSee('Draft terms')->assertSee('size:A5', false);
         $this->assertSame('Bring your receipt', app(SettingsService::class)->get('repair_terms'));
     }
+
+    public function test_sequential_date_tracking_numbers_use_editable_received_date(): void
+    {
+        $todayPrefix = 'TR-'.today()->format('Ymd');
+        $yesterdayDate = today()->subDay()->toDateString();
+        $yesterdayPrefix = 'TR-'.today()->subDay()->format('Ymd');
+
+        $this->get(route('repairs.create'))
+            ->assertOk()
+            ->assertSee('value="'.today()->toDateString().'"', false)
+            ->assertSee($todayPrefix.'001');
+
+        $firstToday = $this->intake();
+        $secondToday = $this->intake();
+        $yesterdayJob = $this->intake(['received_at' => $yesterdayDate]);
+
+        $this->assertSame($todayPrefix.'001', $firstToday->tracking);
+        $this->assertSame($todayPrefix.'002', $secondToday->tracking);
+        $this->assertSame($yesterdayPrefix.'001', $yesterdayJob->tracking);
+
+        $this->post(route('repairs.track'), ['tracking' => strtolower($yesterdayJob->tracking)])
+            ->assertOk()
+            ->assertSee('Received');
+    }
 }
