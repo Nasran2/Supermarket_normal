@@ -16,6 +16,11 @@
     $statuses = Repairs::STATUS;
     $settings = app(\App\Services\SettingsService::class)->all();
     $currency = $settings['currency_symbol'] ?? 'Rs.';
+    $plannedPartsTotal = $plannedPartsTotal ?? Money::sum($job->parts->where('state', 'PLANNED')->map(fn ($p) => Money::mul($p->price, $p->quantity)));
+    $activePartsTotal = Money::add($partsTotal, $plannedPartsTotal);
+    $displayTotal = $job->invoiced_at
+        ? $job->total
+        : Money::add(Money::sub(Money::sum([$activePartsTotal, $job->labor, $job->service_fee]), $job->discount), $job->tax);
 
     // Progress milestone index
     // 0: Received, 1: Diagnosing, 2: In Progress, 3: Ready, 4: Completed
@@ -92,7 +97,7 @@
     <!-- Hero Row: Tracking Number + Status Stepper -->
     <div class="job-hero-grid">
         <!-- Tracking Banner Card -->
-        <div class="card tracking-hero-card">
+        <div class="tracking-hero-card">
             <div class="tracking-hero-content">
                 <span class="tracking-hero-kicker">Tracking Number</span>
                 <div class="tracking-hero-number-wrap">
@@ -266,17 +271,17 @@
         <button type="button" class="job-tab-btn active" data-tab-target="all">
             <x-icon name="layout-dashboard" :size="15"/> Overview
         </button>
+        <button type="button" class="job-tab-btn" data-tab-target="section-parts">
+            <x-icon name="package" :size="15"/> Spare Parts
+        </button>
+        <button type="button" class="job-tab-btn" data-tab-target="section-work-details">
+            <x-icon name="file-text" :size="15"/> Service &amp; Work Details
+        </button>
         <button type="button" class="job-tab-btn" data-tab-target="section-inspection">
             <x-icon name="shield-check" :size="15"/> Inspection
         </button>
-        <button type="button" class="job-tab-btn" data-tab-target="section-parts">
-            <x-icon name="package" :size="15"/> Parts &amp; Labor
-        </button>
         <button type="button" class="job-tab-btn" data-tab-target="section-payments">
             <x-icon name="wallet" :size="15"/> Payments
-        </button>
-        <button type="button" class="job-tab-btn" data-tab-target="section-work-details">
-            <x-icon name="file-text" :size="15"/> Work Details
         </button>
         <button type="button" class="job-tab-btn" data-tab-target="section-attachments">
             <x-icon name="paperclip" :size="15"/> Attachments
@@ -288,115 +293,17 @@
 
     <!-- Main 2-Column Content Layout -->
     <div class="job-main-columns">
-        <!-- LEFT COLUMN: Work Details, Spare Parts, Cost Summary, Activity Timeline -->
+        <!-- LEFT COLUMN: Spare Parts (first), Work Details & Service/Labor, Cost Summary, Activity Timeline -->
         <div class="job-left-column">
-            <!-- Work Details Card -->
-            <section class="card job-card-section" id="section-work-details">
-                <div class="job-section-title">
-                    <span class="job-section-icon"><x-icon name="wrench" :size="16"/></span>
-                    <h2>Work Details</h2>
-                </div>
-
-                @if($canEdit && ($editable || $job->status === 'COMPLETED'))
-                    <form method="post" action="{{ route('repairs.update', $job) }}" class="job-work-form" data-workflow>
-                        @csrf @method('PUT')
-                        <div class="form-field-group">
-                            <label class="field">
-                                <span class="field-title">Customer Complaint / Reported Faults</span>
-                                <div class="reported-fault-box">{{ $job->faults ?: 'No specific fault description provided.' }}</div>
-                            </label>
-                        </div>
-
-                        <div class="form-field-group">
-                            <label class="field">
-                                <span class="field-title">Diagnostic Findings</span>
-                                <textarea name="diagnosis" rows="2" maxlength="4000" placeholder="Describe diagnostic findings, root cause, or required repair actions...">{{ old('diagnosis', $job->diagnosis) }}</textarea>
-                            </label>
-                        </div>
-
-                        @if($editable)
-                            <div class="financial-inputs-grid">
-                                <label class="field">
-                                    <span>Service (Labor) ({{ $currency }})</span>
-                                    <input name="labor" type="number" min="0" step=".01" value="{{ old('labor', $job->labor) }}" required>
-                                </label>
-                                <label class="field">
-                                    <span>Other Charges ({{ $currency }})</span>
-                                    <input name="service_fee" type="number" min="0" step=".01" value="{{ old('service_fee', $job->service_fee) }}" required>
-                                </label>
-                                <label class="field">
-                                    <span>Discount ({{ $currency }})</span>
-                                    <input name="discount" type="number" min="0" step=".01" value="{{ old('discount', $job->discount) }}" required>
-                                </label>
-                                <label class="field">
-                                    <span>Tax ({{ $currency }})</span>
-                                    <input name="tax" type="number" min="0" step=".01" value="{{ old('tax', $job->tax) }}" required>
-                                </label>
-                            </div>
-
-                            <div class="repair-fields" style="margin-top:12px;">
-                                <label class="field">Status
-                                    <select name="status">
-                                        <option value="{{ $job->status }}">{{ $statuses[$job->status] }}</option>
-                                        @foreach(Repairs::transitions($job->status) as $next)
-                                            <option value="{{ $next }}" @selected(old('status')===$next)>{{ $statuses[$next] }}</option>
-                                        @endforeach
-                                    </select>
-                                </label>
-                                @include('repairs.partials.assignment')
-                                <label class="field">Estimated Completion
-                                    <input type="date" name="due_at" value="{{ old('due_at', $job->due_at?->toDateString()) }}">
-                                </label>
-                                <label class="field">Estimate Cost
-                                    <input name="estimate" type="number" min="0" step=".01" value="{{ old('estimate', $job->estimate) }}">
-                                </label>
-                            </div>
-
-                            <div class="checkbox-options-row">
-                                <label class="job-check-label">
-                                    <input type="hidden" name="approved" value="0">
-                                    <input type="checkbox" name="approved" value="1" @checked(old('approved', (bool)$job->approved_at))>
-                                    <span>Customer approved this estimate and charges</span>
-                                </label>
-                                @if(Repairs::sms())
-                                    <label class="job-check-label">
-                                        <input type="hidden" name="sms_opt_in" value="0">
-                                        <input type="checkbox" name="sms_opt_in" value="1" @checked(old('sms_opt_in', $job->sms_opt_in))>
-                                        <span>Customer agrees to repair updates by SMS</span>
-                                    </label>
-                                @endif
-                            </div>
-
-                            <label class="field" style="margin-top:10px;">
-                                <span>Technician Note / Status Reason <small class="text-muted">(Optional)</small></span>
-                                <textarea name="activity_note" rows="2" maxlength="4000" placeholder="Optional notes for activity timeline">{{ old('activity_note') }}</textarea>
-                            </label>
-
-                            <div class="form-actions-bar">
-                                <button class="btn primary"><x-icon name="check" :size="16"/> Save Changes / Update Job</button>
-                            </div>
-                        @endif
-                    </form>
-                @else
-                    <div class="read-only-work-details">
-                        <div class="form-field-group">
-                            <span class="field-title">Customer Complaint / Reported Faults</span>
-                            <div class="reported-fault-box">{{ $job->faults ?: 'None' }}</div>
-                        </div>
-                        <div class="form-field-group">
-                            <span class="field-title">Diagnostic Findings</span>
-                            <p class="diagnostic-text">{{ $job->diagnosis ?: 'No diagnostic notes recorded.' }}</p>
-                        </div>
-                    </div>
-                @endif
-            </section>
-
-            <!-- Spare Parts Card -->
+            <!-- Spare Parts Card (First Step Before Service & Labor) -->
             <section class="card job-card-section" id="section-parts">
                 <div class="job-section-title space-between">
                     <div class="flex-title">
                         <span class="job-section-icon"><x-icon name="package" :size="16"/></span>
-                        <h2>Spare Parts</h2>
+                        <div>
+                            <h2>Spare Parts</h2>
+                            <p class="job-section-subtitle">Add or consume spare parts first, then enter service &amp; other charges below.</p>
+                        </div>
                     </div>
                     @if($editable && $canParts)
                         <button type="button" class="btn primary btn-sm" data-repair-open="modal-add-part">
@@ -449,14 +356,16 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="table-empty-row">No spare parts added to this repair job yet.</td>
+                                    <td colspan="6" class="table-empty-row">
+                                        No spare parts added to this repair job yet.
+                                    </td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
 
-                @if($job->costs->isNotEmpty())
+                @if($canCost && $job->costs->isNotEmpty())
                     <div class="outside-costs-list">
                         <h4>Outside Supplier &amp; Repair Costs</h4>
                         <ul>
@@ -466,38 +375,200 @@
                         </ul>
                     </div>
                 @endif
+
+                @if($editable && $canEdit && auth()->user()->hasPermission('expenses.create'))
+                    <details class="outside-cost-details">
+                        <summary>Record an outside repair or supplier cost</summary>
+                        <form method="post" action="{{ route('repairs.cost', $job) }}" class="repair-fields repair-detail-form">
+                            @csrf
+                            <input type="hidden" name="submission" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
+                            <label class="field">Description<input name="description" maxlength="250" required></label>
+                            <label class="field">Supplier<select name="supplier_id"><option value="">No linked supplier</option>@foreach($suppliers as $supplier)<option value="{{ $supplier->id }}">{{ $supplier->name }}</option>@endforeach</select></label>
+                            <label class="field">Amount<input name="amount" type="number" min=".01" step=".01" required></label>
+                            <label class="field">Paid by<select name="payment_method_id"><option value="">Accrued cost / no payment recorded</option>@foreach($methods as $method)<option value="{{ $method->id }}">{{ $method->name }}</option>@endforeach</select></label>
+                            @if($banks->isNotEmpty())
+                                <label class="field">Bank account (optional)<select name="bank_account_id"><option value="">No linked account</option>@foreach($banks as $bank)<option value="{{ $bank->id }}">{{ $bank->bank_name }} · {{ $bank->account_name }} · {{ substr($bank->account_number, -4) }}</option>@endforeach</select></label>
+                            @endif
+                            <div><button class="btn secondary">Record cost</button></div>
+                        </form>
+                    </details>
+                @endif
+            </section>
+
+            <!-- Work Details Card (Service, Labor & Other Charges) -->
+            <section class="card job-card-section" id="section-work-details">
+                <div class="job-section-title space-between">
+                    <div class="flex-title">
+                        <span class="job-section-icon"><x-icon name="wrench" :size="16"/></span>
+                        <div>
+                            <h2>Work Details &amp; Service Charges</h2>
+                            <p class="job-section-subtitle">Enter diagnostic notes, service (labor), and other charges after adding parts.</p>
+                        </div>
+                    </div>
+                    <span class="work-parts-summary-pill">
+                        <x-icon name="package" :size="13"/>
+                        Parts: {{ $currency }} {{ Money::displayPrice($activePartsTotal) }}
+                    </span>
+                </div>
+
+                @if($canEdit && ($editable || $job->status === 'COMPLETED'))
+                    <form method="post" action="{{ route('repairs.update', $job) }}" class="job-work-form" data-workflow>
+                        @csrf @method('PUT')
+                        <div class="form-field-group">
+                            <label class="field">
+                                <span class="field-title">Customer Complaint / Reported Faults</span>
+                                <div class="reported-fault-box">{{ $job->faults ?: 'No specific fault description provided.' }}</div>
+                            </label>
+                        </div>
+
+                        @if($editable)
+                            <div class="form-field-group">
+                                <label class="field">
+                                    <span class="field-title">Diagnostic Findings</span>
+                                    <textarea name="diagnosis" rows="2" maxlength="4000" placeholder="Describe diagnostic findings, root cause, or required repair actions...">{{ old('diagnosis', $job->diagnosis) }}</textarea>
+                                </label>
+                            </div>
+
+                            <div class="financial-inputs-grid">
+                                <label class="field">
+                                    <span>Service (Labor) ({{ $currency }})</span>
+                                    <input name="labor" type="number" min="0" step=".01" value="{{ old('labor', $job->labor) }}" data-cost-input="labor" required>
+                                </label>
+                                <label class="field">
+                                    <span>Other Charges ({{ $currency }})</span>
+                                    <input name="service_fee" type="number" min="0" step=".01" value="{{ old('service_fee', $job->service_fee) }}" data-cost-input="service_fee" required>
+                                </label>
+                                <label class="field">
+                                    <span>Discount ({{ $currency }})</span>
+                                    <input name="discount" type="number" min="0" step=".01" value="{{ old('discount', $job->discount) }}" data-cost-input="discount" required>
+                                </label>
+                                <label class="field">
+                                    <span>Tax ({{ $currency }})</span>
+                                    <input name="tax" type="number" min="0" step=".01" value="{{ old('tax', $job->tax) }}" data-cost-input="tax" required>
+                                </label>
+                            </div>
+
+                            <div class="repair-fields" style="margin-top:12px;">
+                                <label class="field">Status
+                                    <select name="status">
+                                        <option value="{{ $job->status }}">{{ $statuses[$job->status] }}</option>
+                                        @foreach(Repairs::transitions($job->status) as $next)
+                                            <option value="{{ $next }}" @selected(old('status')===$next)>{{ $statuses[$next] }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                                @include('repairs.partials.assignment')
+                                <label class="field">Estimated Completion
+                                    <input type="date" name="due_at" value="{{ old('due_at', $job->due_at?->toDateString()) }}">
+                                </label>
+                                <label class="field">Estimate Cost
+                                    <input name="estimate" type="number" min="0" step=".01" value="{{ old('estimate', $job->estimate) }}">
+                                </label>
+                            </div>
+
+                            <div class="checkbox-options-row">
+                                <label class="job-check-label">
+                                    <input type="hidden" name="approved" value="0">
+                                    <input type="checkbox" name="approved" value="1" @checked(old('approved', (bool)$job->approved_at))>
+                                    <span>Customer approved this estimate and charges</span>
+                                </label>
+                                @if(Repairs::sms())
+                                    <label class="job-check-label">
+                                        <input type="hidden" name="sms_opt_in" value="0">
+                                        <input type="checkbox" name="sms_opt_in" value="1" @checked(old('sms_opt_in', $job->sms_opt_in))>
+                                        <span>Customer agrees to repair updates by SMS</span>
+                                    </label>
+                                @endif
+                            </div>
+
+                            <label class="field" style="margin-top:10px;">
+                                <span>Technician Note / Status Reason <small class="text-muted">(Optional)</small></span>
+                                <textarea name="activity_note" rows="2" maxlength="4000" placeholder="Optional notes for activity timeline">{{ old('activity_note') }}</textarea>
+                            </label>
+
+                            <div class="form-actions-bar">
+                                <button class="btn primary"><x-icon name="check" :size="16"/> Save Changes / Update Job</button>
+                            </div>
+                        @else
+                            @if($job->diagnosis)
+                                <div class="form-field-group">
+                                    <span class="field-title">Diagnostic Findings</span>
+                                    <p class="diagnostic-text">{{ $job->diagnosis }}</p>
+                                </div>
+                            @endif
+                            <div class="repair-fields" style="margin-top:12px;">
+                                <label class="field">Status
+                                    <select name="status">
+                                        @foreach(Repairs::transitions($job->status) as $next)
+                                            <option value="{{ $next }}" @selected(old('status', $next)===$next)>{{ $statuses[$next] }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            </div>
+                            <label class="field" style="margin-top:10px;">
+                                <span>Delivery / Completion Note <small class="text-muted">(Optional)</small></span>
+                                <textarea name="activity_note" rows="2" maxlength="4000" placeholder="Optional delivery note">{{ old('activity_note') }}</textarea>
+                            </label>
+                            <div class="form-actions-bar">
+                                <button class="btn primary"><x-icon name="check" :size="16"/> Mark Delivered</button>
+                            </div>
+                        @endif
+                    </form>
+                @else
+                    <div class="read-only-work-details">
+                        <div class="form-field-group">
+                            <span class="field-title">Customer Complaint / Reported Faults</span>
+                            <div class="reported-fault-box">{{ $job->faults ?: 'None' }}</div>
+                        </div>
+                        <div class="form-field-group">
+                            <span class="field-title">Diagnostic Findings</span>
+                            <p class="diagnostic-text">{{ $job->diagnosis ?: 'No diagnostic notes recorded.' }}</p>
+                        </div>
+                    </div>
+                @endif
             </section>
 
             <!-- Cost Summary Card -->
             <section class="card job-card-section" id="section-cost-summary">
-                <div class="job-section-title">
-                    <span class="job-section-icon"><x-icon name="receipt-text" :size="16"/></span>
-                    <h2>Cost Summary</h2>
+                <div class="job-section-title space-between">
+                    <div class="flex-title">
+                        <span class="job-section-icon"><x-icon name="receipt-text" :size="16"/></span>
+                        <h2>Cost Summary</h2>
+                    </div>
+                    @if(!$job->invoiced_at)
+                        <span class="job-section-subtitle">Estimated before invoicing</span>
+                    @endif
                 </div>
                 <div class="cost-summary-list">
                     <div class="cost-summary-row">
-                        <span>Parts Total</span>
+                        <span>Parts Total (Consumed)</span>
                         <span class="font-mono">{{ $currency }} {{ Money::displayPrice($partsTotal) }}</span>
                     </div>
+                    @if(!$job->invoiced_at && Money::compare($plannedPartsTotal, 0) > 0)
+                        <div class="cost-summary-row">
+                            <span>Planned Parts (Pending Consume)</span>
+                            <span class="font-mono">{{ $currency }} {{ Money::displayPrice($plannedPartsTotal) }}</span>
+                        </div>
+                    @endif
                     <div class="cost-summary-row">
                         <span>Service / Labor</span>
-                        <span class="font-mono">{{ $currency }} {{ Money::displayPrice($job->labor) }}</span>
+                        <span class="font-mono" data-summary-field="labor">{{ $currency }} {{ Money::displayPrice($job->labor) }}</span>
                     </div>
                     <div class="cost-summary-row">
                         <span>Other Charges</span>
-                        <span class="font-mono">{{ $currency }} {{ Money::displayPrice($job->service_fee) }}</span>
+                        <span class="font-mono" data-summary-field="service_fee">{{ $currency }} {{ Money::displayPrice($job->service_fee) }}</span>
                     </div>
                     <div class="cost-summary-row">
                         <span>Discount</span>
-                        <span class="font-mono text-danger">- {{ $currency }} {{ Money::displayPrice($job->discount) }}</span>
+                        <span class="font-mono text-danger" data-summary-field="discount">- {{ $currency }} {{ Money::displayPrice($job->discount) }}</span>
                     </div>
                     <div class="cost-summary-row">
                         <span>Tax</span>
-                        <span class="font-mono">{{ $currency }} {{ Money::displayPrice($job->tax) }}</span>
+                        <span class="font-mono" data-summary-field="tax">{{ $currency }} {{ Money::displayPrice($job->tax) }}</span>
                     </div>
                     <div class="cost-summary-total-bar">
-                        <span>Total Amount</span>
-                        <strong class="font-mono">{{ $currency }} {{ Money::displayPrice($job->total) }}</strong>
+                        <span>{{ $job->invoiced_at ? 'Total Amount' : 'Estimated Total' }}</span>
+                        <strong class="font-mono" data-summary-total data-invoiced="{{ $job->invoiced_at ? '1' : '0' }}" data-parts-base="{{ (float)$activePartsTotal }}" data-currency="{{ $currency }}">{{ $currency }} {{ Money::displayPrice($displayTotal) }}</strong>
                     </div>
                 </div>
             </section>
@@ -696,6 +767,22 @@
                     </div>
                 </div>
 
+                @if($heldCheques->isNotEmpty())
+                    <div class="pending-cheques-callout">
+                        <x-icon name="clock" :size="16"/>
+                        <ul>
+                            @foreach($heldCheques as $cheque)
+                                <li>
+                                    Pending cheque · {{ $currency }} {{ Money::displayCheque($cheque->amount) }} · {{ $cheque->cheque_date->format('d M Y') }}
+                                    @can('cheques.view')
+                                        <a class="text-link" href="{{ route('cheques.show', $cheque) }}">Review cheque</a>
+                                    @endcan
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 <div class="payment-notice-callout">
                     <x-icon name="info" :size="16"/>
                     <div>
@@ -808,8 +895,19 @@
             <form method="post" action="{{ route('repairs.parts.add', $job) }}" class="repair-stack" data-repair-part>
                 @csrf
                 <input type="hidden" name="submission" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
-                <div class="repair-picker" data-repair-picker="{{ route('repairs.products') }}">
-                    <label class="field">Search Repair Product / SKU
+                
+                <div class="field-title-with-action">
+                    <span class="field-label-text">Search Repair Product / SKU</span>
+                    @can('products.create')
+                        <button type="button" class="btn secondary btn-sm" data-open-quick-product>
+                            <x-icon name="plus" :size="13"/> New Product
+                        </button>
+                    @endcan
+                </div>
+
+                <div class="repair-picker" data-repair-picker="{{ route('repairs.products') }}" data-picker-type="product">
+                    <label class="field">
+                        <span class="sr-only">Search Repair Product / SKU</span>
                         <input data-picker-query type="search" autocomplete="off" placeholder="Type product name or SKU" required>
                     </label>
                     <input type="hidden" name="product_id" data-picker-value>
@@ -830,6 +928,64 @@
             </form>
         </div>
     </dialog>
+
+    @can('products.create')
+        <!-- Quick Add Product Popup Modal -->
+        <dialog class="card repair-dialog" id="modal-quick-add-product" style="max-width: 540px;">
+            <div class="repair-stack">
+                <div class="card-heading">
+                    <div>
+                        <h2>New Repair Product / Part</h2>
+                        <p class="muted">Add a new spare part or product to inventory and auto-select it.</p>
+                    </div>
+                    <button type="button" class="btn secondary" data-repair-close>Close</button>
+                </div>
+                <form data-new-repair-product action="{{ route('repairs.products.store') }}" class="repair-stack">
+                    @csrf
+                    <div class="repair-fields">
+                        <label class="field full">Product Name <b class="text-danger">*</b>
+                            <input name="name" required maxlength="255" placeholder="e.g. iPhone 11 Pro Display Replacement" data-product-name-input autofocus>
+                        </label>
+                    </div>
+                    <div class="repair-fields">
+                        <label class="field">SKU <small class="muted">(auto if blank)</small>
+                            <input name="sku" maxlength="255" placeholder="e.g. DISP-IP11P">
+                        </label>
+                        <label class="field">Unit <b class="text-danger">*</b>
+                            <select name="unit_id" required>
+                                @foreach($units ?? [] as $u)
+                                    <option value="{{ $u->id }}" @selected($loop->first || strtolower($u->name) === 'piece')>{{ $u->name }} ({{ $u->short_name }})</option>
+                                @endforeach
+                            </select>
+                        </label>
+                    </div>
+                    <div class="repair-fields">
+                        <label class="field">Selling Price ({{ $currency }}) <b class="text-danger">*</b>
+                            <input type="number" name="price" step=".01" min="0" placeholder="0.00" required>
+                        </label>
+                        @can('products.view_cost')
+                            <label class="field">Cost Price ({{ $currency }})
+                                <input type="number" name="cost" step=".01" min="0" placeholder="0.00" value="0.00">
+                            </label>
+                        @endcan
+                    </div>
+                    <div class="repair-fields">
+                        <label class="field">Opening Stock Quantity
+                            <input type="number" name="stock" step=".001" min="0" value="1" placeholder="1">
+                        </label>
+                        <label class="field">Low Stock Alert Level
+                            <input type="number" name="low_stock" step=".001" min="0" value="0" placeholder="0">
+                        </label>
+                    </div>
+                    <p class="text-danger" data-product-error role="alert" hidden></p>
+                    <div class="repair-actions">
+                        <button class="btn primary" type="submit">Create & Select Part</button>
+                        <button type="button" class="btn secondary" data-repair-close>Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </dialog>
+    @endcan
 @endif
 
 <!-- 3. Take Payment Modal -->
@@ -993,6 +1149,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Live preview for Cost Summary when editing Service/Labor, Other Charges, Discount, Tax
+    const summaryTotalEl = document.querySelector('[data-summary-total]');
+    const costInputs = document.querySelectorAll('[data-cost-input]');
+    if (summaryTotalEl && summaryTotalEl.dataset.invoiced !== '1' && costInputs.length) {
+        const currency = summaryTotalEl.dataset.currency || 'Rs.';
+        const partsBase = parseFloat(summaryTotalEl.dataset.partsBase || '0') || 0;
+        const fmt = (val) => (Number.isFinite(val) ? val : 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const updateSummary = () => {
+            const values = {};
+            costInputs.forEach((input) => {
+                const key = input.dataset.costInput;
+                const num = parseFloat(input.value || '0') || 0;
+                values[key] = num;
+                const target = document.querySelector('[data-summary-field="' + key + '"]');
+                if (target) {
+                    target.textContent = (key === 'discount' ? '- ' : '') + currency + ' ' + fmt(num);
+                }
+            });
+            const total = partsBase + (values.labor || 0) + (values.service_fee || 0) - (values.discount || 0) + (values.tax || 0);
+            summaryTotalEl.textContent = currency + ' ' + fmt(total);
+        };
+        costInputs.forEach((input) => input.addEventListener('input', updateSummary));
+    }
 });
 </script>
 @endsection

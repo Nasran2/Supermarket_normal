@@ -12,11 +12,13 @@ use App\Models\RepairDevice;
 use App\Models\RepairJob;
 use App\Models\RepairPayment;
 use App\Models\Supplier;
+use App\Models\Unit;
 use App\Models\User;
 use App\Services\Repair\RepairAccounting;
 use App\Services\Repair\RepairInventory;
 use App\Services\Repair\RepairReporting;
 use App\Services\Repair\RepairWorkflow;
+use App\Services\ResourceService;
 use App\Support\Audit;
 use App\Support\Demo;
 use App\Support\Money;
@@ -171,8 +173,10 @@ class RepairController extends Controller
         $customerTotalJobs = RepairJob::where('customer_id', $repair->customer_id)->count();
         $customerDue = $repair->customer->due_balance ?? '0.00';
         $partsTotal = Money::sum($repair->parts->where('state', 'CONSUMED')->map(fn ($p) => Money::mul($p->price, $p->quantity)));
+        $plannedPartsTotal = Money::sum($repair->parts->where('state', 'PLANNED')->map(fn ($p) => Money::mul($p->price, $p->quantity)));
+        $units = Unit::where('active', true)->orderBy('name')->get(['id', 'name', 'short_name']);
 
-        return response()->view('repairs.show', ['job' => $repair] + compact('events', 'methods', 'banks', 'suppliers', 'technicians', 'chequeMethod', 'heldCheques', 'customerDeviceCount', 'customerOngoingCount', 'customerTotalJobs', 'customerDue', 'partsTotal'))->header('Cache-Control', 'no-store');
+        return response()->view('repairs.show', ['job' => $repair] + compact('events', 'methods', 'banks', 'suppliers', 'technicians', 'chequeMethod', 'heldCheques', 'customerDeviceCount', 'customerOngoingCount', 'customerTotalJobs', 'customerDue', 'partsTotal', 'plannedPartsTotal', 'units'))->header('Cache-Control', 'no-store');
     }
 
     public function update(Request $request, RepairJob $repair, RepairWorkflow $workflow)
@@ -221,12 +225,71 @@ class RepairController extends Controller
     {
         $data = $request->validate(['q' => 'nullable|string|max:100']);
         $term = '%'.($data['q'] ?? '').'%';
-        $products = Product::where('available_for_repairs', true)->where('active', true)->where('track_stock', true)
+        $products = Product::where('active', true)->where('track_stock', true)
             ->whereHas('unit', fn ($q) => $q->where('active', true))
             ->where(fn ($q) => $q->where('name', 'like', $term)->orWhere('sku', 'like', $term))
             ->orderBy('name')->limit(20)->get(['id', 'name', 'sku', 'stock', 'price']);
 
         return response()->json($products);
+    }
+
+    public function storeProduct(Request $request, ResourceService $service)
+    {
+        abort_unless($request->user()->hasPermission('products.create'), 403);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'sku' => ['nullable', 'string', 'max:255', 'unique:products,sku'],
+            'unit_id' => ['nullable', 'integer', 'exists:units,id'],
+            'cost' => ['nullable', 'numeric', 'min:0', 'max:999999999'],
+            'price' => ['required', 'numeric', 'min:0', 'max:999999999'],
+            'stock' => ['nullable', 'numeric', 'min:0', 'max:999999'],
+            'low_stock' => ['nullable', 'numeric', 'min:0', 'max:999999'],
+        ]);
+
+        if (empty($validated['sku'])) {
+            do {
+                $sku = (string) random_int(10000000, 99999999);
+            } while (Product::where('sku', $sku)->exists());
+            $validated['sku'] = $sku;
+        }
+
+        if (empty($validated['unit_id'])) {
+            $validated['unit_id'] = Unit::where('active', true)->value('id') ?? 1;
+        }
+
+        $cost = $validated['cost'] ?? '0.00';
+        $price = $validated['price'];
+        $stock = $validated['stock'] ?? '0';
+        $lowStock = $validated['low_stock'] ?? '0';
+
+        $payload = [
+            'name' => $validated['name'],
+            'sku' => $validated['sku'],
+            'unit_id' => $validated['unit_id'],
+            'cost' => $cost,
+            'price' => $price,
+            'stock' => $stock,
+            'low_stock' => $lowStock,
+            'active' => true,
+            'track_stock' => true,
+            'available_for_repairs' => true,
+            'available_for_pos' => true,
+            'opening_layers' => [
+                ['quantity' => $stock, 'cost' => $cost, 'selling_price' => $price],
+            ],
+        ];
+
+        $product = $service->save('products', $payload);
+
+        return response()->json([
+            'id' => $product->id,
+            'name' => $product->name,
+            'sku' => $product->sku,
+            'price' => $product->price,
+            'cost' => $product->cost,
+            'stock' => $product->stock,
+        ], 201);
     }
 
     public function addPart(Request $request, RepairJob $repair, RepairInventory $inventory)

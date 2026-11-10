@@ -34,6 +34,7 @@ Route::middleware(RepairEnabled::class)->group(function () {
                 Route::post('/customers', [RepairController::class, 'storeCustomer'])->middleware('permission:customers.create')->name('customers.store');
             });
             Route::get('/parts/search', [RepairController::class, 'products'])->middleware('permission:repairs.parts')->name('products');
+            Route::post('/parts/products', [RepairController::class, 'storeProduct'])->middleware('permission:products.create')->name('products.store');
             Route::prefix('{repair}')->whereNumber('repair')->group(function () {
                 Route::get('/', [RepairController::class, 'show'])->name('show');
                 Route::put('/', [RepairController::class, 'update'])->name('update');

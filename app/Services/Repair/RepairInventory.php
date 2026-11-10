@@ -70,7 +70,7 @@ class RepairInventory
     private function product(int $id): Product
     {
         $product = Product::with('unit')->whereKey($id)->where('active', true)->where('track_stock', true)
-            ->where('available_for_repairs', true)->whereHas('unit', fn ($q) => $q->where('active', true))->lockForUpdate()->first();
+            ->whereHas('unit', fn ($q) => $q->where('active', true))->lockForUpdate()->first();
         if (! $product) {
             throw ValidationException::withMessages(['product_id' => 'Choose an active, stock-tracked repair product.']);
         }

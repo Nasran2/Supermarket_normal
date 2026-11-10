@@ -73,13 +73,24 @@ function picker(root) {
           p.textContent = `No matches found for "${searchText}".`;
           emptyDiv.append(p);
 
-          const createBtn = document.createElement('button');
-          createBtn.type = 'button';
-          createBtn.className = 'btn secondary btn-sm';
-          createBtn.dataset.quickCreateCustomer = 'true';
-          createBtn.dataset.customerName = searchText;
-          createBtn.textContent = `+ New customer "${searchText}"`;
-          emptyDiv.append(createBtn);
+          const isProduct = root.dataset.pickerType === 'product' || (root.dataset.repairPicker && root.dataset.repairPicker.includes('parts'));
+          if (isProduct) {
+            const createBtn = document.createElement('button');
+            createBtn.type = 'button';
+            createBtn.className = 'btn secondary btn-sm';
+            createBtn.dataset.quickCreateProduct = 'true';
+            createBtn.dataset.productName = searchText;
+            createBtn.textContent = `+ New product "${searchText}"`;
+            emptyDiv.append(createBtn);
+          } else {
+            const createBtn = document.createElement('button');
+            createBtn.type = 'button';
+            createBtn.className = 'btn secondary btn-sm';
+            createBtn.dataset.quickCreateCustomer = 'true';
+            createBtn.dataset.customerName = searchText;
+            createBtn.textContent = `+ New customer "${searchText}"`;
+            emptyDiv.append(createBtn);
+          }
 
           results.replaceChildren(emptyDiv);
         }
@@ -90,16 +101,30 @@ function picker(root) {
   }
 
   results.addEventListener('click', (event) => {
-    const quickBtn = event.target.closest('[data-quick-create-customer]');
-    if (quickBtn) {
+    const quickCustomerBtn = event.target.closest('[data-quick-create-customer]');
+    if (quickCustomerBtn) {
       const dialog = document.getElementById('repair-customer-dialog');
       if (dialog) {
         const nameInput = dialog.querySelector('input[name="name"]');
-        if (nameInput) nameInput.value = quickBtn.dataset.customerName || input.value.trim();
+        if (nameInput) nameInput.value = quickCustomerBtn.dataset.customerName || input.value.trim();
         dialog.showModal();
         nameInput?.focus();
         results.hidden = true;
       }
+      return;
+    }
+
+    const quickProductBtn = event.target.closest('[data-quick-create-product]');
+    if (quickProductBtn) {
+      const dialog = document.getElementById('modal-quick-add-product');
+      if (dialog) {
+        const nameInput = dialog.querySelector('[data-product-name-input]');
+        if (nameInput) nameInput.value = quickProductBtn.dataset.productName || input.value.trim();
+        dialog.showModal();
+        nameInput?.focus();
+        results.hidden = true;
+      }
+      return;
     }
   });
 
@@ -778,4 +803,56 @@ document.querySelectorAll('[data-repair-cheque-method]').forEach((form) => {
   };
   method.addEventListener('change', update);
   update();
+});
+
+document.querySelectorAll('[data-open-quick-product]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const dialog = document.getElementById('modal-quick-add-product');
+    if (dialog) {
+      const partSearchInput = document.querySelector('#modal-add-part [data-picker-query]');
+      const nameInput = dialog.querySelector('[data-product-name-input]');
+      if (nameInput && partSearchInput && partSearchInput.value.trim()) {
+        nameInput.value = partSearchInput.value.trim();
+      }
+      dialog.showModal();
+      nameInput?.focus();
+    }
+  });
+});
+
+document.querySelector('[data-new-repair-product]')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"], button.btn.primary');
+  const error = form.querySelector('[data-product-error]');
+  button.disabled = true;
+  if (error) error.hidden = true;
+  try {
+    const created = await json(form.action, { method: 'POST', body: new FormData(form) });
+    form.reset();
+    form.closest('dialog')?.close();
+
+    const partModal = document.getElementById('modal-add-part');
+    if (partModal) {
+      if (!partModal.open) partModal.showModal();
+      const queryInput = partModal.querySelector('[data-picker-query]');
+      const valueInput = partModal.querySelector('input[name="product_id"]');
+      const priceInput = partModal.querySelector('input[name="price"]');
+      const resultsDiv = partModal.querySelector('[data-picker-results]');
+      if (queryInput) queryInput.value = created.name;
+      if (valueInput) valueInput.value = created.id;
+      if (priceInput && created.price) priceInput.value = created.price;
+      if (resultsDiv) resultsDiv.hidden = true;
+      partModal.querySelector('input[name="quantity"]')?.focus();
+    }
+  } catch (failure) {
+    if (error) {
+      error.textContent = failure.message;
+      error.hidden = false;
+    } else {
+      alert(failure.message);
+    }
+  } finally {
+    button.disabled = false;
+  }
 });

@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::table('products', function (Blueprint $t) {
             $t->boolean('available_for_pos')->default(true);
-            $t->boolean('available_for_repairs')->default(false);
+            $t->boolean('available_for_repairs')->default(true);
         });
         Schema::create('repair_devices', function (Blueprint $t) {
             $t->id();
