@@ -167,6 +167,10 @@ class HrModuleTest extends TestCase
         $this->assertDatabaseCount('hr_attendances', 1);
         $payload['rows'][$staff->id]['overnight'] = 0;
         $this->postJson(route('hr.attendance.mark'), $payload)->assertUnprocessable();
+        $payload['rows'][$staff->id] = ['status' => 'PRESENT', 'check_in' => '08:00', 'check_out' => '17:00', 'overnight' => 1];
+        $this->postJson(route('hr.attendance.mark'), $payload)->assertUnprocessable()->assertJsonValidationErrors('rows');
+        $this->postJson(route('hr.attendance.mark'), ['date' => '2026-09-10', 'rows' => [999999 => ['status' => 'PRESENT']]])
+            ->assertUnprocessable()->assertJsonValidationErrors('rows');
         $this->post(route('hr.attendance.mark'), ['date' => '2026-09-11', 'rows' => [$staff->id => ['status' => '']]])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('hr_attendances', 1);
     }
@@ -206,6 +210,23 @@ class HrModuleTest extends TestCase
         $this->postJson(route('hr.attendance.mark'), ['date' => '2026-09-15', 'rows' => [$staff->id => ['status' => 'PRESENT']]])->assertUnprocessable();
         $summary = app(ProfitLossService::class)->calculate('2026-09-01', '2026-09-30');
         $this->assertSame('29600.00', $summary['expenses']);
+    }
+
+    public function test_payroll_rejects_amounts_without_descriptions_and_keeps_valid_lines(): void
+    {
+        $staff = $this->staff();
+        $data = ['staff_id' => $staff->id, 'month' => '2026-09', 'lines' => [
+            4 => ['kind' => 'EARNING', 'name' => '', 'amount' => '250'],
+        ]];
+
+        $this->from(route('hr.payroll.create'))->post(route('hr.payroll.store'), $data)
+            ->assertRedirect(route('hr.payroll.create'))->assertSessionHasErrors('lines.4.name');
+        $this->assertDatabaseCount('hr_payrolls', 0);
+        $this->get(route('hr.payroll.create'))->assertOk()->assertSee('name="lines[4][name]"', false)->assertSee('value="250"', false);
+
+        $data['lines'][4]['name'] = 'Travel allowance';
+        $this->post(route('hr.payroll.store'), $data)->assertSessionHasNoErrors();
+        $this->assertSame('30250.00', Payroll::firstOrFail()->net);
     }
 
     public function test_daily_pay_and_mid_month_intake_proration(): void
@@ -376,6 +397,8 @@ class HrModuleTest extends TestCase
             ->assertDontSee('Employee 001');
         $this->get(route('hr.attendance', ['date' => '2026-10-10', 'page' => 3]))->assertOk()
             ->assertViewHas('staff', fn ($s) => $s->count() === 4)->assertSee('Employee 105');
+        $this->get(route('hr.attendance', ['date' => '2026-10-10', 'q' => 'Employee 105']))->assertOk()
+            ->assertViewHas('staff', fn ($s) => $s->total() === 1)->assertSee('Employee 105')->assertDontSee('Employee 002');
         $this->get(route('hr.attendance', ['date' => '2026-09-15']))->assertOk()
             ->assertViewHas('staff', fn ($s) => $s->total() === 105)->assertSee('Employee 001');
     }

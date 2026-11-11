@@ -33,6 +33,15 @@ use App\Http\Middleware\HrEnabled;
 use App\Http\Middleware\SaleVisibility;
 use Illuminate\Support\Facades\Route;
 
+Route::prefix('twininstall')->name('installer.')->withoutMiddleware([
+    \App\Http\Middleware\BusinessContext::class,
+    \App\Http\Middleware\DemoMode::class,
+    \App\Http\Middleware\SystemActive::class,
+])->group(function () {
+    Route::get('/', [\App\Http\Controllers\InstallerController::class, 'show'])->name('show');
+    Route::post('/', [\App\Http\Controllers\InstallerController::class, 'store'])->middleware('throttle:5,1')->name('store');
+});
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/login', [AuthController::class, 'authenticate'])->middleware('throttle:20,1');

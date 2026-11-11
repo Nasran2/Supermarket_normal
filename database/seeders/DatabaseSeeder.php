@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Cache;
 
 class DatabaseSeeder extends Seeder
 {
-    public function run(): void
+    public function run(bool $seedTestUser = true, ?array $productCategories = null): void
     {
         Permissions::install();
         $names = array_keys(Permissions::all());
@@ -35,7 +35,7 @@ class DatabaseSeeder extends Seeder
         Role::where('name', 'Administrator')->firstOrFail()->permissions()->syncWithoutDetaching(Permission::whereIn('name', $names)->pluck('id'));
 
         // Fixtures only. Real installations create an account with pos:admin.
-        if (app()->runningUnitTests() && ! \App\Models\User::exists()) {
+        if ($seedTestUser && app()->runningUnitTests() && ! \App\Models\User::exists()) {
             \App\Models\User::create([
                 'name' => 'Admin User',
                 'username' => 'admin',
@@ -96,7 +96,7 @@ class DatabaseSeeder extends Seeder
 
         // 7. Product Categories
         $categories = ['General', 'Groceries', 'Beverages', 'Snacks', 'Fresh Produce', 'Dairy & Eggs', 'Meat & Seafood', 'Bakery', 'Frozen Foods', 'Household & Cleaning', 'Personal Care', 'Baby Care', 'Pet Care'];
-        foreach ($categories as $cat) {
+        foreach ($productCategories ?? $categories as $cat) {
             Category::firstOrCreate(['name' => $cat]);
         }
 

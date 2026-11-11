@@ -1,4 +1,25 @@
+@php
+    $links = [
+        'hr.view' => ['Overview', 'hr.index', 'hr.index', 'layout-dashboard'],
+        'hr.staff.view' => ['Staff', 'hr.staff.index', 'hr.staff.*', 'users-round'],
+        'hr.attendance.view' => ['Attendance', 'hr.attendance', 'hr.attendance', 'calendar-check'],
+        'hr.leave.view' => ['Leave', 'hr.leave', 'hr.leave', 'calendar-days'],
+        'hr.payroll.view' => ['Payroll', 'hr.payroll.index', 'hr.payroll.*', 'wallet'],
+        'hr.payments.view' => ['Payments', 'hr.payments', 'hr.payments', 'credit-card'],
+        'hr.setup.view' => ['Setup', 'hr.setup', 'hr.setup', 'settings-2'],
+    ];
+@endphp
 <nav class="hr-nav" aria-label="Human resources">
-@foreach(['hr.view'=>['Overview','hr.index','layout-dashboard'],'hr.staff.view'=>['Staff','hr.staff.index','users-round'],'hr.attendance.view'=>['Attendance','hr.attendance','calendar-check'],'hr.leave.view'=>['Leave','hr.leave','calendar-days'],'hr.payroll.view'=>['Payroll','hr.payroll.index','wallet'],'hr.payments.view'=>['Payments','hr.payments','credit-card'],'hr.setup.view'=>['Setup','hr.setup','settings-2']] as $permission=>[$label,$route,$icon])@can($permission)<a href="{{ route($route) }}" class="{{ request()->routeIs($route) || (in_array($route,['hr.staff.index','hr.payroll.index']) && request()->routeIs(str_replace('.index','',$route).'.*'))?'active':'' }}"><x-icon :name="$icon" :size="17"/>{{ $label }}</a>@endcan @endforeach
-@if(collect(array_keys(\App\Support\Hr::REPORTS))->contains(fn($k)=>auth()->user()->hasPermission('hr.reports.'.$k.'.view')))<a href="{{ route('hr.reports.index') }}" class="{{ request()->routeIs('hr.reports.*')?'active':'' }}"><x-icon name="chart-no-axes-combined" :size="17"/>Reports</a>@endif
+    @foreach($links as $permission => [$label, $route, $pattern, $icon])
+        @can($permission)
+            <a href="{{ route($route) }}" @if(request()->routeIs($pattern)) class="active" aria-current="page" @endif>
+                <x-icon :name="$icon" :size="17"/>{{ $label }}
+            </a>
+        @endcan
+    @endforeach
+    @if(collect(array_keys(\App\Support\Hr::REPORTS))->contains(fn ($kind) => auth()->user()->hasPermission('hr.reports.'.$kind.'.view')))
+        <a href="{{ route('hr.reports.index') }}" @if(request()->routeIs('hr.reports.*')) class="active" aria-current="page" @endif>
+            <x-icon name="chart-no-axes-combined" :size="17"/>Reports
+        </a>
+    @endif
 </nav>

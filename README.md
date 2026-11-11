@@ -14,6 +14,16 @@ Start in **Settings** to enter your business details, upload a logo and review p
 
 ## Install on another machine
 
+### Install from your browser
+
+For a new deployment, upload the application with `.env.example` and point the web server at `public/`. Create an empty MySQL or MariaDB database in your hosting panel, then open `https://your-domain.com/twininstall`. Choose a shop type and modules, enter the database credentials, and create the administrator account. Each shop type sets its recommended modules and starter categories. Choose Customize modules to make your own selection. Optional demo stock matches the shop type and includes expiry batches for pharmacies and supermarkets when expiry is enabled, or a sample job and parts for mobile shops when Repair Center is enabled.
+
+The web-server user needs write access to the project directory to create `.env`, plus the normal access to `storage/` and `bootstrap/cache/`. Keep access to the new site private until the first installation is complete. If this deployment previously cached its routes, run `php artisan route:clear` once after uploading the installer.
+
+After installation, sign in as an administrator and enter the installer PIN at `/twininstall` to change shop type or modules. Set `TWIN_INSTALL_PIN` in `.env` to replace the default PIN, then clear the configuration cache if enabled. Module changes preserve the current database, users, and application key.
+
+### Install from the command line
+
 Requirements: PHP 8.2+, Composer 2, MySQL/MariaDB with InnoDB and FULLTEXT support, Node.js 20.19+ or 22.12+, and a web server. PHP needs Laravel's standard extensions, including PDO MySQL, mbstring, fileinfo, XML and OpenSSL.
 
 ```sh

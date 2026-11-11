@@ -24,7 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(SecurityHeaders::class);
-        $middleware->trimStrings(except: ['device_unlock']);
+        $middleware->prepend(\App\Http\Middleware\PrepareInstallerSession::class);
+        $middleware->trimStrings(except: ['device_unlock', 'db_password', 'installer_pin']);
         $middleware->prependToPriorityList(\Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class, \App\Http\Middleware\RepairEnabled::class);
         $middleware->prependToPriorityList(\App\Http\Middleware\RepairEnabled::class, \App\Http\Middleware\HrEnabled::class);
         $middleware->alias(['sms-feature' => EnsureSmsEnabled::class, 'permission' => PermissionMiddleware::class, 'barcode-feature' => EnsureBarcodeFeatureEnabled::class, 'cheque-feature' => EnsureChequeFeatureEnabled::class, 'unit-feature' => EnsureUnitFeatureEnabled::class, 'unit-resources' => GuardUnitResources::class, 'superadmin.enabled' => SuperAdminEnabled::class, 'system.active' => SystemActive::class]);
@@ -36,5 +37,5 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectUsersTo(fn (\Illuminate\Http\Request $request) => \Illuminate\Support\Facades\Auth::guard('superadmin')->check() ? route('superadmin.dashboard') : route('dashboard'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->dontFlash(['device_unlock']);
+        $exceptions->dontFlash(['device_unlock', 'db_password', 'installer_pin']);
     })->create();

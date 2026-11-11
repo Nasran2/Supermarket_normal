@@ -145,7 +145,10 @@ class HrService
                 if (empty($row['status'])) {
                     continue;
                 }
-                $staff = Staff::whereKey($id)->lockForUpdate()->firstOrFail();
+                $staff = is_int($id) && $id > 0 ? Staff::whereKey($id)->lockForUpdate()->first() : null;
+                if (! $staff) {
+                    $this->fail('rows', 'A staff record could not be found. Reload the attendance page and try again.');
+                }
                 if (! $this->employed($staff, $date)) {
                     $this->fail('date', $staff->name.' was not employed on this date.');
                 }
@@ -163,6 +166,9 @@ class HrService
                 $out = ! empty($row['check_out']) ? Carbon::parse($date.' '.$row['check_out'])->addDays(! empty($row['overnight']) ? 1 : 0) : null;
                 if ($out && (! $in || $out <= $in)) {
                     $this->fail('rows', 'Check-out must follow check-in; select overnight for a shift ending the next day.');
+                }
+                if ($out && $out->gt($in->copy()->addDay())) {
+                    $this->fail('rows', 'Attendance for '.$staff->name.' spans more than 24 hours. Check the times and the overnight box.');
                 }
                 if (Money::compare((string) ($row['overtime_hours'] ?? 0), 0) > 0 && ! in_array($row['status'], ['PRESENT', 'LATE', 'HALF_DAY'])) {
                     $this->fail('rows', 'Overtime can only be recorded on worked days.');
@@ -324,10 +330,14 @@ class HrService
             if (! empty($data['deduct_unpaid']) && $staff->salary_basis === 'MONTHLY') {
                 $lines[] = ['kind' => 'DEDUCTION', 'name' => 'Marked unpaid days', 'amount' => Money::round((string) $daily->multipliedBy($summary['unpaid_days']))];
             }
-            foreach ($data['lines'] ?? [] as $line) {
-                if (! empty($line['name']) && Money::compare((string) $line['amount'], 0) > 0) {
-                    $lines[] = ['kind' => $line['kind'], 'name' => $line['name'], 'amount' => Money::round((string) $line['amount'])];
+            foreach ($data['lines'] ?? [] as $index => $line) {
+                if (Money::compare((string) $line['amount'], 0) <= 0) {
+                    continue;
                 }
+                if (blank($line['name'] ?? null)) {
+                    $this->fail('lines.'.$index.'.name', 'Enter a description for each allowance or deduction with an amount.');
+                }
+                $lines[] = ['kind' => $line['kind'], 'name' => $line['name'], 'amount' => Money::round((string) $line['amount'])];
             }
             $earnings = Money::sum(collect($lines)->where('kind', 'EARNING')->pluck('amount'));
             $deductions = Money::sum(collect($lines)->where('kind', 'DEDUCTION')->pluck('amount'));
