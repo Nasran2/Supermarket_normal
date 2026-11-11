@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\DemoMode;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\DocumentationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -72,6 +74,27 @@ class DocumentationFeaturesTest extends TestCase
                 $this->get(route('documentation.show', $slug))->assertOk();
             }
         }
+    }
+
+    public function test_module_guides_and_steps_follow_the_current_user_grants(): void
+    {
+        config(['hr.enabled' => true, 'services.phone_rep' => true]);
+        $role = Role::create(['name' => 'Attendance and repair intake']);
+        $role->permissions()->attach(Permission::whereIn('name', [
+            'hr.attendance.view', 'hr.attendance.mark', 'repairs.view', 'repairs.create', 'repairs.pay',
+        ])->pluck('id'));
+        $this->flushSession();
+        $this->actingAs(User::factory()->create(['role_id' => $role->id]));
+        $this->get('/documentation/staff-and-payroll')->assertOk()
+            ->assertSee('Save attendance')->assertDontSee('Prepare a salary draft')->assertDontSee('Record a leave request');
+        $this->get('/documentation/receive-a-repair')->assertOk();
+        $this->get('/documentation/manage-repair-payments-and-reports')->assertOk()
+            ->assertSee('Post an advance or payment')->assertDontSee('Correct or refund a payment');
+        $this->get('/documentation/configure-phone-repairs')->assertNotFound();
+        $this->get('/documentation')->assertOk()->assertDontSee('Correct or refund a payment');
+        config(['hr.enabled' => false, 'services.phone_rep' => false]);
+        $this->get('/documentation/staff-and-payroll')->assertNotFound();
+        $this->get('/documentation/receive-a-repair')->assertNotFound();
     }
 
     public function test_settings_notes_and_related_links_follow_flags_after_a_toggle(): void

@@ -18,6 +18,11 @@ class Expense extends Model
         return $query->where(fn ($q) => $q->whereNull('sale_id')->orWhereHas('sale', fn ($s) => $s->visibleTo()));
     }
 
+    public function scopeVisiblePayrollDetails(Builder $query): Builder
+    {
+        return $query->when(! auth()->user()?->hasPermission('hr.payroll.view'), fn ($q) => $q->where('type', '!=', 'HR_PAYROLL'));
+    }
+
     protected function expenseDate(): Attribute
     {
         return Attribute::make(set: fn ($value) => Carbon::parse($value)->toDateString());

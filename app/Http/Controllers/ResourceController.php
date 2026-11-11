@@ -56,7 +56,7 @@ class ResourceController extends Controller
             }
         }
         if ($resource === 'expenses') {
-            $query->visibleSales();
+            $query->visibleSales()->visiblePayrollDetails();
             if ($request->filled('from')) {
                 $query->whereDate('expense_date', '>=', $request->input('from'));
             }
@@ -132,7 +132,9 @@ class ResourceController extends Controller
     public function show(string $resource, int $id)
     {
         $def = $this->definition($resource, 'view');
-        $record = $def['model']::with($def['relations'] ?? [])->findOrFail($id);
+        $record = $def['model']::with($def['relations'] ?? [])
+            ->when($resource === 'expenses', fn ($query) => $query->visiblePayrollDetails())
+            ->findOrFail($id);
 
         if ($resource === 'payment-methods') {
             return app(PaymentActivityController::class)->show(request(), $record, app(PaymentActivityService::class));

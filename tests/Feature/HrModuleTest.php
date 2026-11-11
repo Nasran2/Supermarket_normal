@@ -76,6 +76,14 @@ class HrModuleTest extends TestCase
         $this->assertDatabaseHas('hr_staff', ['id' => $staff->id]);
     }
 
+    public function test_disabled_hr_routes_return_not_found_before_sign_in(): void
+    {
+        auth()->logout();
+        config(['hr.enabled' => false]);
+
+        $this->get(route('hr.index'))->assertNotFound();
+    }
+
     public function test_staff_crud_optional_login_and_password_changes_use_existing_account_protections(): void
     {
         $role = Role::where('name', 'Cashier')->firstOrFail();
@@ -90,6 +98,29 @@ class HrModuleTest extends TestCase
         $this->assertStringNotContainsString('ChangedTestPassword', AuditLog::latest()->first()->toJson());
         $this->postJson(route('hr.staff.store'), $this->data(['role_id' => $role->id, 'username' => 'staff.demo', 'password' => 'OtherTestPassword', 'login_active' => true]))->assertUnprocessable();
         $this->assertDatabaseCount('hr_staff', 1);
+    }
+
+    public function test_inactivating_staff_disables_their_login_and_requires_account_access(): void
+    {
+        $staff = $this->staff([
+            'role_id' => Role::where('name', 'Cashier')->value('id'), 'username' => 'linked.staff',
+            'password' => 'TemporaryTestPassword', 'login_active' => true,
+        ]);
+        $editor = Role::create(['name' => 'Staff editor']);
+        $editor->permissions()->attach(Permission::whereIn('name', ['hr.staff.view', 'hr.staff.edit'])->pluck('id'));
+        $this->actingAs(User::factory()->create(['role_id' => $editor->id]));
+        $changes = $this->data(['status' => 'INACTIVE']);
+        $this->putJson(route('hr.staff.update', $staff), $changes)->assertForbidden();
+        $this->assertSame('ACTIVE', $staff->fresh()->status);
+        $this->assertTrue($staff->user->fresh()->active);
+
+        $this->flushSession();
+        $this->actingAs($this->admin)->put(route('hr.staff.update', $staff), $changes)->assertRedirect(route('hr.staff.show', $staff))->assertSessionHasNoErrors();
+        $this->assertSame('INACTIVE', $staff->fresh()->status);
+        $this->assertFalse($staff->user->fresh()->active);
+        $account = $staff->user;
+        $this->putJson(route('manage.update', ['users', $account->id]), $account->only(['name', 'username', 'email', 'role_id']) + ['active' => true])
+            ->assertUnprocessable()->assertJsonValidationErrors('active');
     }
 
     public function test_staff_view_cannot_mark_attendance_or_create_login_or_read_payroll(): void
@@ -231,6 +262,10 @@ class HrModuleTest extends TestCase
         $this->post(route('hr.payments.store'), $data)->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('9000.00', app(RegisterService::class)->summary($r)['expected']);
         $p = StaffPayment::first();
+        config(['hr.enabled' => false]);
+        $this->get(route('register.index'))->assertOk()->assertDontSee('HR payment #'.$p->id);
+        $this->assertSame('9000.00', app(RegisterService::class)->summary($r)['expected']);
+        config(['hr.enabled' => true]);
         $this->post(route('hr.payments.reverse', $p), ['reason' => 'Cash returned'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('10000.00', app(RegisterService::class)->summary($r)['expected']);
         $this->post(route('hr.payments.store'), $this->payment($staff, ['payment_method_id' => $cash->id]))->assertRedirect()->assertSessionHasNoErrors();
@@ -268,7 +303,7 @@ class HrModuleTest extends TestCase
         $hr = Permission::where('name', 'hr.staff.view')->first();
         $role->permissions()->syncWithoutDetaching([$hr->id]);
         config(['hr.enabled' => false]);
-        $ids = $role->permissions->reject(fn ($p) => str_starts_with($p->name, 'hr.'))->pluck('id')->all();
+        $ids = $role->permissions->filter(fn ($p) => isset(\App\Support\Permissions::visible()[$p->name]))->pluck('id')->all();
         $this->put(route('manage.update', ['roles', $role->id]), ['name' => $role->name, 'sales_visibility' => $role->sales_visibility, 'permissions' => $ids])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertTrue($role->fresh()->permissions->contains('id', $hr->id));
     }
@@ -319,7 +354,14 @@ class HrModuleTest extends TestCase
         app(HrService::class)->approve($p);
         $this->post(route('hr.payments.store'), $this->payment($staff, ['kind' => 'SALARY', 'payroll_id' => $p->id, 'amount' => '10000']))->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('30000.00', app(ProfitLossService::class)->calculate('2026-09-01', '2026-09-30')['expenses']);
-        $this->get(route('reports.show', ['report' => 'cash', 'from' => '2026-10-01', 'to' => '2026-10-31']))->assertOk()->assertViewHas('cards', fn ($c) => (float) $c['Period Money Out'] === 10000.0);
+        $cashReport = route('reports.show', ['report' => 'cash', 'from' => '2026-10-01', 'to' => '2026-10-31']);
+        $this->get($cashReport)->assertOk()->assertSee('Staff payment')->assertViewHas('cards', fn ($c) => (float) $c['Period Money Out'] === 10000.0);
+
+        $expenseUrl = route('manage.show', ['expenses', $p->fresh()->expense_id]);
+        $this->get($expenseUrl)->assertOk()->assertSee($p->reference);
+        config(['hr.enabled' => false]);
+        $this->get($cashReport)->assertOk()->assertDontSee('Staff payment')->assertViewHas('cards', fn ($c) => (float) $c['Period Money Out'] === 10000.0);
+        $this->get($expenseUrl)->assertNotFound();
     }
 
     public function test_large_attendance_lists_are_paginated_without_losing_employment_history(): void

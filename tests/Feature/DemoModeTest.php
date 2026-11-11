@@ -59,7 +59,7 @@ class DemoModeTest extends TestCase
 
     public function test_all_settings_and_account_configuration_are_protected_even_for_admin(): void
     {
-        config(['demo.enabled' => true]);
+        config(['demo.enabled' => true, 'hr.enabled' => true]);
         $before = DB::table('settings')->get()->toJson();
         $password = $this->admin->password;
         foreach (array_keys(config('pos')) as $group) {

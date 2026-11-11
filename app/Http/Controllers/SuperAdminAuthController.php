@@ -29,7 +29,7 @@ class SuperAdminAuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        if (Auth::guard('superadmin')->attempt(['username' => $credentials['username'], 'password' => $credentials['password']])) {
+        if (Auth::guard('superadmin')->attempt($credentials + ['active' => true])) {
             $request->session()->regenerate();
 
             return redirect()->route('superadmin.dashboard');

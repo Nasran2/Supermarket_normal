@@ -11,6 +11,8 @@ class SuperAdmin extends Authenticatable
 
     protected $table = 'super_admins';
 
+    protected $attributes = ['active' => true];
+
     protected $fillable = [
         'username',
         'password',
@@ -38,12 +40,13 @@ class SuperAdmin extends Authenticatable
 
     public function isAdministrator(): bool
     {
-        return true;
+        return $this->active;
     }
 
     public function hasPermission(string $permission): bool
     {
-        return ! str_starts_with($permission, 'repairs.') || \App\Support\Repairs::enabled();
+        return $this->active && ! str_starts_with($permission, 'hr.')
+            && (! str_starts_with($permission, 'repairs.') || \App\Support\Repairs::enabled());
     }
 
     public function hasAnyPermission(array $permissions): bool

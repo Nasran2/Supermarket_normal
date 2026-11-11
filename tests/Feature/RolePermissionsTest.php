@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\Role;
 use App\Models\Sale;
+use App\Models\SuperAdmin;
 use App\Models\Supplier;
 use App\Models\Unit;
 use App\Models\User;
@@ -18,6 +19,7 @@ use App\Services\ReportService;
 use App\Support\Permissions;
 use App\Support\Resources;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -42,6 +44,42 @@ class RolePermissionsTest extends TestCase
         $this->actingAs($user);
 
         return $user;
+    }
+
+    public function test_web_setup_cannot_change_roles_or_provision_accounts(): void
+    {
+        foreach (['/migrate', '/seed', '/seeder', '/superadmin-setup'] as $path) {
+            $this->get($path)->assertNotFound();
+        }
+    }
+
+    public function test_super_admin_provisioning_uses_cli_and_inactive_accounts_cannot_sign_in(): void
+    {
+        config(['features.super_admin' => true, 'services.phone_rep' => true]);
+        $this->artisan('pos:superadmin', ['username' => 'audit-super'])
+            ->expectsQuestion('New Super Admin password (at least 10 characters)', 'TemporaryAuditPassword')->assertSuccessful();
+        $account = SuperAdmin::where('username', 'audit-super')->firstOrFail();
+        $this->assertTrue(Hash::check('TemporaryAuditPassword', $account->password));
+        $this->post(route('superadmin.login.post'), ['username' => $account->username, 'password' => 'TemporaryAuditPassword'])
+            ->assertRedirect(route('superadmin.dashboard'));
+        $this->assertAuthenticatedAs($account, 'superadmin');
+        $account->update(['active' => false]);
+        $this->actingAs($account, 'superadmin')->getJson(route('superadmin.repairs.settings'))->assertUnauthorized();
+        $this->assertGuest('superadmin');
+        $this->post(route('superadmin.login.post'), ['username' => $account->username, 'password' => 'TemporaryAuditPassword'])
+            ->assertSessionHasErrors('username');
+        $this->assertGuest('superadmin');
+    }
+
+    public function test_seeded_roles_have_their_configured_module_access(): void
+    {
+        config(['hr.enabled' => true, 'services.phone_rep' => true]);
+        foreach (['Administrator' => [200, 200], 'Manager' => [403, 200], 'Cashier' => [403, 403]] as $name => [$repair, $hr]) {
+            $this->flushSession();
+            $this->actingAs($this->user(role: Role::where('name', $name)->firstOrFail()));
+            $this->get(route('repairs.index'))->assertStatus($repair);
+            $this->get(route('hr.index'))->assertStatus($hr);
+        }
     }
 
     public function test_catalog_covers_all_resource_actions_report_formats_and_dashboard_cards(): void

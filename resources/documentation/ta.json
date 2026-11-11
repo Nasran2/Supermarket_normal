@@ -822,5 +822,21 @@
   "Enable message types": "செய்தி வகைகளை இயக்குங்கள்",
   "Open Phone repairs → Repair settings. Turn on Enable repair SMS and choose the notifications you want to send. Use the SMS account and templates link to review the message wording.": "தொலைபேசி பழுதுபார்ப்பு → Repair settings ஐத் திறக்கவும். Enable repair SMS ஐ இயக்கி அனுப்ப வேண்டிய அறிவிப்புகளைத் தேர்வு செய்யவும். செய்தி உரையைச் சரிபார்க்க SMS கணக்கு மற்றும் வார்ப்புரு இணைப்பைப் பயன்படுத்தவும்.",
   "Confirm customer consent": "வாடிக்கையாளர் ஒப்புதலை உறுதிப்படுத்துங்கள்",
-  "Tick the consent checkbox only if the customer agrees. Staff can withdraw consent on the job. Check SMS history for queued and sent updates.": "வாடிக்கையாளர் ஒப்புக்கொண்டால் மட்டும் ஒப்புதல் பெட்டியைக் குறியுங்கள். பணித் திரையில் ஒப்புதலை நீக்கலாம். வரிசையிலுள்ள மற்றும் அனுப்பிய செய்திகளை SMS வரலாற்றில் பார்க்கலாம்."
+  "Tick the consent checkbox only if the customer agrees. Staff can withdraw consent on the job. Check SMS history for queued and sent updates.": "வாடிக்கையாளர் ஒப்புக்கொண்டால் மட்டும் ஒப்புதல் பெட்டியைக் குறியுங்கள். பணித் திரையில் ஒப்புதலை நீக்கலாம். வரிசையிலுள்ள மற்றும் அனுப்பிய செய்திகளை SMS வரலாற்றில் பார்க்கலாம்.",
+  "Use Human resources": "மனிதவளப் பகுதியைப் பயன்படுத்துங்கள்",
+  "Find the staff tools and reports available to your account.": "உங்கள் கணக்கில் கிடைக்கும் ஊழியர் கருவிகளையும் அறிக்கைகளையும் பாருங்கள்.",
+  "Check the staff member and the date before saving.": "சேமிப்பதற்கு முன் ஊழியரையும் தேதியையும் சரிபாருங்கள்.",
+  "Add a staff member": "ஊழியரைச் சேருங்கள்",
+  "Open Staff and select Add staff. Enter the name, intake date and employment details. Select Add staff member to save.": "Staff பகுதியைத் திறந்து Add staff அழுத்துங்கள். பெயர், சேர்ந்த தேதி மற்றும் வேலை விவரங்களை உள்ளிடுங்கள். சேமிக்க Add staff member அழுத்துங்கள்.",
+  "Save attendance": "வருகையைச் சேமியுங்கள்",
+  "Open Attendance, choose the date and select Load day. Choose a status for each staff member you are updating, then select Save attendance.": "Attendance திறந்து தேதியைத் தேர்ந்தெடுத்து Load day அழுத்துங்கள். புதுப்பிக்கும் ஒவ்வொரு ஊழியரின் வருகை நிலையையும் தேர்ந்தெடுத்து Save attendance அழுத்துங்கள்.",
+  "Record a leave request": "விடுப்புக் கோரிக்கையைப் பதிவு செய்யுங்கள்",
+  "Open Leave, then New leave request. Choose the staff member, leave type and dates. Enter the reason and select Record leave request.": "Leave திறந்து New leave request தேர்ந்தெடுங்கள். ஊழியர், விடுப்பு வகை, தேதிகளைத் தேர்ந்தெடுங்கள். காரணத்தை உள்ளிட்டு Record leave request அழுத்துங்கள்.",
+  "Prepare a salary draft": "சம்பள வரைவைக் கணக்கிடுங்கள்",
+  "Open Payroll and select Prepare payroll. Choose the staff member and month, check any allowances or deductions and select Calculate salary draft.": "Payroll திறந்து Prepare payroll தேர்ந்தெடுங்கள். ஊழியரையும் மாதத்தையும் தேர்ந்தெடுத்து கொடுப்பனவுகளையும் கழிவுகளையும் சரிபாருங்கள். Calculate salary draft அழுத்துங்கள்.",
+  "Review payroll": "சம்பளக் கணக்கைச் சரிபாருங்கள்",
+  "Open Payroll and select a payroll reference. Check the month, earnings, deductions and amount due.": "Payroll திறந்து சம்பளப் பதிவு எண்ணைத் தேர்ந்தெடுங்கள். மாதம், வருமானம், கழிவுகள் மற்றும் செலுத்த வேண்டிய தொகையைச் சரிபாருங்கள்.",
+  "Find an HR report": "மனிதவள அறிக்கையைத் திறக்கவும்",
+  "Open HR Reports, choose a report and select Apply filters after entering a date range or staff member.": "HR Reports திறந்து அறிக்கையைத் தேர்ந்தெடுங்கள். தேதிக் காலப்பகுதி அல்லது ஊழியரைத் தேர்ந்தெடுத்து Apply filters அழுத்துங்கள்.",
+  "Open Billing & payments. Select Correct beside the original payment to replace it, or Record refund to return money. Enter a reason, tick the confirmation box, then select Post confirmed change. The original payment stays in the history.": "Billing & payments திறக்கவும். கட்டணத்தை மாற்ற அதன் அருகிலுள்ள Correct என்பதைத் தேர்ந்தெடுங்கள். பணத்தைத் திருப்ப Record refund அழுத்துங்கள். காரணத்தை உள்ளிட்டு உறுதிப் பெட்டியைத் தேர்வுசெய்து Post confirmed change அழுத்துங்கள். அசல் கட்டணம் வரலாற்றில் இருக்கும்."
 }

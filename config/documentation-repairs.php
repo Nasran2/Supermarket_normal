@@ -7,6 +7,7 @@ return [
         'path' => 'Phone repairs → Receive device', 'before' => 'Ask which faults the customer noticed and which accessories they left with you.',
         'tip' => 'A price is optional on the intake receipt. Revenue posts when you finalize the invoice.',
         'requires' => ['phone_rep'],
+        'permissions' => ['repairs.view', 'repairs.create'],
         'link' => ['route' => 'repairs.create', 'permission' => ['repairs.view', 'repairs.create'], 'parameters' => []],
         'steps' => [
             ['title' => 'Select the customer and device', 'text' => 'Search for the customer, then pick a saved device or select its brand and model. Use manual entry if the device is missing. Choose the reported issues and continue.'],
@@ -20,11 +21,12 @@ return [
         'path' => 'Phone repairs → Repair jobs', 'before' => 'Use an account with permission to edit jobs or manage parts.',
         'tip' => 'Mark a part consumed when it is fitted or used. Removing it before invoicing returns the recorded quantity to stock.',
         'requires' => ['phone_rep'],
+        'permissions' => ['repairs.view'],
         'link' => ['route' => 'repairs.index', 'permission' => 'repairs.view', 'parameters' => []],
         'steps' => [
-            ['title' => 'Assign and diagnose', 'text' => 'Open the job and select a technician, priority and due date. Move to Diagnosing, record the findings and save the estimate when you have it.'],
-            ['title' => 'Record approval and parts', 'text' => 'Record the customer’s approval when they accept the quote. Enable Available for Repairs on stock products. Plan the required quantities in the job, then mark the parts consumed as work progresses.'],
-            ['title' => 'Finalize and hand over', 'text' => 'Review labor, fees, discounts, tax and costs. Mark the device Ready and then Completed to issue the invoice. Record delivery at handover to start the warranty period and clear the stored unlock credential.'],
+            ['title' => 'Assign and diagnose', 'permissions' => ['repairs.edit'], 'text' => 'Open the job and select a technician, priority and due date. Move to Diagnosing, record the findings and save the estimate when you have it.'],
+            ['title' => 'Record approval and parts', 'permissions' => ['repairs.edit', 'repairs.parts'], 'text' => 'Record the customer’s approval when they accept the quote. Enable Available for Repairs on stock products. Plan the required quantities in the job, then mark the parts consumed as work progresses.'],
+            ['title' => 'Finalize and hand over', 'permissions' => ['repairs.edit'], 'text' => 'Review labor, fees, discounts, tax and costs. Mark the device Ready and then Completed to issue the invoice. Record delivery at handover to start the warranty period and clear the stored unlock credential.'],
         ],
     ],
     'manage-repair-payments-and-reports' => [
@@ -35,9 +37,9 @@ return [
         'requires' => ['phone_rep'],
         'link' => ['route' => 'repairs.reports', 'permission' => 'repairs.reports', 'parameters' => []],
         'steps' => [
-            ['title' => 'Post an advance or payment', 'text' => 'In Billing & payments, choose Take advance before invoicing or Collect payment afterward. Enter the amount and method, then print the payment receipt.'],
-            ['title' => 'Correct or refund a payment', 'text' => 'Choose Correct next to the original entry and give a reason for the replacement. Use Record refund when returning money. Refund remaining advances before cancelling an uninvoiced job.'],
-            ['title' => 'Review and export', 'text' => 'Open Repair reports and pick a report. Use date and job filters, then Export CSV. The consolidated profit statement includes invoiced repair revenue, parts costs, direct costs and credits.'],
+            ['title' => 'Post an advance or payment', 'permissions' => ['repairs.view', 'repairs.pay'], 'text' => 'In Billing & payments, choose Take advance before invoicing or Collect payment afterward. Enter the amount and method, then print the payment receipt.'],
+            ['title' => 'Correct or refund a payment', 'permissions' => ['repairs.view', 'repairs.correct_payment'], 'text' => 'Open Billing & payments. Select Correct beside the original payment to replace it, or Record refund to return money. Enter a reason, tick the confirmation box, then select Post confirmed change. The original payment stays in the history.'],
+            ['title' => 'Review and export', 'permissions' => ['repairs.reports', 'repairs.reports.export'], 'text' => 'Open Repair reports and pick a report. Use date and job filters, then Export CSV. The consolidated profit statement includes invoiced repair revenue, parts costs, direct costs and credits.'],
         ],
     ],
     'configure-phone-repairs' => [
@@ -46,10 +48,11 @@ return [
         'path' => 'Settings → Repair settings', 'before' => 'An administrator assigns repair permissions from the role editor.',
         'tip' => 'Grant unlock access only to staff who need to test customer devices.',
         'requires' => ['phone_rep'],
+        'permissions' => ['repairs.settings'],
         'link' => ['route' => 'repairs.settings', 'permission' => 'repairs.settings', 'parameters' => []],
         'steps' => [
             ['title' => 'Set printed terms', 'text' => 'In Phone repairs, open Repair settings to set the paper size, layout and terms. Preview a sample receipt before saving. Open Device catalog to add or archive brands and models.'],
-            ['title' => 'Set permissions', 'text' => 'Open Roles & permissions, choose a role and grant the repair actions it needs. Repair jobs follow owner and role visibility. Assigned technicians can open their jobs if they have repair access.'],
+            ['title' => 'Set permissions', 'permissions' => ['roles.edit'], 'text' => 'Open Roles & permissions, choose a role and grant the repair actions it needs. Repair jobs follow owner and role visibility. Assigned technicians can open their jobs if they have repair access.'],
         ],
     ],
     'configure-repair-sms' => [
@@ -58,10 +61,11 @@ return [
         'path' => 'Settings → SMS', 'before' => 'Configure the Textit account and enable SMS sending.',
         'tip' => 'Keep message templates focused on the tracking number, status and collection details.',
         'requires' => ['repair_sms'],
+        'permissions' => ['repairs.settings', 'sms.settings'],
         'link' => ['route' => 'settings.sms', 'permission' => 'sms.settings', 'parameters' => []],
         'steps' => [
             ['title' => 'Enable message types', 'text' => 'Open Phone repairs → Repair settings. Turn on Enable repair SMS and choose the notifications you want to send. Use the SMS account and templates link to review the message wording.'],
-            ['title' => 'Confirm customer consent', 'text' => 'Tick the consent checkbox only if the customer agrees. Staff can withdraw consent on the job. Check SMS history for queued and sent updates.'],
+            ['title' => 'Confirm customer consent', 'permissions' => ['repairs.view', 'repairs.edit'], 'text' => 'Tick the consent checkbox only if the customer agrees. Staff can withdraw consent on the job. Check SMS history for queued and sent updates.'],
         ],
     ],
 ];

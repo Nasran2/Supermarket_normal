@@ -133,51 +133,63 @@ class RepairController extends Controller
             'device' => $job->device->brand.' '.$job->device->model, 'status' => Repairs::STATUS[$job->status],
             'received' => $job->received_at->toDateString(), 'warranty' => $job->warranty_until?->toDateString(), 'url' => route('repairs.show', $job),
         ]);
-        $payments = RepairPayment::whereIn('repair_job_id', (clone $jobs)->select('id'))->latest('id')->limit(12)
-            ->get(['created_at', 'kind', 'method_name', 'amount']);
+        $payments = Repairs::canViewPayments(auth()->user())
+            ? RepairPayment::whereIn('repair_job_id', (clone $jobs)->select('id'))->latest('id')->limit(12)->get(['kind', 'method_name', 'amount'])
+            : collect();
         $open = (clone $jobs)->whereNotIn('status', Repairs::CLOSED)->count();
         $due = (string) (clone $jobs)->whereNotNull('invoiced_at')->selectRaw('COALESCE(SUM(total - credited - paid), 0) as balance')->value('balance');
-        $account = $customer->pos_due_balance;
-        $previous_payments = $customer->sales()->visibleTo()->whereIn('status', ['ACTIVE', 'RETURN_CANCELLED'])
-            ->with('payments', 'collections')->latest('sold_at')->limit(12)->get()
-            ->flatMap(fn ($sale) => $sale->payments->map(fn ($payment) => ['date' => $sale->sold_at->toDateString(), 'type' => 'POS payment', 'amount' => Money::displayPayment(Money::sub($payment->amount_paid, $payment->change))])
-                ->concat($sale->collections->map(fn ($payment) => ['date' => $payment->collected_at->toDateString(), 'type' => 'Due collection', 'amount' => Money::displayPayment($payment->amount)])))
-            ->concat(SalesVisibility::apply($customer->customerPayments()->getQuery(), 'customer_payments.user_id')
-                ->with('allocations')->latest('payment_date')->limit(12)->get()->map(fn ($payment) => [
-                    'date' => $payment->payment_date->toDateString(), 'type' => 'Opening balance payment',
-                    'amount' => Money::displayPayment(Money::sum($payment->allocations->where('type', 'OPENING_BALANCE')->pluck('amount'))),
-                ])->filter(fn ($payment) => $payment['amount'] !== Money::displayPayment(0)))
-            ->sortByDesc('date')->take(12)->values();
+        $account = null;
+        $previous_payments = collect();
+        if (auth()->user()->hasPermission('customers.ledger')) {
+            $account = Money::displayCustomerAmount($customer->pos_due_balance);
+            $previous_payments = $customer->sales()->visibleTo()->whereIn('status', ['ACTIVE', 'RETURN_CANCELLED'])
+                ->with('payments', 'collections')->latest('sold_at')->limit(12)->get()
+                ->flatMap(fn ($sale) => $sale->payments->map(fn ($payment) => ['date' => $sale->sold_at->toDateString(), 'type' => 'POS payment', 'amount' => Money::displayPayment(Money::sub($payment->amount_paid, $payment->change))])
+                    ->concat($sale->collections->map(fn ($payment) => ['date' => $payment->collected_at->toDateString(), 'type' => 'Due collection', 'amount' => Money::displayPayment($payment->amount)])))
+                ->concat(SalesVisibility::apply($customer->customerPayments()->getQuery(), 'customer_payments.user_id')
+                    ->with('allocations')->latest('payment_date')->limit(12)->get()->map(fn ($payment) => [
+                        'date' => $payment->payment_date->toDateString(), 'type' => 'Opening balance payment',
+                        'amount' => Money::displayPayment(Money::sum($payment->allocations->where('type', 'OPENING_BALANCE')->pluck('amount'))),
+                    ])->filter(fn ($payment) => $payment['amount'] !== Money::displayPayment(0)))
+                ->sortByDesc('date')->take(12)->values();
+        }
         $due = Money::displayCustomerAmount($due);
-        $account = Money::displayCustomerAmount($account);
         $payments = $payments->map(fn ($payment) => ['kind' => $payment->kind, 'method_name' => $payment->method_name, 'amount' => Money::displayPayment($payment->amount)]);
 
-        return response()->json(compact('devices', 'history', 'payments', 'open', 'due', 'account', 'previous_payments'));
+        return response()->json(compact('devices', 'history', 'payments', 'open', 'due', 'account', 'previous_payments'))->header('Cache-Control', 'no-store');
     }
 
     public function show(RepairJob $repair)
     {
         Gate::authorize('view', $repair);
-        $repair->load('customer', 'device', 'technician', 'parts', 'payments.reversal', 'attachments', 'costs');
-        $events = $repair->events()->with('user')->latest('id')->paginate(20, pageName: 'activity');
+        $canViewPayments = Repairs::canViewPayments(auth()->user());
+        $repair->load('customer', 'device', 'technician', 'parts', 'attachments', 'costs');
+        if ($canViewPayments) {
+            $repair->load('payments.reversal');
+        } else {
+            $repair->setRelation('payments', $repair->newCollection());
+        }
+        $events = $repair->events()->with('user')
+            ->when(! $canViewPayments, fn ($query) => $query->whereNotIn('kind', ['PAYMENT', 'CHEQUE']))
+            ->latest('id')->paginate(20, pageName: 'activity');
         $methods = $this->methods();
         $chequeMethod = PaymentMethod::forContext('receive')->where('type', 'CHEQUE')->where('active', true)->first();
-        $heldCheques = config('features.cheque') ? $repair->cheques()->held()->get() : collect();
+        $heldCheques = $canViewPayments && config('features.cheque') ? $repair->cheques()->held()->get() : collect();
         $banks = BankAccount::where('active', true)->orderBy('bank_name')->get();
         $suppliers = Supplier::where('active', true)->orderBy('name')->get(['id', 'name']);
         $technicians = $this->technicians();
 
-        $customerDeviceCount = RepairDevice::where('customer_id', $repair->customer_id)->count();
-        $customerOngoingCount = RepairJob::where('customer_id', $repair->customer_id)
-            ->whereNotIn('status', ['COMPLETED', 'DELIVERED', 'CANCELLED', 'UNREPAIRABLE'])
-            ->count();
-        $customerTotalJobs = RepairJob::where('customer_id', $repair->customer_id)->count();
-        $customerDue = $repair->customer->due_balance ?? '0.00';
+        $customerJobs = RepairJob::visibleTo()->where('customer_id', $repair->customer_id);
+        $customerDeviceCount = (clone $customerJobs)->distinct()->count('device_id');
+        $customerOngoingCount = (clone $customerJobs)->whereNotIn('status', Repairs::CLOSED)->count();
+        $customerTotalJobs = (clone $customerJobs)->count();
+        $customerDue = Money::round((string) (clone $customerJobs)->whereNotNull('invoiced_at')
+            ->selectRaw('COALESCE(SUM(total - credited - paid), 0) as balance')->value('balance'));
         $partsTotal = Money::sum($repair->parts->where('state', 'CONSUMED')->map(fn ($p) => Money::mul($p->price, $p->quantity)));
         $plannedPartsTotal = Money::sum($repair->parts->where('state', 'PLANNED')->map(fn ($p) => Money::mul($p->price, $p->quantity)));
         $units = Unit::where('active', true)->orderBy('name')->get(['id', 'name', 'short_name']);
 
-        return response()->view('repairs.show', ['job' => $repair] + compact('events', 'methods', 'banks', 'suppliers', 'technicians', 'chequeMethod', 'heldCheques', 'customerDeviceCount', 'customerOngoingCount', 'customerTotalJobs', 'customerDue', 'partsTotal', 'plannedPartsTotal', 'units'))->header('Cache-Control', 'no-store');
+        return response()->view('repairs.show', ['job' => $repair] + compact('canViewPayments', 'events', 'methods', 'banks', 'suppliers', 'technicians', 'chequeMethod', 'heldCheques', 'customerDeviceCount', 'customerOngoingCount', 'customerTotalJobs', 'customerDue', 'partsTotal', 'plannedPartsTotal', 'units'))->header('Cache-Control', 'no-store');
     }
 
     public function update(Request $request, RepairJob $repair, RepairWorkflow $workflow)
@@ -200,6 +212,7 @@ class RepairController extends Controller
 
     public function consent(Request $request, RepairJob $repair)
     {
+        abort_unless(Repairs::sms(), 404);
         Gate::authorize('act', [$repair, 'edit']);
         $data = $request->validate(['sms_opt_in' => 'required|boolean']);
         DB::transaction(function () use ($request, $repair, $data) {
@@ -335,6 +348,7 @@ class RepairController extends Controller
             'cheque.cheque_number' => 'nullable|string|max:80', 'cheque.cheque_date' => 'nullable|date_format:Y-m-d',
             'cheque.bank_name' => 'nullable|string|max:150', 'cheque.branch' => 'nullable|string|max:150',
             'bank_account_id' => 'nullable|integer', 'reference' => 'nullable|string|max:120', 'reason' => ($reason ? 'required' : 'nullable').'|string|max:500',
+            'confirmed' => $reason ? 'required|accepted' : 'exclude',
         ]);
     }
 
@@ -379,6 +393,7 @@ class RepairController extends Controller
     public function print(Request $request, RepairJob $repair, string $document)
     {
         Gate::authorize('view', $repair);
+        abort_if($document === 'payment' && ! Repairs::canViewPayments($request->user()), 403);
         abort_if($document === 'invoice' && ! $repair->invoiced_at, 404);
         $data = $request->validate(RepairReceipt::rules() + ['payment' => ($document === 'payment' ? 'required' : 'nullable').'|integer']);
         $receipt = RepairReceipt::options($data, $document === 'intake');

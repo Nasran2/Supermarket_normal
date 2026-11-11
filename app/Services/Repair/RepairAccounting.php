@@ -24,6 +24,14 @@ class RepairAccounting
     {
         DB::transaction(function () use ($job, $data, $user, $kind, $paymentId) {
             $job = RepairJob::lockForUpdate()->findOrFail($job->id);
+            if ($cheque = Cheque::withoutGlobalScopes()->where('repair_submission', $data['submission'])->first()) {
+                abort_unless($cheque->repair_job_id === $job->id && $cheque->created_by === $user->id, 403);
+                if ($kind !== 'COLLECT' || (int) $data['payment_method_id'] !== (int) $cheque->repair_method_id) {
+                    throw ValidationException::withMessages(['payment' => 'This submission already recorded a cheque. Reopen the payment form for a new entry.']);
+                }
+
+                return;
+            }
             if ($existing = $job->payments()->where('submission', $data['submission'])->first()) {
                 abort_unless($existing->user_id === $user->id, 403);
 
@@ -111,11 +119,6 @@ class RepairAccounting
         }
         $cheques = app(ChequeService::class);
         $cheques->authorize($user->id, 'receive');
-        if ($existing = Cheque::withoutGlobalScopes()->where('repair_submission', $data['submission'])->first()) {
-            abort_unless($existing->repair_job_id === $job->id && $existing->created_by === $user->id, 403);
-
-            return;
-        }
         $held = Money::add($job->chequeHold(), $amount);
         if (($job->invoiced_at && Money::compare($held, $job->due()) > 0)
             || Money::compare(Money::add($job->paid, $held), '999999999999.99') > 0) {

@@ -82,6 +82,9 @@ class HrService
             } elseif (array_key_exists('role_id', $data) && $staff->user_id) {
                 $this->fail('role_id', 'Select the existing login role. Deactivate access using the login status instead of deleting its history.');
             }
+            if ($staff->status === 'INACTIVE') {
+                $this->deactivateStaffLogin($staff);
+            }
             if (! $new && collect($before)->except(['updated_at'])->all() !== collect($staff->getAttributes())->except(['updated_at'])->all()) {
                 $staff->events()->create(['type' => 'PROFILE_UPDATE', 'event_date' => today(), 'reason' => 'Staff details updated', 'snapshot' => $staff->getAttributes(), 'user_id' => auth()->id()]);
             }
@@ -111,16 +114,28 @@ class HrService
             if ($type === 'EXIT' && ($staff->attendances()->where('status', '!=', 'UNMARKED')->whereDate('date', '>', $date)->exists() || $staff->leaves()->where('status', 'APPROVED')->whereDate('to', '>', $date)->exists() || $staff->payrolls()->where('status', '!=', 'VOIDED')->whereDate('period', '>', Carbon::parse($date)->startOfMonth())->exists())) {
                 $this->fail('date', 'Later attendance, approved leave or payroll exists. Correct those records before backdating the exit.');
             }
-            if ($type === 'EXIT' && $staff->user_id) {
-                $user = User::with('role.permissions')->findOrFail($staff->user_id);
-                // Preserve the protected Administrator and self-access checks in user management.
-                app(ResourceService::class)->save('users', ['name' => $user->name, 'username' => $user->username, 'email' => $user->email, 'role_id' => $user->role_id, 'active' => false], $user->id);
+            if ($type === 'EXIT') {
+                $this->deactivateStaffLogin($staff);
             }
             $before = $staff->getAttributes();
             $staff->update(['status' => $type === 'EXIT' ? 'EXITED' : 'ACTIVE', 'left_on' => $type === 'EXIT' ? $date : null]);
             $staff->events()->create(['type' => $type, 'event_date' => $date, 'reason' => $data['reason'], 'snapshot' => $staff->getAttributes(), 'user_id' => auth()->id()]);
             Audit::record('hr.staff.'.strtolower($type), $staff, $before, $staff->getAttributes());
         }, 3);
+    }
+
+    private function deactivateStaffLogin(Staff $staff): void
+    {
+        $account = $staff->user_id ? $staff->user()->lockForUpdate()->firstOrFail() : null;
+        if (! $account?->active) {
+            return;
+        }
+
+        abort_unless(auth()->user()->hasPermission('hr.staff.accounts') && auth()->user()->hasPermission('users.edit'), 403);
+        app(ResourceService::class)->save('users', [
+            ...$account->only(['name', 'username', 'email', 'role_id']),
+            'active' => false,
+        ], $account->id);
     }
 
     public function markAttendance(string $date, array $rows): void

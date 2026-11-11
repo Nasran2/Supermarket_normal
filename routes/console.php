@@ -2,6 +2,7 @@
 
 use App\Models\Role;
 use App\Models\SmsMessage;
+use App\Models\SuperAdmin;
 use App\Models\User;
 use App\Services\ChequeSmsReminderService;
 use App\Services\DemoDataService;
@@ -9,6 +10,7 @@ use App\Services\SmsService;
 use App\Services\SmsSettingsService;
 use App\Support\Demo;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -52,6 +54,28 @@ Artisan::command('pos:admin {email} {--name=Administrator} {--username= : Login 
     User::create(['name' => $this->option('name'), 'username' => $username, 'email' => $email, 'password' => $password, 'role_id' => $role->id, 'active' => true]);
     $this->info('Administrator created. Username: '.$username);
 })->purpose('Create an administrator without a default password');
+
+Artisan::command('pos:superadmin {username}', function () {
+    $username = trim($this->argument('username'));
+    $validator = Validator::make(['username' => $username], [
+        'username' => ['required', 'string', 'max:64', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/', 'unique:super_admins,username'],
+    ]);
+    if ($validator->fails()) {
+        $this->error($validator->errors()->first());
+
+        return 1;
+    }
+    $password = $this->secret('New Super Admin password (at least 10 characters)');
+    if (! is_string($password) || strlen($password) < 10 || strlen($password) > 72) {
+        $this->error('Enter a password between 10 and 72 bytes.');
+
+        return 1;
+    }
+    SuperAdmin::create(['username' => $username, 'password' => Hash::make($password), 'active' => true]);
+    $this->info('Super Admin created.');
+
+    return 0;
+})->purpose('Create a Super Admin without a default password');
 
 Artisan::command('demo:reset', function (DemoDataService $service) {
     if (! Demo::enabled()) {

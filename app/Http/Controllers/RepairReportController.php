@@ -21,6 +21,7 @@ class RepairReportController extends Controller
     {
         abort_if(SecretControl::isHidden('disable_reports'), 404);
         $filters = $reports->filters($request);
+        abort_if(($filters['export'] ?? null) === 'csv' && ! $request->user()->hasPermission('repairs.reports.export'), 403);
         $kind = $filters['view'] ?? 'jobs';
         $canProfit = $request->user()->hasPermission('products.view_cost') && ! SecretControl::isHidden('hide_profit');
         abort_if($kind === 'profit' && ! $canProfit, 403);

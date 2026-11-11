@@ -367,7 +367,8 @@ class ReportService
             $headers = ['Date', 'Reference', 'Category', 'Description', 'Amount', 'Type', 'Status', 'Method', 'Recorded by'];
             $map = fn ($e) => [$e->expense_date->format('Y-m-d'), $e->reference ?? 'EXP-'.$e->id, $e->category->name, $e->description, Money::display($e->amount), $e->type, $e->status, $e->method?->name ?? '—', $e->user->name];
             $cards = ['Active expenses' => (string) (clone $query)->where('status', 'ACTIVE')->sum('amount')];
-            if (\App\Support\Repairs::enabled()) {
+            $query->visiblePayrollDetails();
+            if (auth()->user()?->hasPermission('repairs.reports')) {
                 $reference = DB::getDriverName() === 'sqlite' ? "'EXP-' || e.id" : "CONCAT('EXP-', e.id)";
                 $pos = DB::table('expenses as e')->whereIn('e.id', (clone $query)->reorder()->select('expenses.id')->toBase())
                     ->join('expense_categories as category', 'category.id', '=', 'e.expense_category_id')
@@ -733,6 +734,12 @@ class ReportService
                 'Period Money Out' => (string) $periodOut,
                 'Closing balance' => (string) $closing,
             ];
+            if (! auth()->user()?->hasPermission('hr.payments.view')) {
+                $query->where('transactions.type', '!=', 'Staff payment');
+            }
+            if (! auth()->user() || ! \App\Support\Repairs::canViewPayments(auth()->user())) {
+                $query->where('transactions.type', 'not like', 'Repair %');
+            }
         } elseif ($kind === 'audit') {
             $query = SalesVisibility::apply(AuditLog::with('user')->when(! \App\Support\Units::enabled(), fn ($q) => $q->where('action', 'not like', 'units.%')->where('action', 'not like', 'unit-presets.%')->where('action', '!=', 'unit.default'))->where('action', 'not like', 'hr.%')->when(! \App\Support\Repairs::enabled(), fn ($q) => $q->where('action', 'not like', 'repair.%'))->when(! config('features.barcode'), fn ($q) => $q->where('action', 'not like', 'barcode.%')->where('action', '!=', 'settings.barcode')), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
             $query->where(function ($q) {

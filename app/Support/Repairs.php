@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\RepairJob;
+use App\Models\User;
 use App\Services\SettingsService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -13,7 +14,7 @@ final class Repairs
         'view' => 'View repair jobs', 'create' => 'Receive devices', 'edit' => 'Manage repair jobs',
         'parts' => 'Manage and consume repair parts', 'pay' => 'Collect repair payments',
         'correct_payment' => 'Correct and refund repair payments', 'unlock' => 'Reveal device unlock credentials',
-        'reports' => 'View and export repair reports', 'settings' => 'Manage repair settings',
+        'reports' => 'View repair reports', 'reports.export' => 'Export repair reports', 'settings' => 'Manage repair settings',
     ];
 
     public const STATUS = [
@@ -33,6 +34,12 @@ final class Repairs
     public static function enabled(): bool
     {
         return (bool) config('services.phone_rep');
+    }
+
+    public static function canViewPayments(User $user): bool
+    {
+        return $user->hasPermission('repairs.pay') || $user->hasPermission('repairs.correct_payment')
+            || $user->hasPermission('repairs.reports');
     }
 
     public static function sms(): bool

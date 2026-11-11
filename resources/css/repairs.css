@@ -921,14 +921,70 @@ body.phone-repair-theme {
 }
 
 /* Work Details Card */
+.job-work-form {
+  display: flex;
+  flex-direction: column;
+  gap: .95rem;
+}
+
+.job-work-form .field {
+  margin-top: 0;
+  gap: .35rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.job-work-form .field > span,
+.job-work-form .field > .field-title {
+  font-size: .78rem;
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.25;
+}
+
+.job-work-form .field :is(input:not([type="checkbox"]), select) {
+  height: 38px;
+  min-height: 38px;
+  padding: 0 .7rem;
+  font-size: .84rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  box-sizing: border-box;
+}
+
+.job-work-form .field textarea {
+  padding: .6rem .75rem;
+  font-size: .84rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  min-height: 62px;
+}
+
 .reported-fault-box {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
+  border-left: 3px solid #6366f1;
   border-radius: 8px;
-  padding: .7rem .85rem;
-  font-size: .88rem;
+  padding: .6rem .85rem;
+  font-size: .85rem;
   color: #1e293b;
-  margin-top: .3rem;
+  font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+}
+
+.reported-fault-kicker {
+  font-size: .7rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #64748b;
+  font-weight: 700;
 }
 
 .diagnostic-text {
@@ -937,35 +993,71 @@ body.phone-repair-theme {
   margin: .3rem 0 0;
 }
 
+.work-subpanel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: .9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+.work-subpanel-title {
+  font-size: .74rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #475569;
+  margin: 0;
+}
+
 .financial-inputs-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: .75rem;
-  margin-top: .75rem;
+  align-items: end;
+}
+
+.work-schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem;
+  align-items: end;
 }
 
 .checkbox-options-row {
   display: flex;
-  flex-direction: column;
-  gap: .4rem;
-  margin-top: .6rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .65rem 1.25rem;
+  padding-top: .55rem;
+  border-top: 1px dashed #cbd5e1;
 }
 
 .job-check-label {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: .5rem;
-  font-size: .82rem;
+  gap: .45rem;
+  font-size: .8rem;
+  font-weight: 500;
   color: #334155;
   cursor: pointer;
 }
 
 .job-check-label input[type="checkbox"] {
   accent-color: #4f46e5;
+  width: 15px;
+  height: 15px;
+  min-height: 15px;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .form-actions-bar {
-  margin-top: .75rem;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: .25rem;
 }
 
 /* Spare Parts Table */
@@ -1285,9 +1377,17 @@ body.phone-repair-theme {
   display: flex;
   flex-direction: column;
   gap: .45rem;
-  padding-top: .4rem;
+  padding-top: .5rem;
   border-top: 1px solid #e2e8f0;
 }
+
+.payments-totals-block [hidden] {
+  display: none !important;
+}
+
+.repair-job-card-view .text-success { color: #15803d; }
+.repair-job-card-view .text-primary { color: #4f46e5; }
+.repair-job-card-view .text-danger { color: #dc2626; }
 
 .payment-total-row {
   display: flex;
@@ -1318,6 +1418,42 @@ body.phone-repair-theme {
 }
 
 /* Quick Actions Card */
+.repair-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .64rem;
+  font-weight: 700;
+  line-height: 1;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  letter-spacing: 0;
+}
+
+.repair-kbd.on-primary {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+.repair-kbd.on-success {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.repair-shortcut-hint {
+  font-size: .72rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
 .quick-actions-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1329,17 +1465,18 @@ body.phone-repair-theme {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: .4rem;
+  gap: .35rem;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: .75rem .4rem;
+  padding: .75rem .4rem .6rem;
   color: #334155;
   font-size: .74rem;
   font-weight: 650;
   cursor: pointer;
   transition: all 0.15s ease;
   text-decoration: none;
+  position: relative;
 }
 
 .quick-action-btn:hover {
@@ -1383,6 +1520,9 @@ body.phone-repair-theme {
 }
 
 .btn-action-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
   background: #16a34a;
   color: #ffffff;
   border: none;
@@ -1400,23 +1540,40 @@ body.phone-repair-theme {
 /* Responsive adjustments */
 @media (max-width: 1100px) {
   .job-hero-grid,
-  .job-context-grid {
-    grid-template-columns: 1fr;
-  }
+  .job-context-grid,
   .job-main-columns {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
-  .financial-inputs-grid {
-    grid-template-columns: 1fr 1fr;
+  .financial-inputs-grid,
+  .work-schedule-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 600px) {
-  .quick-actions-grid {
-    grid-template-columns: 1fr 1fr;
+  .job-tabs-bar {
+    flex-wrap: wrap;
   }
-  .financial-inputs-grid {
-    grid-template-columns: 1fr;
+  .job-tab-btn {
+    min-height: 42px;
+    padding-inline: .7rem;
+  }
+  .repair-milestone-stepper {
+    align-items: flex-start;
+  }
+  .milestone-node {
+    min-width: 0;
+  }
+  .milestone-text {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .quick-actions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .financial-inputs-grid,
+  .work-schedule-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

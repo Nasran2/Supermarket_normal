@@ -155,12 +155,7 @@ $walkthroughs = [
             [$frame('user-form', 'username', 'Enter separate login details for each person.'), $frame('user-form', 'role', 'Choose the correct role before creating the user.')],
             [$frame('login', 'signin', 'Have the staff member sign in and check the available menus.')],
         ],
-        'staff-and-payroll' => [
-            [$frame('staff-form', 'name', 'Add staff details, employment information and salary rates.')],
-            [$frame('attendance-form', 'date', 'Choose the working date.'), $frame('attendance-form', 'status', 'Record the attendance status and review leave.')],
-            [$frame('payroll-form', 'month', 'Choose the staff member and salary period before calculating a draft.')],
-            [$frame('staff-payments', 'staff', 'Choose the right staff member.'), $frame('staff-payments', 'amount', 'Record only the money actually paid or advanced.')],
-        ],
+        'staff-and-payroll' => array_fill(0, 6, []),
         'common-questions' => [
             [$frame('pos-catalog', 'all', 'Clear the search and choose All products.')],
             [$frame('pos-price', 'price', 'Choose the price that matches the goods being sold.')],

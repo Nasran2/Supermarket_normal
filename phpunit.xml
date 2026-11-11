@@ -21,6 +21,7 @@
         <env name="APP_ENV" value="testing"/>
         <env name="CUS_TAX" value="false" force="true"/>
         <env name="PHONE_REP" value="false" force="true"/>
+        <env name="hr_module" value="false" force="true"/>
         <env name="SMS" value="false" force="true"/>
         <env name="CHEQUE" value="false" force="true"/>
         <env name="UNIT" value="true" force="true"/>

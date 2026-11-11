@@ -1,3 +1,4 @@
+import { interceptWithInlineConfirm } from './inline-dialog.js';
 import './repairs.js';
 import './sms-templates.js';
 import './sms.js';
@@ -243,10 +244,13 @@ document.addEventListener('click', (e) => {
   dismiss?.closest('.notice')?.remove();
 });
 document.addEventListener('submit', (e) => {
+  if (e.defaultPrevented) return;
   const form = e.target;
-  if (form.dataset.confirm && !confirm(form.dataset.confirm)) {
-    e.preventDefault();
-    return;
+  if (form.dataset.confirm) {
+    const isDanger = /delete|remove|cancel|void|deactivate/i.test(form.dataset.confirm);
+    if (interceptWithInlineConfirm(form, e, { message: form.dataset.confirm, danger: isDanger })) {
+      return;
+    }
   }
   const button = e.submitter;
   if (button && !e.defaultPrevented) {

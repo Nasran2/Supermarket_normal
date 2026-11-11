@@ -26,7 +26,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -43,10 +42,7 @@ class PhoneRepairTest extends TestCase
     {
         parent::setUp();
         $this->seed();
-        $this->assertFalse(Route::has('repairs.index'));
         config(['services.phone_rep' => true]);
-        Route::middleware('web')->group(base_path('routes/repairs.php'));
-        Route::getRoutes()->refreshNameLookups();
         $this->admin = User::whereHas('role', fn ($q) => $q->where('name', 'Administrator'))->firstOrFail();
         $this->flushSession();
         $this->actingAs($this->admin);
@@ -139,13 +135,17 @@ class PhoneRepairTest extends TestCase
         $replacement = $this->payment('450', 'CARD');
         $this->post(route('repairs.payment.correct', [$job, $original]), $replacement)->assertSessionHasErrors('reason');
         $replacement['reason'] = 'Corrected tender and counted amount';
+        $this->post(route('repairs.payment.correct', [$job, $original]), $replacement)->assertSessionHasErrors('confirmed');
+        $replacement['confirmed'] = true;
         $this->post(route('repairs.payment.correct', [$job, $original]), $replacement)->assertSessionHasNoErrors();
         $this->post(route('repairs.payment.correct', [$job, $original]), $replacement)->assertSessionHasNoErrors();
         $this->assertSame('500.00', $original->fresh()->amount);
         $this->assertSame('-500.00', $original->reversal->amount);
+        $this->post(route('repairs.payment.correct', [$job, $original]), array_replace($replacement, ['submission' => (string) Str::uuid()]))->assertSessionHasErrors('payment');
+        $this->assertSame(1, $job->payments()->where('kind', 'REVERSAL')->count());
         $this->assertSame('50.00', $this->customer->fresh()->due_balance);
         $this->post(route('repairs.payment', [$job, 'collect']), $this->payment('50'))->assertSessionHasNoErrors();
-        $this->post(route('repairs.payment', [$job, 'refund']), $this->payment('70') + ['reason' => 'Partial goodwill credit'])->assertSessionHasNoErrors();
+        $this->post(route('repairs.payment', [$job, 'refund']), $this->payment('70') + ['reason' => 'Partial goodwill credit', 'confirmed' => true])->assertSessionHasNoErrors();
         $this->assertSame('0.00', $this->customer->fresh()->due_balance);
         $this->assertSame('0.00', app(CustomerLedgerService::class)->build($this->customer)->last()['balance']);
         $this->assertSame('240.00', app(RegisterService::class)->summary($register)['expected']);
@@ -215,6 +215,35 @@ class PhoneRepairTest extends TestCase
         $this->get(route('superadmin.repairs.settings'))->assertOk();
         $this->put(route('superadmin.repairs.settings.update'), ['terms' => 'Supervised intake'])->assertSessionHasNoErrors()->assertRedirect();
         $this->assertSame('Supervised intake', app(SettingsService::class)->get('repair_terms'));
+    }
+
+    public function test_repair_intake_history_and_receipts_require_financial_access(): void
+    {
+        $job = $this->intake();
+        $this->post(route('repairs.payment', [$job, 'collect']), $this->payment('50', 'CARD'))->assertSessionHasNoErrors();
+        $payment = $job->payments()->firstOrFail();
+
+        $role = Role::create(['name' => 'Repair intake only', 'sales_visibility' => 'ALL']);
+        $role->permissions()->attach(Permission::whereIn('name', ['repairs.view', 'repairs.create'])->pluck('id'));
+        $clerk = User::factory()->create(['role_id' => $role->id]);
+        $this->flushSession();
+        $this->actingAs($clerk)->getJson(route('repairs.customers.history', $this->customer))->assertOk()
+            ->assertJsonPath('account', null)->assertJsonPath('previous_payments', [])->assertJsonPath('payments', []);
+        $this->get(route('repairs.show', $job))->assertOk()->assertDontSee('Print payment receipt');
+        $this->get(route('repairs.print', [$job, 'payment', 'payment' => $payment->id]))->assertForbidden();
+    }
+
+    public function test_repair_report_export_requires_a_separate_grant(): void
+    {
+        $role = Role::create(['name' => 'Repair reports only', 'sales_visibility' => 'ALL']);
+        $role->permissions()->attach(Permission::where('name', 'repairs.reports')->value('id'));
+        $viewer = User::factory()->create(['role_id' => $role->id]);
+        $this->flushSession();
+        $this->actingAs($viewer)->get(route('repairs.reports'))->assertOk()->assertDontSee('Export CSV');
+        $this->get(route('repairs.reports', ['export' => 'csv']))->assertForbidden();
+        $role->permissions()->attach(Permission::where('name', 'repairs.reports.export')->value('id'));
+        $viewer->unsetRelation('role');
+        $this->get(route('repairs.reports', ['export' => 'csv']))->assertOk();
     }
 
     public function test_cheque_hold_clearance_and_return_are_counted_once(): void

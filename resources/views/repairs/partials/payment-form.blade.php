@@ -1,4 +1,4 @@
-<form method="post" action="{{ $action }}" class="repair-stack" @if(!$reason && $chequeMethod) data-repair-cheque-method="{{ $chequeMethod->id }}" @endif @if($reason) data-repair-confirm="Post this change to the payment ledger?" @endif>@csrf
+<form method="post" action="{{ $action }}" class="repair-stack" @if(!$reason && $chequeMethod) data-repair-cheque-method="{{ $chequeMethod->id }}" @endif>@csrf
     <div class="card-heading"><h2>{{ $title }}</h2><button type="button" class="btn secondary" data-repair-close>Close</button></div>
     <input type="hidden" name="submission" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
     <label class="field">{{ $original ? 'Replacement amount' : 'Amount' }}<input type="number" name="amount" min=".01" step=".01" value="{{ $original?->amount }}" required></label>
@@ -13,6 +13,8 @@
     @endif
     @if($banks->isNotEmpty())<label class="field">Bank account (for bank, card or QR)<select name="bank_account_id"><option value="">No linked account</option>@foreach($banks as $bank)<option value="{{ $bank->id }}" @selected($original?->bank_account_id===$bank->id)>{{ $bank->bank_name }} · {{ $bank->account_name }} · {{ substr($bank->account_number,-4) }}</option>@endforeach</select></label>@endif
     <label class="field">Reference<input name="reference" maxlength="120" value="{{ $original?->reference }}"></label>
-    @if($reason)<label class="field">Reason<textarea name="reason" rows="2" maxlength="500" required></textarea></label>@endif
-    <div><button class="btn primary">Post entry</button></div>
+    @if($reason)<label class="field">Reason<textarea name="reason" rows="2" maxlength="500" required></textarea></label>
+        <label class="repair-setting-check"><input type="checkbox" name="confirmed" value="1" required> I confirm this change to the payment ledger.</label>
+    @endif
+    <div><button class="btn primary">{{ $reason ? 'Post confirmed change' : 'Record payment' }}</button></div>
 </form>

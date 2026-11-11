@@ -256,6 +256,9 @@ class ResourceService
                     }
                     $this->guardPermissions($target->permissions->pluck('id')->all());
                     $this->guardSalesVisibility($target);
+                    if ($id && $data['active'] && \App\Models\Hr\Staff::where('user_id', $id)->whereIn('status', ['INACTIVE', 'EXITED'])->exists()) {
+                        throw ValidationException::withMessages(['active' => 'This account is linked to an inactive staff member.']);
+                    }
                     if ($id === auth()->id() && (! $data['active'] || $data['role_id'] != auth()->user()->role_id)) {
                         throw ValidationException::withMessages(['active' => 'You cannot disable yourself or change your own role.']);
                     }

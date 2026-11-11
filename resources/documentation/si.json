@@ -822,5 +822,21 @@
   "Enable message types": "පණිවිඩ වර්ග සක්‍රීය කරන්න",
   "Open Phone repairs → Repair settings. Turn on Enable repair SMS and choose the notifications you want to send. Use the SMS account and templates link to review the message wording.": "දුරකථන අලුත්වැඩියා → Repair settings විවෘත කරන්න. Enable repair SMS සක්‍රීය කර යැවීමට අවශ්‍ය දැනුම්දීම් තෝරන්න. පණිවිඩ පෙළ පරීක්ෂා කිරීමට SMS ගිණුම සහ ආකෘති සබැඳිය භාවිත කරන්න.",
   "Confirm customer consent": "පාරිභෝගික කැමැත්ත තහවුරු කරන්න",
-  "Tick the consent checkbox only if the customer agrees. Staff can withdraw consent on the job. Check SMS history for queued and sent updates.": "පාරිභෝගිකයා එකඟ නම් පමණක් කැමැත්ත සලකුණු කරන්න. කාර්යයෙන් එම කැමැත්ත ඉවත් කළ හැකිය. පෝලිමේ සහ යැවූ පණිවිඩ SMS ඉතිහාසයෙන් බලන්න."
+  "Tick the consent checkbox only if the customer agrees. Staff can withdraw consent on the job. Check SMS history for queued and sent updates.": "පාරිභෝගිකයා එකඟ නම් පමණක් කැමැත්ත සලකුණු කරන්න. කාර්යයෙන් එම කැමැත්ත ඉවත් කළ හැකිය. පෝලිමේ සහ යැවූ පණිවිඩ SMS ඉතිහාසයෙන් බලන්න.",
+  "Use Human resources": "මානව සම්පත් භාවිතය",
+  "Find the staff tools and reports available to your account.": "ඔබේ ගිණුමට ලබා දී ඇති සේවක මෙවලම් සහ වාර්තා සොයන්න.",
+  "Check the staff member and the date before saving.": "සුරැකීමට පෙර සේවකයා සහ දිනය පරීක්ෂා කරන්න.",
+  "Add a staff member": "සේවකයෙකු එක් කරන්න",
+  "Open Staff and select Add staff. Enter the name, intake date and employment details. Select Add staff member to save.": "Staff විවෘත කර Add staff තෝරන්න. නම, සේවයට එක් වූ දිනය සහ රැකියා විස්තර ඇතුළත් කරන්න. සුරැකීමට Add staff member තෝරන්න.",
+  "Save attendance": "පැමිණීම සුරකින්න",
+  "Open Attendance, choose the date and select Load day. Choose a status for each staff member you are updating, then select Save attendance.": "Attendance විවෘත කර දිනය තෝරා Load day ඔබන්න. යාවත්කාලීන කරන එක් එක් සේවකයාගේ පැමිණීමේ තත්ත්වය තෝරා Save attendance ඔබන්න.",
+  "Record a leave request": "නිවාඩු ඉල්ලීමක් සටහන් කරන්න",
+  "Open Leave, then New leave request. Choose the staff member, leave type and dates. Enter the reason and select Record leave request.": "Leave විවෘත කර New leave request තෝරන්න. සේවකයා, නිවාඩු වර්ගය සහ දින තෝරන්න. හේතුව ඇතුළත් කර Record leave request ඔබන්න.",
+  "Prepare a salary draft": "වැටුප් කෙටුම්පතක් සකස් කරන්න",
+  "Open Payroll and select Prepare payroll. Choose the staff member and month, check any allowances or deductions and select Calculate salary draft.": "Payroll විවෘත කර Prepare payroll තෝරන්න. සේවකයා සහ මාසය තෝරා දීමනා හා අඩු කිරීම් පරීක්ෂා කරන්න. Calculate salary draft ඔබන්න.",
+  "Review payroll": "වැටුප් ගණනය පරීක්ෂා කරන්න",
+  "Open Payroll and select a payroll reference. Check the month, earnings, deductions and amount due.": "Payroll විවෘත කර වැටුප් යොමුව තෝරන්න. මාසය, ඉපැයීම්, අඩු කිරීම් සහ ගෙවිය යුතු මුදල පරීක්ෂා කරන්න.",
+  "Find an HR report": "මානව සම්පත් වාර්තාවක් සොයන්න",
+  "Open HR Reports, choose a report and select Apply filters after entering a date range or staff member.": "HR Reports විවෘත කර වාර්තාව තෝරන්න. දින පරාසය හෝ සේවකයා ඇතුළත් කර Apply filters ඔබන්න.",
+  "Open Billing & payments. Select Correct beside the original payment to replace it, or Record refund to return money. Enter a reason, tick the confirmation box, then select Post confirmed change. The original payment stays in the history.": "Billing & payments විවෘත කරන්න. ගෙවීම නිවැරදි කිරීමට එය අසල Correct තෝරන්න. මුදල් ආපසු දීමට Record refund තෝරන්න. හේතුව ඇතුළත් කර තහවුරු කිරීමේ කොටුව සලකුණු කර Post confirmed change ඔබන්න. මුල් ගෙවීම ඉතිහාසයේ පවතී."
 }

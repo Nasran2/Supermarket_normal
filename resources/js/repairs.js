@@ -1,3 +1,5 @@
+import { interceptWithInlineConfirm } from './inline-dialog.js';
+
 const node = (tag, text) => {
   const element = document.createElement(tag);
   element.textContent = text;
@@ -578,7 +580,7 @@ function intake(root, chooseCustomer) {
         device.add(new Option(title, row.id, false, String(row.id) === String(selected)));
       }
       updateDevice();
-      const totals = node('p', data.open + ' active jobs · Repair balance ' + data.due + ' · Account balance ' + data.account);
+      const totals = node('p', data.open + ' active jobs · Repair balance ' + data.due + (data.account === null ? '' : ' · Account balance ' + data.account));
       const list = document.createElement('ul');
       list.className = 'repair-history';
       for (const job of data.history) {
@@ -775,7 +777,28 @@ document.querySelectorAll('[data-repair-confirm], [data-workflow]').forEach((for
       CANCELLED: 'Cancel this repair?',
       UNREPAIRABLE: 'Close this repair as unrepairable?',
     })[status];
-    if (message && !window.confirm(message)) event.preventDefault();
+    if (!message) return;
+
+    const actionText = (message + ' ' + (form.action || '')).toLowerCase();
+    const isDanger = status === 'CANCELLED' || status === 'UNREPAIRABLE' || actionText.includes('remove') || actionText.includes('refund');
+    const titleMap = {
+      COMPLETED: 'Finalize Repair Invoice',
+      DELIVERED: 'Mark Device Delivered',
+      CANCELLED: 'Cancel Repair Job',
+      UNREPAIRABLE: 'Close as Unrepairable',
+    };
+    const title = titleMap[status]
+      || (actionText.includes('deduct') ? 'Consume Spare Part'
+        : actionText.includes('remove') ? 'Remove Spare Part'
+        : actionText.includes('payment') ? 'Confirm Payment Entry'
+        : 'Please Confirm');
+    const confirmText = status === 'COMPLETED' ? 'Finalize Invoice'
+      : status === 'DELIVERED' ? 'Mark Delivered'
+      : isDanger ? 'Yes, Confirm'
+      : actionText.includes('deduct') ? 'Deduct Stock'
+      : 'Confirm';
+
+    interceptWithInlineConfirm(form, event, { title, message, confirmText, danger: isDanger });
   });
 });
 document.querySelectorAll('[data-repair-unlock]').forEach((button) => {
@@ -860,7 +883,11 @@ document.querySelector('[data-new-repair-product]')?.addEventListener('submit', 
       error.textContent = failure.message;
       error.hidden = false;
     } else {
-      alert(failure.message);
+      const msg = document.createElement('p');
+      msg.className = 'text-danger';
+      msg.setAttribute('role', 'alert');
+      msg.textContent = failure.message;
+      form.prepend(msg);
     }
   } finally {
     button.disabled = false;

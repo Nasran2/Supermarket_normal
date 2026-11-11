@@ -3,7 +3,14 @@
 @section('content')
 <div class="repair-page repair-stack">
     <div class="page-heading"><div><span class="eyebrow">SERVICE DESK / REPORTS</span><h1>Repair reports</h1><p>Review activity, outstanding balances, and repair performance.</p></div>
-        <div class="repair-actions"><a class="btn secondary" data-repair-export href="{{ request()->fullUrlWithQuery(['export'=>'csv']) }}">Export CSV</a>@can('repairs.view')<a class="btn secondary" href="{{ route('repairs.index') }}">Repair jobs</a>@endcan</div>
+        <div class="repair-actions">
+            @can('repairs.reports.export')
+                <a class="btn secondary" data-repair-export href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}">Export CSV</a>
+            @endcan
+            @can('repairs.view')
+                <a class="btn secondary" href="{{ route('repairs.index') }}">Repair jobs</a>
+            @endcan
+        </div>
     </div>
     <nav class="repair-actions repair-report-nav" aria-label="Repair reports">
         @foreach(\App\Services\Repair\RepairReporting::VIEWS as $key=>$label)

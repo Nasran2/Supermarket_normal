@@ -26,7 +26,9 @@ class DocumentationService
             $features[] = 'expiry';
         }
 
-        return collect($features)->every(fn ($feature) => $this->featureEnabled($feature));
+        return collect($features)->every(fn ($feature) => $this->featureEnabled($feature))
+            && collect($content['permissions'] ?? [])->every(fn ($permission) => auth()->user()?->hasPermission($permission))
+            && (! isset($content['any_permission']) || collect($content['any_permission'])->contains(fn ($permission) => auth()->user()?->hasPermission($permission)));
     }
 
     public function languages(): array
@@ -88,6 +90,9 @@ class DocumentationService
                 $step['notes'] = array_values(array_map(fn ($note) => $note['text'], array_filter($step['notes'] ?? [], fn ($note) => $this->available($note))));
                 $step['frames'] = $walkthroughs[$slug][$index] ?? [];
                 $steps[] = $step;
+            }
+            if ($steps === []) {
+                continue;
             }
             // Recorded screens contain optional controls. Show written instructions
             // when those controls are disabled, instead of exposing stale examples.

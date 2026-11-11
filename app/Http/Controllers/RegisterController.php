@@ -18,7 +18,7 @@ class RegisterController extends Controller
         $summary = $register ? $service->summary($register, true) : null;
         $registers = SalesVisibility::apply(Register::with('user'), 'registers.user_id')->when(! auth()->user()->hasPermission('register.view_all'), fn ($q) => $q->where('user_id', auth()->id()))->latest()->paginate(15);
         if ($register) {
-            $register->load('movements.user');
+            $register->load(['movements' => fn ($query) => $query->visibleDetails()->with('user')]);
         }
 
         return view('register.index', compact('register', 'summary', 'registers'));
@@ -71,7 +71,7 @@ class RegisterController extends Controller
     {
         abort_unless($register->user_id === auth()->id() || auth()->user()->hasPermission('register.view_all'), 403);
         abort_unless(SalesVisibility::allowsOwner((int) $register->user_id), 403);
-        $register->load(['user', 'movements.user']);
+        $register->load(['user', 'movements' => fn ($query) => $query->visibleDetails()->with('user')]);
         $summary = $service->summary($register, true);
         $sales = $register->sales()->visibleTo()->with('payments')->latest('sold_at')->get();
 
