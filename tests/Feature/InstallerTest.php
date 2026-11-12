@@ -5,11 +5,18 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\Installer;
 use Dotenv\Dotenv;
+use Illuminate\Database\MariaDbConnection;
+use Illuminate\Database\MySqlConnection;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Schema\MySqlBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Mockery;
+use PDOException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -148,6 +155,107 @@ class InstallerTest extends TestCase
         $this->assertFileDoesNotExist($this->directory.'/.env');
         $this->assertSame(42, $database->table('keep_me')->sole()->id);
         $this->assertFalse($database->getSchemaBuilder()->hasTable('migrations'));
+    }
+
+    public function test_mysql_and_mariadb_create_tables_with_innodb_explicitly(): void
+    {
+        foreach (['mysql' => MySqlConnection::class, 'mariadb' => MariaDbConnection::class] as $driver => $connectionClass) {
+            $connection = new $connectionClass(DB::connection('sqlite')->getPdo(), 'example_db', '', config('database.connections.'.$driver));
+            $queries = $connection->pretend(fn () => $connection->getSchemaBuilder()->create(
+                'installer_example',
+                fn (Blueprint $table) => $table->id(),
+            ));
+
+            $this->assertStringContainsString('engine = InnoDB', $queries[0]['query']);
+        }
+    }
+
+    public function test_setup_requires_innodb_before_creating_any_tables(): void
+    {
+        if (! extension_loaded('pdo_mysql')) {
+            $this->markTestSkipped('pdo_mysql is required to exercise the engine preflight.');
+        }
+
+        $connection = new class(DB::connection('sqlite')->getPdo(), 'example_db', '', config('database.connections.mysql')) extends MySqlConnection
+        {
+            public MySqlBuilder $schema;
+
+            public function getSchemaBuilder()
+            {
+                return $this->schema;
+            }
+
+            public function select($query, $bindings = [], $useReadPdo = true)
+            {
+                if ($query !== 'SHOW ENGINES') {
+                    return parent::select($query, $bindings, $useReadPdo);
+                }
+
+                return [
+                    (object) ['Engine' => 'MyISAM', 'Support' => 'DEFAULT'],
+                    (object) ['Engine' => 'InnoDB', 'Support' => 'DISABLED'],
+                ];
+            }
+        };
+        $schema = Mockery::mock(MySqlBuilder::class);
+        $schema->shouldReceive('getCurrentSchemaName')->andReturn('example_db');
+        $schema->shouldReceive('getTables')->with('example_db')->andReturn([]);
+        $schema->shouldReceive('getViews')->with('example_db')->andReturn([]);
+        $connection->schema = $schema;
+        DB::extend('twin_install', fn () => $connection);
+        Artisan::partialMock()->shouldNotReceive('call');
+
+        $this->from('/twininstall')->post('/twininstall', $this->payload())->assertRedirect('/twininstall')
+            ->assertSessionHasErrors([
+                'db_database' => 'This database server does not offer InnoDB. Ask your hosting provider to enable InnoDB or use a server that supports it. Setup has not created any tables.',
+            ]);
+        $this->assertFileDoesNotExist($this->directory.'/.env');
+    }
+
+    public function test_setup_shows_the_failed_migration_and_safe_database_error_details(): void
+    {
+        $database = $this->useTemporaryDatabase();
+        Artisan::partialMock()->shouldReceive('call')->once()->with('migrate', [
+            '--database' => 'twin_install', '--force' => true, '--no-interaction' => true,
+        ])->andReturnUsing(function () use ($database) {
+            $database->statement('create table migrations (migration varchar(255), batch integer)');
+            $completed = array_slice(array_keys(app('migrator')->getMigrationFiles(database_path('migrations'))), 0, 20);
+            $database->table('migrations')->insert(array_map(fn ($name) => ['migration' => $name, 'batch' => 1], $completed));
+
+            $error = new PDOException('Private connection credentials or SQL could appear here.');
+            $error->errorInfo = ['42000', 1091, 'Private database detail'];
+            throw $error;
+        });
+
+        $this->from('/twininstall')->post('/twininstall', $this->payload())->assertRedirect('/twininstall')
+            ->assertSessionHasErrors([
+                'db_database' => 'Table migrations (2026_10_08_203124_create_category_product_table) failed [42000 / 1091]. A required column, index or foreign key was missing. Use an empty database with InnoDB enabled. Setup may have created tables before it stopped. Retry with an empty database after fixing the error.',
+            ]);
+        $this->get('/twininstall')->assertOk()->assertSee('2026_10_08_203124_create_category_product_table')
+            ->assertDontSee('Private database detail')->assertDontSee('Private connection credentials');
+        $this->assertFileDoesNotExist($this->directory.'/.env');
+    }
+
+    public function test_setup_distinguishes_an_incorrect_database_login_from_a_migration_failure(): void
+    {
+        $this->app->instance(Installer::class, new class extends Installer
+        {
+            protected function databaseConfig(#[\SensitiveParameter] array $data): array
+            {
+                return ['driver' => 'installer_test_connection', 'database' => 'example_db'];
+            }
+        });
+        DB::extend('installer_test_connection', static function () {
+            $error = new PDOException('Private connection credentials');
+            $error->errorInfo = ['28000', 1045, 'Private database detail'];
+            throw $error;
+        });
+
+        $this->from('/twininstall')->post('/twininstall', $this->payload())->assertRedirect('/twininstall')
+            ->assertSessionHasErrors([
+                'db_database' => 'Connection check failed [28000 / 1045]. The database server rejected the login. Check the full database username and password, and confirm the host matches the user grant.',
+            ]);
+        $this->assertFileDoesNotExist($this->directory.'/.env');
     }
 
     public function test_locked_setup_requires_admin_and_the_configured_pin(): void

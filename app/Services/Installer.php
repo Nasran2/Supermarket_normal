@@ -8,9 +8,11 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\SampleProductSeeder;
 use Dotenv\Dotenv;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use PDOException;
 use RuntimeException;
 use Throwable;
 
@@ -92,47 +94,135 @@ class Installer
         config(['database.default' => self::CONNECTION, 'database.connections.'.self::CONNECTION => $this->databaseConfig($data)]);
 
         try {
-            try {
-                $connection = DB::connection(self::CONNECTION);
-                $schema = $connection->getSchemaBuilder();
-                $database = $schema->getCurrentSchemaName();
-                $occupied = $schema->getTables($database) || $schema->getViews($database);
-            } catch (Throwable) {
-                throw ValidationException::withMessages(['db_database' => 'Could not connect. Check the database name, host, port, username and password.']);
-            }
-            if ($occupied) {
-                throw ValidationException::withMessages(['db_database' => 'Use a new, empty database. Setup never overwrites an existing database.']);
+            $stage = 'Connection check';
+            $connection = null;
+            $driver = config('database.connections.'.self::CONNECTION.'.driver');
+            $mysql = in_array($driver, ['mysql', 'mariadb'], true);
+            if ($mysql && ! extension_loaded('pdo_mysql')) {
+                throw ValidationException::withMessages(['db_database' => 'The PHP MySQL driver (pdo_mysql) is missing. Enable it for the PHP version used by your website.']);
             }
 
-            try {
-                if (Artisan::call('migrate', ['--database' => self::CONNECTION, '--force' => true, '--no-interaction' => true]) !== 0) {
-                    throw new RuntimeException('Migration failed.');
-                }
-                $connection->transaction(function () use ($data) {
-                    $shopCategories = config('installer.shops')[$data['shop_type']]['categories'];
-                    app(DatabaseSeeder::class)->run(
-                        seedTestUser: false,
-                        productCategories: ['General', ...$shopCategories],
-                    );
-                    $admin = User::create([
-                        'name' => $data['admin_name'],
-                        'username' => $data['admin_username'],
-                        'email' => $data['admin_email'],
-                        'password' => $data['password'],
-                        'role_id' => Role::where('name', 'Administrator')->firstOrFail()->id,
-                    ]);
-                    Setting::where('key', 'business_name')->update(['value' => json_encode($data['shop_name'], JSON_THROW_ON_ERROR)]);
-                    if (! empty($data['sample_data'])) {
-                        app(SampleProductSeeder::class)->seedFor($admin, $data['shop_type'], $data['modules'] ?? []);
-                    }
-                });
-            } catch (Throwable $error) {
-                logger()->error('Twin installer database setup failed.', ['exception_type' => $error::class, 'code' => $error->getCode()]);
-                throw ValidationException::withMessages(['setup' => 'Database setup stopped. Check the database permissions and requirements. Use an empty database when retrying.']);
+            $connection = DB::connection(self::CONNECTION);
+            $schema = $connection->getSchemaBuilder();
+            $database = $schema->getCurrentSchemaName();
+            $tables = $schema->getTables($database);
+            if ($tables || $schema->getViews($database)) {
+                $myisam = collect($tables)->contains(fn ($table) => strcasecmp($table['engine'] ?? '', 'MyISAM') === 0);
+                $message = $myisam
+                    ? 'This database already contains MyISAM tables, possibly from a previous setup attempt. Twin POS requires InnoDB. Use a new empty database or restore this database to an empty state if it contains only disposable setup data.'
+                    : 'This database already contains tables or views. Use an empty database. The installer preserves existing records.';
+                throw ValidationException::withMessages(['db_database' => $message]);
             }
+
+            if ($mysql) {
+                $stage = 'InnoDB check';
+                $engines = $connection->select('SHOW ENGINES');
+                $supported = collect($engines)->contains(fn ($engine) => strcasecmp($engine->Engine, 'InnoDB') === 0
+                    && in_array(strtoupper($engine->Support), ['YES', 'DEFAULT'], true));
+                if (! $supported) {
+                    throw ValidationException::withMessages(['db_database' => 'This database server does not offer InnoDB. Ask your hosting provider to enable InnoDB or use a server that supports it. Setup has not created any tables.']);
+                }
+            }
+
+            $stage = 'Table migrations';
+            if (Artisan::call('migrate', ['--database' => self::CONNECTION, '--force' => true, '--no-interaction' => true]) !== 0) {
+                throw new RuntimeException('Migration failed.');
+            }
+
+            $stage = 'Starter data';
+            $connection->transaction(function () use ($data) {
+                $shopCategories = config('installer.shops')[$data['shop_type']]['categories'];
+                app(DatabaseSeeder::class)->run(
+                    seedTestUser: false,
+                    productCategories: ['General', ...$shopCategories],
+                );
+                $admin = User::create([
+                    'name' => $data['admin_name'],
+                    'username' => $data['admin_username'],
+                    'email' => $data['admin_email'],
+                    'password' => $data['password'],
+                    'role_id' => Role::where('name', 'Administrator')->firstOrFail()->id,
+                ]);
+                Setting::where('key', 'business_name')->update(['value' => json_encode($data['shop_name'], JSON_THROW_ON_ERROR)]);
+                if (! empty($data['sample_data'])) {
+                    app(SampleProductSeeder::class)->seedFor($admin, $data['shop_type'], $data['modules'] ?? []);
+                }
+            });
+        } catch (ValidationException $error) {
+            if (! in_array($stage, ['Table migrations', 'Starter data'], true)) {
+                throw $error;
+            }
+            throw $this->databaseFailure($stage, $connection, $error);
+        } catch (Throwable $error) {
+            throw $this->databaseFailure($stage, $connection, $error);
         } finally {
             DB::purge(self::CONNECTION);
             config(['database.default' => $original, 'database.connections.'.self::CONNECTION => null]);
+        }
+    }
+
+    private function databaseFailure(string $stage, ?Connection $connection, Throwable $error): ValidationException
+    {
+        $state = null;
+        $code = null;
+        for ($cause = $error; $cause; $cause = $cause->getPrevious()) {
+            if (! $cause instanceof PDOException) {
+                continue;
+            }
+            $candidate = (string) ($cause->errorInfo[0] ?? $cause->getCode());
+            $state ??= preg_match('/\A[A-Z0-9]{5}\z/', $candidate) ? $candidate : null;
+            $native = $cause->errorInfo[1] ?? null;
+            $code ??= is_numeric($native) ? (int) $native : null;
+        }
+
+        $migration = $stage === 'Table migrations' && $connection ? $this->pendingMigration($connection) : null;
+        $detail = match ($code) {
+            1044, 1142, 1143, 1227 => 'The database user lacks a required permission. In cPanel, add the user to this database and grant all privileges for this database.',
+            1045, 1698 => 'The database server rejected the login. Check the full database username and password, and confirm the host matches the user grant.',
+            1049 => 'The database does not exist. Create it in your hosting panel and enter its full name, including the account prefix.',
+            2002, 2003, 2005 => 'Could not reach the database server. Confirm the host and port with your hosting provider.',
+            2006, 2013 => 'The connection to the database server was lost. Check server availability and retry.',
+            1005 => 'The server could not create a required table. Ask your hosting provider to check database privileges and InnoDB support.',
+            1215, 1822, 3780 => 'A foreign key could not be created. Twin POS requires InnoDB tables and compatible foreign key columns.',
+            1091 => 'A required column, index or foreign key was missing. Use an empty database with InnoDB enabled.',
+            1050, 1060, 1061 => 'A table, column or index already exists. The database may contain part of an earlier installation.',
+            1286, 3161 => 'The server cannot create InnoDB tables. Ask your host to enable InnoDB.',
+            1071, 1214, 1709 => 'The server rejected a required database index. Ask your host to check InnoDB and FULLTEXT support.',
+            default => $state === '28000'
+                ? 'The database server rejected the login. Check the database username and password.'
+                : 'Check the application log or contact your hosting provider with the setup step and error code below.',
+        };
+
+        logger()->error('Twin installer database setup failed.', [
+            'stage' => $stage, 'migration' => $migration, 'sqlstate' => $state,
+            'database_code' => $code, 'exception_type' => $error::class,
+        ]);
+
+        $step = $stage.($migration ? ' ('.$migration.')' : '');
+        $identifier = implode(' / ', array_filter([$state, $code], fn ($value) => $value !== null));
+        $retry = in_array($stage, ['Table migrations', 'Starter data'], true)
+            ? ' Setup may have created tables before it stopped. Retry with an empty database after fixing the error.'
+            : '';
+
+        return ValidationException::withMessages([
+            'db_database' => $step.' failed'.($identifier !== '' ? ' ['.$identifier.']' : '').'. '.$detail.$retry,
+        ]);
+    }
+
+    private function pendingMigration(Connection $connection): ?string
+    {
+        try {
+            $table = config('database.migrations.table', 'migrations');
+            if (! $connection->getSchemaBuilder()->hasTable($table)) {
+                return null;
+            }
+
+            $completed = $connection->table($table)->pluck('migration')->all();
+            $files = app('migrator')->getMigrationFiles(database_path('migrations'));
+
+            return array_key_first(array_diff_key($files, array_flip($completed)));
+        } catch (Throwable) {
+            return null;
         }
     }
 

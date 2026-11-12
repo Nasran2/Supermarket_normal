@@ -20,6 +20,8 @@ For a new deployment, upload the application with `.env.example` and point the w
 
 The web-server user needs write access to the project directory to create `.env`, plus the normal access to `storage/` and `bootstrap/cache/`. Keep access to the new site private until the first installation is complete. If this deployment previously cached its routes, run `php artisan route:clear` once after uploading the installer.
 
+The installer checks for InnoDB support and explicitly uses it for new MySQL or MariaDB tables. If setup stops after creating some tables, fix the reported issue and retry with an empty database. The installer preserves tables left by previous attempts and refuses to overwrite them.
+
 After installation, sign in as an administrator and enter the installer PIN at `/twininstall` to change shop type or modules. Set `TWIN_INSTALL_PIN` in `.env` to replace the default PIN, then clear the configuration cache if enabled. Module changes preserve the current database, users, and application key.
 
 ### Install from the command line
