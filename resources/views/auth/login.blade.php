@@ -1,4 +1,12 @@
-@php($branding = \App\Support\Branding::values($settings ?? []))
+@php
+    $branding = \App\Support\Branding::values($settings ?? []);
+    $developerName = trim((string) config('app.developer.name'));
+    $developerPhone = trim((string) config('app.developer.phone'));
+    $developerWeb = trim((string) config('app.developer.web'));
+    $developerUrl = preg_match('~^https?://~i', $developerWeb) ? $developerWeb : 'https://'.$developerWeb;
+    $developerUrl = filter_var($developerUrl, FILTER_VALIDATE_URL) ? $developerUrl : null;
+    $developerTel = preg_replace('/[^0-9+]/', '', $developerPhone);
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -37,6 +45,17 @@
         .input-icon-left {
             padding-left: 2.75rem;
         }
+        .login-options { justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+        .login-forgot { color: var(--login-accent); font-size: 13px; font-weight: 600; min-height: 32px; }
+        .login-forgot:hover { text-decoration: underline; }
+        .login-support-dialog { width: min(460px, calc(100vw - 24px)); }
+        .login-support-dialog .modal-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .login-support-dialog h2 { font-size: 18px; font-weight: 700; }
+        .login-support-dialog p { font-size: 14px; line-height: 1.6; }
+        .login-support-details { display: grid; gap: 16px; margin: 20px 0; }
+        .login-support-details dt { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+        .login-support-details dd { margin: 0; overflow-wrap: anywhere; }
+        .login-support-details a { color: var(--login-accent); text-decoration: underline; }
     </style>
 </head>
 <body class="supermarket-bg min-h-screen flex items-center justify-center p-6 font-sans antialiased text-gray-800 {{ \App\Support\Repairs::enabled() ? 'phone-repair-theme' : '' }}">
@@ -118,8 +137,8 @@
                 </div>
             </div>
 
-            <!-- Remember me (No forgot password) -->
-            <div class="flex items-center">
+            <!-- Remember me and password help -->
+            <div class="flex items-center login-options">
                 <label class="flex items-center gap-2 cursor-pointer group">
                     <div class="relative flex items-center justify-center">
                         <input type="checkbox" name="remember" class="peer appearance-none w-4 h-4 rounded border-gray-300 border bg-white  transition-all cursor-pointer shadow-sm">
@@ -129,6 +148,7 @@
                     </div>
                     <span class="text-[13px] font-bold text-[#374151] select-none group-hover:text-gray-900 transition-colors">Remember me</span>
                 </label>
+                <button type="button" id="forgot-password" class="login-forgot" aria-haspopup="dialog" aria-controls="developer-contact-dialog">Forgot password?</button>
             </div>
 
             <button type="submit" class="w-full flex justify-center items-center gap-2 btn-green-gradient text-white font-bold text-[14px] py-3 px-4 rounded-xl transition-all active:scale-[0.98] mt-2">
@@ -155,15 +175,37 @@
 
             <div class="mt-4 pt-4 border-t border-gray-100/80">
                 <p class="text-center text-[10px] text-gray-400 font-medium">
-                    Powered by <span class="font-bold login-accent-text"><a href="https://{{ config('app.developer.web') }}" target="_blank" rel="noopener">{{ config('app.developer.name') }}</a></span>
+                    Powered by <span class="font-bold login-accent-text">@if($developerUrl)<a href="{{ $developerUrl }}" target="_blank" rel="noopener noreferrer">{{ $developerName }}</a>@else{{ $developerName }}@endif</span>
                 </p>
             </div>
         </div>
         @if(\App\Support\Repairs::enabled())<p class="text-center mt-5"><a class="text-link" href="{{ route('repairs.track') }}">Track your repair</a></p>@endif
     </main>
 
+    <dialog id="developer-contact-dialog" class="customer-dialog login-support-dialog" aria-labelledby="developer-contact-title" aria-describedby="developer-contact-description">
+        <div class="modal-heading">
+            <h2 id="developer-contact-title">Contact the developer</h2>
+            <button type="button" class="icon-button" data-close-developer-contact aria-label="Close developer contact"><x-icon name="x"/></button>
+        </div>
+        <div class="customer-dialog-body">
+            <p id="developer-contact-description">Forgot your password? Contact the developer for help resetting it.</p>
+            <dl class="login-support-details">
+                @if($developerName)<div><dt>Developer</dt><dd>{{ $developerName }}</dd></div>@endif
+                @if($developerPhone)<div><dt>Phone</dt><dd>@if($developerTel)<a href="tel:{{ $developerTel }}">{{ $developerPhone }}</a>@else{{ $developerPhone }}@endif</dd></div>@endif
+                @if($developerWeb)<div><dt>Website</dt><dd>@if($developerUrl)<a href="{{ $developerUrl }}" target="_blank" rel="noopener noreferrer">{{ $developerWeb }}</a>@else{{ $developerWeb }}@endif</dd></div>@endif
+            </dl>
+            @if(!$developerPhone && !$developerWeb)<p class="muted">Contact your administrator for developer contact details.</p>@endif
+            <div class="customer-dialog-actions"><button type="button" class="btn btn-green-gradient" data-close-developer-contact>Close</button></div>
+        </div>
+    </dialog>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const contactDialog = document.getElementById('developer-contact-dialog');
+            document.getElementById('forgot-password').addEventListener('click', () => contactDialog.showModal());
+            document.querySelectorAll('[data-close-developer-contact]').forEach(button => {
+                button.addEventListener('click', () => contactDialog.close());
+            });
             const toggleButton = document.getElementById('toggle-password');
             const passwordInput = document.getElementById('password-input');
             const eyeIcon = document.getElementById('eye-icon');
