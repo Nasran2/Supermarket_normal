@@ -231,8 +231,12 @@ class ResourceController extends Controller
             $presets = UnitPreset::with(['unit', 'conversions.unit'])->orderBy('name')->get();
             $record->loadMissing('conversions.unit');
             $view = $resource === 'products' ? 'products.form' : 'products.presets.form';
+            $purchasePopup = $resource === 'products' && ! $record->exists && request()->boolean('purchase_popup');
+            if ($purchasePopup) {
+                abort_unless(auth()->user()->hasPermission('purchases.create') || auth()->user()->hasPermission('purchases.edit'), 403);
+            }
 
-            return view($view, compact('resource', 'def', 'record', 'options', 'units', 'presets'));
+            return view($view, compact('resource', 'def', 'record', 'options', 'units', 'presets', 'purchasePopup'));
         }
         $moduleOrder = array_flip(['Dashboard', 'Point of sale', 'Sales', 'Purchases', 'Products', 'Stock adjustments', 'Daily register', 'Customers', 'Suppliers', 'Categories', 'Units', 'Multiple units', 'Expenses', 'Expense categories', 'Users', 'Roles & permissions', 'Settings']);
         $permissions = Permission::whereIn('name', array_keys(Permissions::visible()))->get()->sortBy(fn ($p) => sprintf('%02d-%s-%03d', $moduleOrder[Permissions::info($p->name)['group']] ?? 18, Permissions::info($p->name)['group'], array_search($p->name, array_keys(Permissions::all()))));
@@ -242,10 +246,14 @@ class ResourceController extends Controller
 
     public function store(ResourceRequest $request, string $resource, ResourceService $service)
     {
+        $purchasePopup = $resource === 'products' && $request->boolean('purchase_popup');
+        if ($purchasePopup) {
+            abort_unless($request->user()->hasPermission('purchases.create') || $request->user()->hasPermission('purchases.edit'), 403);
+        }
         $record = $service->save($resource, $request->validated());
 
         if ($request->wantsJson()) {
-            return response()->json($record, 201);
+            return response()->json($purchasePopup ? app(\App\Services\UnitService::class)->purchaseProduct($record) : $record, 201);
         }
 
         return ($request->user()->hasPermission(Resources::permission($resource, 'view'))

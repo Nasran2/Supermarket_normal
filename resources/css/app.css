@@ -6272,4 +6272,23 @@ html[data-units="0"] .documentation-guide-layout { grid-template-columns: minmax
 
 .product-name-mode { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:12px; }
 .product-name-mode select { width:auto; max-width:100%; min-height:32px; padding:4px 8px; font-size:12px; }
-.field [data-product-name-preview] { overflow-wrap:anywhere; font-size:16px; line-height:1.6; }
+.field [data-product-name-preview], .product-editor .field [data-product-name-preview] { overflow-wrap:anywhere; font-size:16px; line-height:1.6; }
+
+.purchase-item-search input { min-width:0; }
+.purchase-add-product { flex:0 0 42px; width:42px; height:42px; padding:0; }
+.purchase-product-no-results { padding:14px; color:var(--muted); white-space:normal; }
+.purchase-product-feedback { margin:0 24px 16px; color:var(--green); overflow-wrap:anywhere; }
+.purchase-product-dialog { width:min(1240px,calc(100vw - 24px)); height:min(920px,calc(100dvh - 24px)); overflow:hidden; }
+.purchase-product-dialog[open] { display:flex; flex-direction:column; }
+.purchase-product-dialog .modal-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex:0 0 auto; }
+.purchase-product-dialog .modal-heading p { margin:4px 0 0; font-size:13px; }
+.purchase-product-dialog iframe { display:block; width:100%; flex:1; min-height:0; border:0; }
+.purchase-product-loading { padding:12px 24px; }
+.product-popup-body { margin:0; min-width:0; }
+.product-popup-content { padding:20px; }
+@media (max-width:600px) {
+  .purchase-product-dialog { width:calc(100vw - 12px); max-width:calc(100vw - 12px); height:calc(100dvh - 12px); max-height:calc(100dvh - 12px); border-radius:12px; }
+  .purchase-product-dialog .modal-heading { padding:12px; }
+  .purchase-product-dialog .modal-heading p { font-size:12px; }
+  .product-popup-content { padding:12px; }
+}

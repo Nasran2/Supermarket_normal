@@ -217,23 +217,98 @@ if (supSearch) {
 const prodSearch = document.getElementById('product-search');
 const prodDrop = document.getElementById('product-dropdown');
 if (prodSearch) {
-    prodSearch.addEventListener('focus', () => prodDrop.classList.add('show'));
-    document.addEventListener('click', (e) => {
-        if(!e.target.closest('#product-search-container')) prodDrop.classList.remove('show');
-    });
-    prodSearch.addEventListener('input', (e) => {
-        const val = e.target.value;
+    const noResults = prodDrop.querySelector('[data-no-purchase-products]');
+    const filterProducts = () => {
+        let matches = 0;
         prodDrop.querySelectorAll('.product-option').forEach(opt => {
-            opt.style.display = matchesProductSearch(opt.dataset, val, prodSearch.dataset.bamini === '1') ? 'block' : 'none';
+            const found = matchesProductSearch(opt.dataset, prodSearch.value, prodSearch.dataset.bamini === '1');
+            opt.style.display = found ? 'block' : 'none';
+            if (found) matches++;
         });
+        noResults.hidden = matches > 0;
+    };
+    prodSearch.addEventListener('focus', () => { filterProducts(); prodDrop.classList.add('show'); });
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#product-search-container')) prodDrop.classList.remove('show');
     });
-    document.querySelectorAll('.product-option').forEach(opt => {
-        opt.addEventListener('click', () => {
-            add({ product_id: opt.dataset.id }, true); // prepend true
-            prodSearch.value = '';
+    prodSearch.addEventListener('input', () => { filterProducts(); prodDrop.classList.add('show'); });
+    prodDrop.addEventListener('click', (event) => {
+        const option = event.target.closest('.product-option');
+        if (!option) return;
+        add({ product_id: option.dataset.id }, true);
+        prodSearch.value = '';
+        prodDrop.classList.remove('show');
+        filterProducts();
+    });
+
+    const open = document.querySelector('[data-add-purchase-product]');
+    const dialog = document.getElementById('purchase-product-dialog');
+    if (open && dialog) {
+        const frame = dialog.querySelector('[data-purchase-product-frame]');
+        const loading = dialog.querySelector('[data-product-popup-loading]');
+        const close = dialog.querySelector('[data-close-purchase-product]');
+        const feedback = document.querySelector('[data-purchase-product-feedback]');
+        let busy = false;
+        const closeProduct = () => { if (!busy) { dialog.close(); prodSearch.focus({ preventScroll: true }); } };
+        const openProduct = () => {
+            if (!frame.hasAttribute('src')) {
+                const url = new URL(open.dataset.url, window.location.href);
+                url.searchParams.set('prefill_name', prodSearch.value.trim());
+                url.searchParams.set('prefill_supplier', document.getElementById('supplier_id').value);
+                loading.textContent = 'Loading product form…';
+                loading.hidden = false;
+                frame.src = url.href;
+            }
             prodDrop.classList.remove('show');
-            prodDrop.querySelectorAll('.product-option').forEach(o => o.style.display = 'block'); // reset filter
+            dialog.showModal();
+        };
+        open.addEventListener('click', openProduct);
+        prodDrop.querySelector('[data-create-missing-product]')?.addEventListener('click', openProduct);
+        close.addEventListener('click', closeProduct);
+        dialog.addEventListener('cancel', (event) => { if (busy) event.preventDefault(); });
+        frame.addEventListener('load', () => {
+            if (!frame.hasAttribute('src')) return;
+            const ready = frame.contentDocument?.querySelector('[data-product-popup]');
+            loading.hidden = Boolean(ready);
+            if (!ready) loading.textContent = 'Unable to load the product form. Close and try again.';
         });
-    });
+        window.addEventListener('message', (event) => {
+            if (event.origin !== window.location.origin || event.source !== frame.contentWindow || !dialog.open) return;
+            if (event.data?.type === 'purchase-product-saving') {
+                busy = Boolean(event.data.busy);
+                close.disabled = busy;
+            } else if (event.data?.type === 'purchase-product-cancel') {
+                closeProduct();
+            } else if (event.data?.type === 'purchase-product-created') {
+                const product = event.data.product;
+                if (!product?.id || typeof product.name !== 'string' || !Array.isArray(product.units)) return;
+                busy = close.disabled = false;
+                if (product.active) {
+                    allProducts.push(product);
+                    const option = document.createElement('button');
+                    option.type = 'button';
+                    option.className = 'search-option product-option';
+                    Object.assign(option.dataset, { id: product.id, name: product.name, sku: product.sku, barcode: product.barcode || '' });
+                    const name = document.createElement('strong');
+                    name.textContent = product.name;
+                    const code = document.createElement('small');
+                    code.textContent = ` · ${product.sku}`;
+                    option.append(name, code);
+                    prodDrop.insertBefore(option, noResults);
+                    add({ product_id: product.id }, true);
+                    prodSearch.value = '';
+                    filterProducts();
+                    feedback.textContent = `${product.name} created and added to this purchase.`;
+                } else {
+                    feedback.textContent = `${product.name} created as inactive. Activate it before adding it to a purchase.`;
+                }
+                feedback.hidden = false;
+                closeProduct();
+                prodDrop.classList.remove('show');
+                frame.removeAttribute('src');
+            }
+        });
+    }
 }
+
 import {moneyCents, lineCostCents, displayCents, paymentBalance, allocateCharges} from './purchase-totals.js';

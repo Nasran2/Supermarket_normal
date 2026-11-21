@@ -24,7 +24,7 @@
     "name": "units"
   },
   "resources/css/app.css": {
-    "file": "assets/app-C2jLf-YH.css",
+    "file": "assets/app-DCvI5VwQ.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -106,6 +106,12 @@
       "_bamini-CBoSUQ7O.js"
     ]
   },
+  "resources/js/product-popup.js": {
+    "file": "assets/product-popup-CxL-oo9J.js",
+    "name": "product-popup",
+    "src": "resources/js/product-popup.js",
+    "isEntry": true
+  },
   "resources/js/product-units.js": {
     "file": "assets/product-units-BssMXNhY.js",
     "name": "product-units",
@@ -116,7 +122,7 @@
     ]
   },
   "resources/js/purchase.js": {
-    "file": "assets/purchase-BDXNhG9C.js",
+    "file": "assets/purchase-Bw6QR7-l.js",
     "name": "purchase",
     "src": "resources/js/purchase.js",
     "isEntry": true,

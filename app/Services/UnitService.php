@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Product;
 use App\Models\PurchaseItem;
 use App\Models\Unit;
+use App\Support\Expiry;
 use App\Support\Units;
 
 class UnitService
@@ -27,6 +28,22 @@ class UnitService
     public function resolveProductUnit(Product $product): Unit
     {
         return $product->unit ?? $this->getDefaultUnit();
+    }
+
+    public function purchaseProduct(Product $product): array
+    {
+        $product->loadMissing('unit', 'conversions.unit', 'stockLayers');
+
+        return [
+            'id' => $product->id, 'name' => $product->name, 'sku' => $product->sku,
+            'barcode' => config('features.barcode') ? $product->barcode : null,
+            'active' => $product->active, 'cost' => $product->cost, 'price' => $product->price,
+            'unit' => Units::label($product->unit),
+            'track_expiry' => Expiry::tracks($product),
+            'expiry_required' => Expiry::enabled() && Expiry::setting('expiry_purchase_required'),
+            'prices' => app(StockLayerService::class)->groups($product),
+            'units' => app(ProductUnitService::class)->publicOptions($product),
+        ];
     }
 
     /** Populate edits in the primary basis without counting allocated charges twice. */

@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends(($purchasePopup ?? false) ? 'layouts.product-popup' : 'layouts.app')
 @section('title',$record->exists?'Edit product':'Add product')
 @section('content')
 @push('head')
@@ -15,8 +15,10 @@
     .tom-select .ts-control > div { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); padding: 2px 8px; }
 </style>
 @endpush
+@if(!($purchasePopup ?? false))
 <div class="page-heading"><div><span class="eyebrow">PRODUCT CATALOGUE</span><h1>{{ $record->exists?'Edit product':'Add product' }}</h1><p>{{ \App\Support\Units::enabled()?'Product details, pricing and units — together in one place.':'Product details, pricing and stock — together in one place.' }}</p></div><a class="btn secondary" href="{{ route('manage.index','products') }}"><x-icon name="arrow-left"/>Products</a></div>
-<form class="product-editor" method="POST" enctype="multipart/form-data" action="{{ $record->exists?route('manage.update',['products',$record->id]):route('manage.store','products') }}" id="unit-editor" data-product="1">
+@endif
+<form class="product-editor" method="POST" enctype="multipart/form-data" action="{{ $record->exists?route('manage.update',['products',$record->id]):route('manage.store', ($purchasePopup ?? false) ? ['resource'=>'products','purchase_popup'=>1] : 'products') }}" id="unit-editor" data-product="1" @if($purchasePopup ?? false)data-product-popup @endif>
 @csrf @if($record->exists)@method('PUT')@endif
 <section class="card product-details-card">
     <div class="customer-section-heading"><span class="customer-section-icon"><x-icon name="package"/></span><div><h2>Product information</h2><p>Make this item easy to find at checkout.</p></div></div>
@@ -87,7 +89,7 @@
     </div>
 </section>
 @if(\App\Support\Units::enabled())@include('products.partials.conversions',['product'=>true])@endif
-<div class="customer-editor-footer"><a class="btn secondary" href="{{ route('manage.index','products') }}">Cancel</a><button class="btn primary" type="submit"><x-icon name="check"/>{{ $record->exists?'Save product':'Create product' }}</button></div>
+<div class="customer-editor-footer">@if($purchasePopup ?? false)<button class="btn secondary" type="button" data-product-popup-cancel>Cancel</button>@else<a class="btn secondary" href="{{ route('manage.index','products') }}">Cancel</a>@endif<button class="btn primary" type="submit"><x-icon name="check"/>{{ $record->exists?'Save product':'Create product' }}</button></div>
 </form>
 @include('products.partials.add-reference',['reference'=>'categories','singular'=>'category','selectId'=>'categories-select'])
 @include('products.partials.add-reference',['reference'=>'suppliers','singular'=>'supplier','selectId'=>'supplier-select'])
@@ -98,6 +100,7 @@
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        if (typeof TomSelect === 'undefined') return;
         if (document.getElementById('categories-select')) {
             new TomSelect('#categories-select', {
                 plugins: ['remove_button'],
