@@ -393,7 +393,7 @@ class ReportService
 
             $lotQuery = ProductStockLayer::where('status', 'ACTIVE')->whereHas('product', fn ($q) => $q->where('track_stock', true))->with('product.unit', 'product.categories');
             if (! empty($filters['q'])) {
-                $lotQuery->whereHas('product', fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%'));
+                $lotQuery->whereHas('product', fn ($q) => $q->searchName($filters['q'])->orWhere('sku', 'like', '%'.$filters['q'].'%'));
             }
             if (! empty($filters['product_id'])) {
                 $lotQuery->where('product_id', $filters['product_id']);
@@ -506,7 +506,7 @@ class ReportService
             } else {
                 $query = Product::where('track_stock', true)->with('unit', 'categories')->with(['stockLayers' => fn ($q) => $q->available()])->orderBy('name');
                 if (! empty($filters['q'])) {
-                    $query->where(fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%'));
+                    $query->where(fn ($q) => $q->searchName($filters['q'])->orWhere('sku', 'like', '%'.$filters['q'].'%'));
                 }
                 if (! empty($filters['product_id'])) {
                     $query->whereKey($filters['product_id']);

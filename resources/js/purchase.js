@@ -1,3 +1,4 @@
+import { matchesProductSearch } from './product-search.js';
 import { unitsEnabled, quantityText } from './units.js';
 const container = document.getElementById('purchase-items'),
   template = document.getElementById('purchase-item-template');
@@ -221,9 +222,9 @@ if (prodSearch) {
         if(!e.target.closest('#product-search-container')) prodDrop.classList.remove('show');
     });
     prodSearch.addEventListener('input', (e) => {
-        const val = e.target.value.toLowerCase();
+        const val = e.target.value;
         prodDrop.querySelectorAll('.product-option').forEach(opt => {
-            opt.style.display = `${opt.dataset.name} ${opt.dataset.sku} ${opt.dataset.barcode || ''}`.toLowerCase().includes(val) ? 'block' : 'none';
+            opt.style.display = matchesProductSearch(opt.dataset, val, prodSearch.dataset.bamini === '1') ? 'block' : 'none';
         });
     });
     document.querySelectorAll('.product-option').forEach(opt => {

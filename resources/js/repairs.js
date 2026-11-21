@@ -121,7 +121,10 @@ function picker(root) {
       const dialog = document.getElementById('modal-quick-add-product');
       if (dialog) {
         const nameInput = dialog.querySelector('[data-product-name-input]');
-        if (nameInput) nameInput.value = quickProductBtn.dataset.productName || input.value.trim();
+        if (nameInput) {
+          nameInput.value = quickProductBtn.dataset.productName || input.value.trim();
+          nameInput.dispatchEvent(new Event('product-name:prefill'));
+        }
         dialog.showModal();
         nameInput?.focus();
         results.hidden = true;
@@ -846,6 +849,7 @@ document.querySelectorAll('[data-open-quick-product]').forEach((btn) => {
       const nameInput = dialog.querySelector('[data-product-name-input]');
       if (nameInput && partSearchInput && partSearchInput.value.trim()) {
         nameInput.value = partSearchInput.value.trim();
+        nameInput.dispatchEvent(new Event('product-name:prefill'));
       }
       dialog.showModal();
       nameInput?.focus();

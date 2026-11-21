@@ -994,9 +994,7 @@
                 <form data-new-repair-product action="{{ route('repairs.products.store') }}" class="repair-stack">
                     @csrf
                     <div class="repair-fields">
-                        <label class="field full">Product Name <b class="text-danger">*</b>
-                            <input name="name" required maxlength="255" placeholder="e.g. iPhone 11 Pro Display Replacement" data-product-name-input autofocus>
-                        </label>
+                        @include('products.partials.name-input', ['nameValue' => '', 'namePlaceholder' => 'e.g. iPhone 11 Pro Display Replacement'])
                     </div>
                     <div class="repair-fields">
                         <label class="field">SKU <small class="muted">(auto if blank)</small>

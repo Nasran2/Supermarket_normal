@@ -241,7 +241,7 @@ class RepairController extends Controller
         $term = '%'.($data['q'] ?? '').'%';
         $products = Product::where('active', true)->where('track_stock', true)
             ->whereHas('unit', fn ($q) => $q->where('active', true))
-            ->where(fn ($q) => $q->where('name', 'like', $term)->orWhere('sku', 'like', $term))
+            ->where(fn ($q) => $q->searchName($data['q'] ?? '')->orWhere('sku', 'like', $term))
             ->orderBy('name')->limit(20)->get(['id', 'name', 'sku', 'stock', 'price']);
 
         return response()->json($products);

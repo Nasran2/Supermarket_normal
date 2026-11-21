@@ -11,6 +11,7 @@ export default defineConfig({
         'resources/js/pos.js',
         'resources/js/purchase.js',
         'resources/js/product-units.js',
+        'resources/js/product-name.js',
         'resources/js/stock-adjustments.js',
         'resources/js/sales.js',
         'resources/js/barcode.js',

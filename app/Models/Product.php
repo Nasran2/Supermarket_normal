@@ -70,6 +70,15 @@ class Product extends Model
         return $query->where('available_for_pos', true);
     }
 
+    public function scopeSearchName($query, string $search)
+    {
+        return $query->where(function ($names) use ($search) {
+            foreach (\App\Support\Bamini::searchTerms($search) as $term) {
+                $names->orWhere('name', 'like', '%'.$term.'%');
+            }
+        });
+    }
+
     public static function sellableStockSql(): string
     {
         if (! Expiry::enabled()) {

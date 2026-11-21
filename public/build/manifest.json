@@ -1,4 +1,8 @@
 {
+  "_bamini-CBoSUQ7O.js": {
+    "file": "assets/bamini-CBoSUQ7O.js",
+    "name": "bamini"
+  },
   "_barcode-layout-BGx-9NiP.js": {
     "file": "assets/barcode-layout-BGx-9NiP.js",
     "name": "barcode-layout"
@@ -20,7 +24,7 @@
     "name": "units"
   },
   "resources/css/app.css": {
-    "file": "assets/app-BhRgFZx6.css",
+    "file": "assets/app-C2jLf-YH.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -29,7 +33,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-tUmU5KVf.js",
+    "file": "assets/app-D46iPxwU.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -93,6 +97,15 @@
       "resources/js/pos-camera-zxing.js"
     ]
   },
+  "resources/js/product-name.js": {
+    "file": "assets/product-name-MrV0Ijy_.js",
+    "name": "product-name",
+    "src": "resources/js/product-name.js",
+    "isEntry": true,
+    "imports": [
+      "_bamini-CBoSUQ7O.js"
+    ]
+  },
   "resources/js/product-units.js": {
     "file": "assets/product-units-BssMXNhY.js",
     "name": "product-units",
@@ -103,11 +116,12 @@
     ]
   },
   "resources/js/purchase.js": {
-    "file": "assets/purchase-DJ6x7V9H.js",
+    "file": "assets/purchase-BDXNhG9C.js",
     "name": "purchase",
     "src": "resources/js/purchase.js",
     "isEntry": true,
     "imports": [
+      "_bamini-CBoSUQ7O.js",
       "_units-C18jATk4.js",
       "_purchase-totals-Bp1k2QOT.js"
     ]

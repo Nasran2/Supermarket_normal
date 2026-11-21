@@ -41,7 +41,15 @@ class ResourceController extends Controller
         }
         $query = $def['model']::with($def['relations'] ?? []);
         if ($search = trim((string) $request->input('q'))) {
-            $query->where(fn ($q) => collect($def['search'])->each(fn ($col) => $q->orWhere($col, 'like', '%'.$search.'%')));
+            $query->where(function ($q) use ($def, $search, $resource) {
+                foreach ($def['search'] as $col) {
+                    if ($resource === 'products' && $col === 'name') {
+                        $q->orWhere(fn ($names) => $names->searchName($search));
+                    } else {
+                        $q->orWhere($col, 'like', '%'.$search.'%');
+                    }
+                }
+            });
         }
         if ($request->filled('active') && in_array($resource, ['products', 'units', 'payment-methods', 'payment-rules', 'users', 'suppliers', 'customers'])) {
             $query->where('active', $request->boolean('active'));
@@ -151,7 +159,7 @@ class ResourceController extends Controller
         }
         if ($resource === 'categories') {
             $filters = request()->validate(['q' => 'nullable|string|max:150', 'active' => 'nullable|boolean']);
-            $products = $record->products()->with('unit')->when(! empty($filters['q']), fn ($q) => $q->where(fn ($q) => $q->where('name', 'like', '%'.$filters['q'].'%')->orWhere('sku', 'like', '%'.$filters['q'].'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', 'like', '%'.$filters['q'].'%'))))->when(isset($filters['active']), fn ($q) => $q->where('active', $filters['active']))->orderBy('name')->paginate(20)->withQueryString();
+            $products = $record->products()->with('unit')->when(! empty($filters['q']), fn ($q) => $q->where(fn ($q) => $q->searchName($filters['q'])->orWhere('sku', 'like', '%'.$filters['q'].'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', 'like', '%'.$filters['q'].'%'))))->when(isset($filters['active']), fn ($q) => $q->where('active', $filters['active']))->orderBy('name')->paginate(20)->withQueryString();
 
             return view('categories.show', compact('record', 'products'));
         }

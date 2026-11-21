@@ -39,7 +39,7 @@ class StockBatchController extends Controller
         $query = Product::with('unit')->where('track_stock', true)->where('active', true)->whereHas('unit', fn ($q) => $q->where('active', true));
         $q = trim($input['q'] ?? '');
         if ($q !== '') {
-            $query->where(fn ($query) => $query->where('name', 'like', '%'.$q.'%')->orWhere('sku', 'like', '%'.$q.'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', 'like', '%'.$q.'%')));
+            $query->where(fn ($query) => $query->searchName($q)->orWhere('sku', 'like', '%'.$q.'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', 'like', '%'.$q.'%')));
         }
 
         if ($q !== '' && config('features.barcode')) {

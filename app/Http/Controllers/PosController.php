@@ -15,6 +15,7 @@ use App\Services\SaleService;
 use App\Services\SettingsService;
 use App\Services\StockLayerService;
 use App\Support\Audit;
+use App\Support\Bamini;
 use App\Support\Expiry;
 use App\Support\Money;
 use App\Support\Units;
@@ -76,7 +77,12 @@ class PosController extends Controller
         }
         if ($q !== '') {
             $cols = $mode === 'all' ? (config('features.barcode') ? ['name', 'sku', 'barcode'] : ['name', 'sku']) : [$mode];
-            $products->where(function ($query) use ($q, $cols) {
+            $products->where(function ($query) use ($q, $cols, $scanning) {
+                if (in_array('name', $cols) && ! $scanning) {
+                    foreach (array_slice(Bamini::searchTerms($q), 1) as $name) {
+                        $query->orWhere('name', 'like', '%'.$name.'%');
+                    }
+                }
                 foreach ($cols as $col) {
                     if ($col === 'name' && DB::getDriverName() === 'mysql' && mb_strlen($q) >= 3) {
                         $terms = preg_split('/[^\p{L}\p{N}]+/u', trim($q), -1, PREG_SPLIT_NO_EMPTY);

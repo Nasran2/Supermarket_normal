@@ -50,7 +50,7 @@ class BarcodeController extends Controller
             return response()->json([]);
         }
         $q = Product::with('unit', 'conversions.unit', 'stockLayers')
-            ->where(fn ($q) => $q->where('name', 'like', '%'.$search.'%')->orWhere('sku', 'like', '%'.$search.'%')->orWhere('barcode', 'like', '%'.$search.'%'));
+            ->where(fn ($q) => $q->searchName($search)->orWhere('sku', 'like', '%'.$search.'%')->orWhere('barcode', 'like', '%'.$search.'%'));
         if (! empty($data['category'])) {
             $q->whereHas('categories', fn ($q) => $q->where('categories.id', $data['category']));
         }

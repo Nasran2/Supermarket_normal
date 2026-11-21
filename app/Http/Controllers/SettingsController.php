@@ -41,6 +41,9 @@ class SettingsController extends Controller
         if (! Units::enabled()) {
             unset($fields['show_unit']);
         }
+        if (! config('features.bamini')) {
+            unset($fields['product_name_typing_mode']);
+        }
         $values = $service->all();
         if (! config('features.barcode') && ($values['search_mode'] ?? '') === 'barcode') {
             $values['search_mode'] = 'all';

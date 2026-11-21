@@ -206,7 +206,7 @@ class TransactionReturnController extends Controller
         if ($request->has('ids')) {
             $q->whereIn('id', $request->ids);
         } elseif ($request->filled('q')) {
-            $q->where(fn ($q) => $q->where('name', 'like', '%'.$request->q.'%')->orWhere('sku', 'like', '%'.$request->q.'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', $request->q)));
+            $q->where(fn ($q) => $q->searchName($request->q)->orWhere('sku', 'like', '%'.$request->q.'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', $request->q)));
         }
         if ($request->category_id) {
             $q->whereHas('categories', fn ($q) => $q->where('categories.id', $request->category_id));
@@ -235,7 +235,7 @@ class TransactionReturnController extends Controller
         if ($request->has('ids')) {
             $q->whereIn('id', $request->ids);
         } elseif ($request->filled('q')) {
-            $q->where(fn ($q) => $q->where('name', 'like', '%'.$request->q.'%')->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', $request->q))->orWhere('sku', 'like', '%'.$request->q.'%'));
+            $q->where(fn ($q) => $q->searchName($request->q)->when(config('features.barcode'), fn ($barcodeQuery) => $barcodeQuery->orWhere('barcode', $request->q))->orWhere('sku', 'like', '%'.$request->q.'%'));
         }
         if ($request->filled('category_id')) {
             $q->whereHas('categories', fn ($q) => $q->where('categories.id', $request->category_id));

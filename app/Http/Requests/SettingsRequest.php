@@ -52,6 +52,10 @@ class SettingsRequest extends FormRequest
             unset($r['show_unit']);
         }
 
+        if (! config('features.bamini')) {
+            unset($r['product_name_typing_mode']);
+        }
+
         return $r;
     }
 

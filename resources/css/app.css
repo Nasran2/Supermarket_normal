@@ -6269,3 +6269,7 @@ html[data-units="0"] .documentation-guide-layout { grid-template-columns: minmax
 .inline-confirm-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; padding-top:12px; border-top:1px solid #f1f5f9; }
 .inline-confirm-actions .btn-danger-solid { background:#dc2626; color:#fff; border:none; }
 .inline-confirm-actions .btn-danger-solid:hover { background:#b91c1c; }
+
+.product-name-mode { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:12px; }
+.product-name-mode select { width:auto; max-width:100%; min-height:32px; padding:4px 8px; font-size:12px; }
+.field [data-product-name-preview] { overflow-wrap:anywhere; font-size:16px; line-height:1.6; }
