@@ -3,19 +3,19 @@
 @section('body-class','pos-workspace')
 @section('main-class','pos-main')
 @section('content')
-<div class="pos-heading"><div><span class="eyebrow">{{ isset($editingSale)?'INVOICE WORKSPACE':'YOUR CHECKOUT WORKSPACE' }}</span><h1>{{ isset($editingSale)?'Edit '.$editingSale->invoice:'Point of sale' }}</h1>@isset($editingSale)<p class="pos-edit-description">Update the saved invoice. Unsaved changes reset when you refresh or return.</p>@endisset</div><div class="pos-heading-actions">@isset($editingSale)<a class="btn secondary" href="{{ route('sales.show',$editingSale) }}"><x-icon name="arrow-left"/>Cancel edit</a>@endisset<span class="badge {{ $register?'green':'amber' }}">{{ $register?'REG-'.$register->id.' · Ready to sell':'Register closed' }}</span>@if($register)@can('register.close')<button class="btn secondary pos-close-register" type="button" data-close-register><x-icon name="wallet"/>Close register</button>@endcan
-@endif<span class="pos-shortcut">F1 Search <span>·</span> F4 Payment</span>
+<div class="pos-heading"><div><span class="eyebrow">{{ isset($editingSale)?'INVOICE WORKSPACE':'YOUR CHECKOUT WORKSPACE' }}</span><h1>{{ isset($editingSale)?'Edit '.$editingSale->invoice:'Point of sale' }}</h1>@isset($editingSale)<p class="pos-edit-description">Update the saved invoice. Unsaved changes reset when you refresh or return.</p>@endisset</div><div class="pos-heading-actions">@isset($editingSale)<a class="btn secondary" href="{{ route('sales.show',$editingSale) }}"><x-icon name="arrow-left"/>Cancel edit</a>@endisset @if(\App\Support\Registers::enabled())<span class="badge {{ $register?'green':'amber' }}">{{ $register?'REG-'.$register->id.' · Ready to sell':'Register closed' }}</span>@if($register)@can('register.close')<button class="btn secondary pos-close-register" type="button" data-close-register><x-icon name="wallet"/>Close register</button>@endcan
+@endif @endif<span class="pos-shortcut">F1 Search <span>·</span> F4 Payment</span>
 @unless(isset($editingSale))
     @if($privacy = \App\Support\SalesPrivacy::view('pos'))
         @include('sales.partials.privacy-shortcuts', ['surface' => 'pos'])
     @endif
 @endunless
 </div></div>
-@if(!$register)
+@if(\App\Support\Registers::enabled() && !$register)
 <div class="card pos-register-gate"><span class="register-welcome-icon"><x-icon name="wallet" :size="30"/></span><h2>Open a register to start selling</h2><p>Your POS will unlock once you enter the opening cash.</p>@can('register.open')<button class="btn primary" type="button" data-open-register>Open register</button>@endcan</div>
 @else
 @php($cameraBarcode = config('features.barcode') && config('features.camera_barcode') && ($settings['barcode_enabled'] ?? true))
-<div id="pos" @if(config('features.customer_tax') || (isset($editingSale) && $editingSale->tax)) data-tax-rate="{{ $editingSale->tax['rate'] ?? app(\App\Services\SettingsService::class)->get('vat_rate',18) }}" data-tax-mode="{{ $editingSale->tax['mode'] ?? app(\App\Services\SettingsService::class)->get('vat_price_mode','INCLUSIVE') }}" @endif data-cheque-branch-required="{{ config('features.cheque') && \App\Support\Cheques::setting('cheque_require_branch')?1:0 }}" data-cheque-multiple="{{ config('features.cheque') && \App\Support\Cheques::setting('cheque_allow_multiple')?1:0 }}" data-can-checkout="{{ auth()->user()->hasPermission(isset($editingSale)?'sales.edit':'sales.create')?1:0 }}" data-can-discount="{{ auth()->user()->hasPermission('pos.discount')?1:0 }}" data-can-due="{{ auth()->user()->hasPermission('pos.due_sale')?1:0 }}" data-user-id="{{ auth()->id() }}" data-demo-cycle="{{ $demoCycle ?? '' }}" data-allow-discount="{{ ($settings['allow_discount']??true)?1:0 }}" data-status-url="{{ route('pos.checkout-status') }}" data-products-url="{{ isset($editingSale)?route('sales.edit.products',$editingSale):route('pos.products') }}" data-quote-url="{{ isset($editingSale)?route('sales.edit.quote',$editingSale):route('pos.quote') }}" data-complete-url="{{ isset($editingSale)?route('sales.revise',$editingSale):route('pos.complete') }}" data-currency="{{ $settings['currency_symbol']??'Rs.' }}" data-quantity-precision="{{ $settings['quantity_decimals']??3 }}" data-decimals="{{ $settings['number_decimals']??2 }}" data-barcode="{{ (config('features.barcode') && ($settings['barcode_enabled']??true))?1:0 }}" data-default-method="{{ $settings['default_payment_method']??'' }}" data-register="{{ $register?1:0 }}">
+<div id="pos" @if(config('features.customer_tax') || (isset($editingSale) && $editingSale->tax)) data-tax-rate="{{ $editingSale->tax['rate'] ?? app(\App\Services\SettingsService::class)->get('vat_rate',18) }}" data-tax-mode="{{ $editingSale->tax['mode'] ?? app(\App\Services\SettingsService::class)->get('vat_price_mode','INCLUSIVE') }}" @endif data-cheque-branch-required="{{ config('features.cheque') && \App\Support\Cheques::setting('cheque_require_branch')?1:0 }}" data-cheque-multiple="{{ config('features.cheque') && \App\Support\Cheques::setting('cheque_allow_multiple')?1:0 }}" data-can-checkout="{{ auth()->user()->hasPermission(isset($editingSale)?'sales.edit':'sales.create')?1:0 }}" data-can-discount="{{ auth()->user()->hasPermission('pos.discount')?1:0 }}" data-can-due="{{ auth()->user()->hasPermission('pos.due_sale')?1:0 }}" data-user-id="{{ auth()->id() }}" data-demo-cycle="{{ $demoCycle ?? '' }}" data-allow-discount="{{ ($settings['allow_discount']??true)?1:0 }}" data-status-url="{{ route('pos.checkout-status') }}" data-products-url="{{ isset($editingSale)?route('sales.edit.products',$editingSale):route('pos.products') }}" data-quote-url="{{ isset($editingSale)?route('sales.edit.quote',$editingSale):route('pos.quote') }}" data-complete-url="{{ isset($editingSale)?route('sales.revise',$editingSale):route('pos.complete') }}" data-currency="{{ $settings['currency_symbol']??'Rs.' }}" data-quantity-precision="{{ $settings['quantity_decimals']??3 }}" data-decimals="{{ $settings['number_decimals']??2 }}" data-barcode="{{ (config('features.barcode') && ($settings['barcode_enabled']??true))?1:0 }}" data-default-method="{{ $settings['default_payment_method']??'' }}" data-register="{{ !\App\Support\Registers::enabled() || $register?1:0 }}">
 @isset($editSeed)<script type="application/json" id="sale-edit-seed">{!! json_encode($editSeed, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>@endisset
 <div class="pos-grid">
 <section class="pos-catalog">
@@ -38,7 +38,7 @@
         @if(config('features.customer_tax'))<div class="order-summary"><span id="cart-vat-label">VAT</span><strong id="cart-vat">0.00</strong></div>@endif
         <div class="order-summary total"><span>Order total</span><strong id="cart-total">0.00</strong></div>
         <p class="muted text-xs">{{ isset($editingSale)?'Review the revised payments before saving this invoice.':'Pay with one method or split the payment.' }}</p>
-        <button id="open-payment" class="btn primary checkout-button" type="button" @disabled(!$register)><x-icon name="credit-card"/>{{ isset($editingSale)?'Review payment':'Take payment' }} <x-icon name="arrow-right"/></button>
+        <button id="open-payment" class="btn primary checkout-button" type="button" @disabled(\App\Support\Registers::enabled() && !$register)><x-icon name="credit-card"/>{{ isset($editingSale)?'Review payment':'Take payment' }} <x-icon name="arrow-right"/></button>
         <div id="pos-message" role="status" class="pos-message"></div>
     </div>
 </aside>
@@ -97,5 +97,5 @@
 </div>
 @endif
 @endsection
-@if($register)@push('scripts')@vite('resources/js/pos.js')@endpush
+@if(!\App\Support\Registers::enabled() || $register)@push('scripts')@vite('resources/js/pos.js')@endpush
 @endif

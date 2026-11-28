@@ -39,6 +39,12 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
+        if (! app(\App\Services\DeveloperAccess::class)->permissionAllowed($permission)) {
+            return false;
+        }
+        if (\App\Support\Registers::permission($permission) && ! \App\Support\Registers::enabled()) {
+            return false;
+        }
         if (str_starts_with($permission, 'repairs.') && ! \App\Support\Repairs::enabled()) {
             return false;
         }

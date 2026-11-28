@@ -130,7 +130,7 @@ class Permissions
 
     public static function visible(): array
     {
-        return array_filter(self::all(), fn ($info, $name) => (Repairs::enabled() || ! str_starts_with($name, 'repairs.')) && (config('sms.enabled') || ! str_starts_with($name, 'sms.')) && (Units::enabled() || ! Units::permission($name)) && (config('features.cheque') || ! str_starts_with($name, 'cheques.')) && (config('features.barcode') || ! str_starts_with($name, 'barcode.')) && (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
+        return array_filter(self::all(), fn ($info, $name) => app(\App\Services\DeveloperAccess::class)->permissionAllowed($name) && (Registers::enabled() || ! Registers::permission($name)) && (Repairs::enabled() || ! str_starts_with($name, 'repairs.')) && (config('sms.enabled') || ! str_starts_with($name, 'sms.')) && (Units::enabled() || ! Units::permission($name)) && (config('features.cheque') || ! str_starts_with($name, 'cheques.')) && (config('features.barcode') || ! str_starts_with($name, 'barcode.')) && (Hr::enabled() || ! str_starts_with($name, 'hr.')) && (Expiry::enabled() || (! str_starts_with($name, 'expiry.') && $name !== 'purchase.expiry_edit')), ARRAY_FILTER_USE_BOTH);
     }
 
     public static function info(string $name): array

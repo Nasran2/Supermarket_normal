@@ -25,6 +25,7 @@
         <env name="SMS" value="false" force="true"/>
         <env name="CHEQUE" value="false" force="true"/>
         <env name="UNIT" value="true" force="true"/>
+        <env name="REGISTER_CASHIER" value="true" force="true"/>
         <env name="SCODE" value="false" force="true"/>
         <env name="SUPER_ADMIN" value="false" force="true"/>
         <env name="COLORS" value="false" force="true"/>

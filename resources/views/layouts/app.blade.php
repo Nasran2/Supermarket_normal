@@ -3,7 +3,7 @@
 <html lang="en" data-units="{{ config('features.unit')?'1':'0' }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('title','Dashboard') · {{ $settings['business_name'] ?? 'Twinsofte' }}</title>@vite(['resources/css/app.css','resources/js/app.js'])@include('partials.branding-theme')@stack('head')</head>
 <body class="@yield('body-class') {{ \App\Support\Repairs::enabled() ? 'phone-repair-theme' : '' }}">
 <x-demo-watermark/>
-@php($currentRegister = app(\App\Services\RegisterService::class)->current(auth()->id()))
+@php($currentRegister = \App\Support\Registers::enabled() ? app(\App\Services\RegisterService::class)->current(auth()->id()) : null)
 <div class="nav-overlay" id="nav-overlay"></div>
 <aside class="sidebar" id="sidebar">
  <a class="brand" href="{{ \App\Support\Navigation::home(auth()->user()) }}">@if(!empty($settings['logo']))<img src="{{ asset('storage/'.$settings['logo']) }}" alt="Business logo">@else<span class="brand-mark"><x-icon name="shopping-basket" :size="23"/></span>@endif<div class="brand-copy"><strong>{{ $branding['brand_name'] }}</strong><span>{{ $branding['brand_subtitle'] }}</span></div></a>

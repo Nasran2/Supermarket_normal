@@ -2,6 +2,7 @@
 
 $guides = [
     'start-your-shift' => [
+        'requires' => ['register_cashier'],
         'title' => 'Start your shift',
         'category' => 'Daily selling',
         'description' => 'Count the money in the drawer and get ready to serve customers.',
@@ -1048,6 +1049,7 @@ $guides = [
         ],
     ],
     'close-your-shift' => [
+        'requires' => ['register_cashier'],
         'title' => 'Close your shift',
         'category' => 'Daily selling',
         'description' => 'Compare the recorded cash with the actual money in the drawer.',

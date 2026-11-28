@@ -15,10 +15,12 @@ return new class extends Migration
         $view = DB::table('permissions')->where('name', 'repairs.reports')->value('id');
         $export = DB::table('permissions')->where('name', 'repairs.reports.export')->value('id');
 
-        DB::table('permission_role')->insertOrIgnoreUsing(
-            ['role_id', 'permission_id'],
-            DB::table('permission_role')->where('permission_id', $view)->select('role_id')->selectRaw('? AS permission_id', [$export]),
-        );
+        if ($view && $export) {
+            DB::table('permission_role')->insertOrIgnoreUsing(
+                ['role_id', 'permission_id'],
+                DB::table('permission_role')->where('permission_id', $view)->select('role_id')->selectRaw('? AS permission_id', [$export]),
+            );
+        }
     }
 
     public function down(): void

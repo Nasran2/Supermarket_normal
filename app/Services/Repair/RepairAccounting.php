@@ -54,7 +54,7 @@ class RepairAccounting
             $original = null;
             $credit = $taxCredit = '0.00';
             $paid = $job->paid;
-            $register = $this->registers->current($user->id, true);
+            $register = $this->registers->forTransactions($user->id, true);
             if ($kind === 'CORRECTION') {
                 $original = $job->payments()->whereKey($paymentId)->whereIn('kind', ['ADVANCE', 'PAYMENT', 'CORRECTION'])->firstOrFail();
                 if ($original->method_type === 'CHEQUE') {
@@ -174,7 +174,7 @@ class RepairAccounting
                 : null;
             $account = $this->bankAccount($data['bank_account_id'] ?? null, $method);
             $cash = $method?->type === 'CASH';
-            $register = $cash ? $this->registers->current($user->id, true) : null;
+            $register = $cash ? $this->registers->forTransactions($user->id, true) : null;
             if ($cash && ! $register) {
                 throw ValidationException::withMessages(['cost' => 'Open a register before recording a cash expense.']);
             }

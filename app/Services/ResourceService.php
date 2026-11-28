@@ -295,7 +295,7 @@ class ResourceService
                     }
                 }
                 if ($resource === 'expenses') {
-                    $r = app(RegisterService::class)->current(auth()->id(), true);
+                    $r = app(RegisterService::class)->forTransactions(auth()->id(), true);
                     if ($id && $record->register_id) {
                         $previous = Register::whereKey($record->register_id)->lockForUpdate()->firstOrFail();
                         if ($previous->closed_at) {

@@ -64,7 +64,7 @@ class ReturnSettlementService
         if (! $method) {
             self::fail('Choose an active payment method.');
         }
-        $register = app(RegisterService::class)->current($user->id, true);
+        $register = app(RegisterService::class)->forTransactions($user->id, true);
         if ($method->type === 'CASH' && ! $register) {
             self::fail('Open a daily register before making a cash return settlement.');
         }
@@ -165,7 +165,7 @@ class ReturnSettlementService
     {
         foreach ($document->settlements()->where('kind', '!=', 'REVERSAL')->get() as $row) {
             $amount = Money::sub('0', $row->amount);
-            $register = app(RegisterService::class)->current($user->id, true);
+            $register = app(RegisterService::class)->forTransactions($user->id, true);
             $movement = null;
             if ($row->method_type === 'CASH') {
                 if (! $register) {

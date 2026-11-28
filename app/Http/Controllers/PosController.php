@@ -196,7 +196,7 @@ class PosController extends Controller
 
     private function requireRegister(RegisterService $registers): void
     {
-        if (! $registers->current(auth()->id())) {
+        if (\App\Support\Registers::enabled() && ! $registers->current(auth()->id())) {
             throw ValidationException::withMessages(['register' => 'Open your register before accessing the POS.']);
         }
     }

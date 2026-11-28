@@ -428,7 +428,7 @@ class HrService
                 }
             }
             $method = PaymentMethod::where('type', '!=', 'CHEQUE')->whereKey($data['payment_method_id'])->where('active', true)->firstOrFail();
-            $register = $method->type === 'CASH' ? app(RegisterService::class)->current(auth()->id(), true) : null;
+            $register = $method->type === 'CASH' ? app(RegisterService::class)->forTransactions(auth()->id(), true) : null;
             if ($method->type === 'CASH' && ! $register) {
                 $this->fail('payment_method_id', 'Open your register before making a cash payment.');
             }

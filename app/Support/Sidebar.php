@@ -9,9 +9,9 @@ class Sidebar
 {
     public static function sections(User $user): array
     {
-        $link = fn ($label, $route, $parameters, $permissions, $active = false) => ['label' => $label, 'url' => route($route, $parameters), 'permissions' => (array) $permissions, 'active' => $active];
+        $link = fn ($label, $route, $parameters, $permissions, $active = false) => ['label' => $label, 'url' => route($route, $parameters), 'permissions' => (array) $permissions, 'active' => $active, 'developer_allowed' => \App\Services\DeveloperRouteAccess::navigationAllowed($route, $parameters)];
         $group = function ($label, $icon, $children) use ($user) {
-            $children = array_values(array_filter($children, fn ($c) => collect($c['permissions'])->every(fn ($p) => $user->hasPermission($p))));
+            $children = array_values(array_filter($children, fn ($c) => $c['developer_allowed'] && collect($c['permissions'])->every(fn ($p) => $user->hasPermission($p))));
 
             return ['label' => $label, 'icon' => $icon, 'children' => $children, 'active' => collect($children)->contains('active', true)];
         };
@@ -59,14 +59,14 @@ class Sidebar
         }
         $products = $resource('products', 'Products', 'package', 'product');
         foreach ([$link('Stock adjustments', 'adjustments.index', [], 'stock-adjustments.view', request()->is('stock-adjustments*') && ! request()->routeIs('adjustments.create')), $link('New adjustment', 'adjustments.create', [], 'stock-adjustments.create', request()->routeIs('adjustments.create')), $link('Low stock', 'manage.index', ['resource' => 'products', 'low_stock' => 1], 'products.view')] as $child) {
-            if ($user->hasPermission($child['permissions'][0])) {
+            if ($child['developer_allowed'] && $user->hasPermission($child['permissions'][0])) {
                 $products['children'][] = $child;
             }
         }
         $products['active'] = collect($products['children'])->contains('active', true);
         $expenses = $resource('expenses', 'Expenses', 'circle-dollar-sign', 'expense');
         foreach ([$link('Expense categories', 'manage.index', 'expense-categories', 'expense-categories.view', request()->route('resource') === 'expense-categories'), $link('Add expense category', 'manage.create', 'expense-categories', 'expense-categories.create')] as $child) {
-            if ($user->hasPermission($child['permissions'][0])) {
+            if ($child['developer_allowed'] && $user->hasPermission($child['permissions'][0])) {
                 $expenses['children'][] = $child;
             }
         }
@@ -129,6 +129,9 @@ class Sidebar
         }
         if (Expiry::enabled()) {
             $settings[] = $link('Expiry dates', 'settings.edit', 'expiry', 'expiry.manage_settings', request()->route('group') === 'expiry');
+        }
+        if ($user->isAdministrator()) {
+            $settings[] = $link('Database migrations', 'migration.index', [], [], request()->routeIs('migration.*'));
         }
         foreach (['payment-methods' => ['Payment methods', 'payment method']] as $key => [$title, $singular]) {
             $settings[] = $link($title, 'manage.index', $key, Resources::permission($key, 'view'), request()->route('resource') === $key && ! request()->routeIs('manage.create'));

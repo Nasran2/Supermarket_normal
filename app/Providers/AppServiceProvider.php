@@ -18,6 +18,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(SettingsService::class);
+        $this->app->scoped(\App\Services\DeveloperAccess::class);
     }
 
     public function boot(): void
@@ -28,6 +29,6 @@ class AppServiceProvider extends ServiceProvider
         Schema::defaultStringLength(191);
         Paginator::useTailwind();
         Paginator::defaultView('components.pagination');
-        Gate::before(fn ($user, $ability) => $user->hasPermission($ability) ? true : null);
+        Gate::before(fn ($user, $ability) => ! app(\App\Services\DeveloperAccess::class)->permissionAllowed($ability) ? false : ($user->hasPermission($ability) ? true : null));
     }
 }

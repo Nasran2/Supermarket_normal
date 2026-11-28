@@ -160,7 +160,7 @@ $repairLinks = ['Overdue'=>['due'=>'overdue'], 'Ready'=>['status'=>'READY'], 'Un
     <p>Your role has no dashboard cards enabled. Ask an administrator to choose the cards you need.</p>
 </div>@endif
 @if(!\App\Support\SecretControl::isHidden('hide_tables'))
-@if(\App\Support\Expiry::enabled() && auth()->user()->hasPermission('expiry.view') && \App\Support\Expiry::setting('expiry_dashboard'))
+@if(app(\App\Services\DeveloperAccess::class)->permissionAllowed('dashboard.expiry_alerts') && \App\Support\Expiry::enabled() && auth()->user()->hasPermission('expiry.view') && \App\Support\Expiry::setting('expiry_dashboard'))
 <section class="card mt-6">
     <div class="card-heading">
         <div>

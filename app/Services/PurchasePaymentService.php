@@ -29,7 +29,7 @@ class PurchasePaymentService
         if ($method->type !== 'CASH' || ! $takeFromRegister) {
             return null;
         }
-        $register = app(RegisterService::class)->current($userId, true);
+        $register = app(RegisterService::class)->forTransactions($userId, true);
         if (! $register) {
             $this->fail('Open your register before recording a cash supplier payment (Or uncheck "Take from register").');
         }

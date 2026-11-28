@@ -32,6 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', [DemoMode::class, BusinessContext::class, SystemActive::class]);
         // Acquire the demo lock and restore overdue data before binding records.
         $middleware->prependToPriorityList(SubstituteBindings::class, DemoMode::class);
+        $middleware->appendToGroup('web', \App\Http\Middleware\DeveloperControls::class);
+        $middleware->prependToPriorityList(SubstituteBindings::class, \App\Http\Middleware\DeveloperControls::class);
+        $middleware->prependToPriorityList(\App\Http\Middleware\HrEnabled::class, \App\Http\Middleware\DeveloperControls::class);
 
         $middleware->redirectGuestsTo(fn (\Illuminate\Http\Request $request) => $request->is('superadmin*') ? route('superadmin.login') : route('login'));
         $middleware->redirectUsersTo(fn (\Illuminate\Http\Request $request) => \Illuminate\Support\Facades\Auth::guard('superadmin')->check() ? route('superadmin.dashboard') : route('dashboard'));

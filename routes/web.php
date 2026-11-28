@@ -33,6 +33,21 @@ use App\Http\Middleware\HrEnabled;
 use App\Http\Middleware\SaleVisibility;
 use Illuminate\Support\Facades\Route;
 
+Route::prefix('developer')->name('developer.')->withoutMiddleware([
+    \App\Http\Middleware\BusinessContext::class,
+    \App\Http\Middleware\DemoMode::class,
+    \App\Http\Middleware\SystemActive::class,
+    \App\Http\Middleware\DeveloperControls::class,
+])->group(function () {
+    Route::get('/login', [\App\Http\Controllers\DeveloperController::class, 'login'])->name('login');
+    Route::post('/login', [\App\Http\Controllers\DeveloperController::class, 'authenticate'])->middleware('throttle:10,1')->name('authenticate');
+    Route::middleware(\App\Http\Middleware\DeveloperAuthenticated::class)->group(function () {
+        Route::get('/', [\App\Http\Controllers\DeveloperController::class, 'index'])->name('controls');
+        Route::put('/controls', [\App\Http\Controllers\DeveloperController::class, 'update'])->name('update');
+        Route::post('/logout', [\App\Http\Controllers\DeveloperController::class, 'logout'])->name('logout');
+    });
+});
+
 Route::prefix('twininstall')->name('installer.')->withoutMiddleware([
     \App\Http\Middleware\BusinessContext::class,
     \App\Http\Middleware\DemoMode::class,
@@ -41,6 +56,21 @@ Route::prefix('twininstall')->name('installer.')->withoutMiddleware([
     Route::get('/', [\App\Http\Controllers\InstallerController::class, 'show'])->name('show');
     Route::post('/', [\App\Http\Controllers\InstallerController::class, 'store'])->middleware('throttle:5,1')->name('store');
 });
+
+Route::prefix('migration')->name('migration.')->withoutMiddleware([
+    \App\Http\Middleware\BusinessContext::class,
+    \App\Http\Middleware\DemoMode::class,
+    \App\Http\Middleware\SystemActive::class,
+])->group(function () {
+    Route::get('/', [\App\Http\Controllers\MigrationController::class, 'index'])->name('index');
+    Route::post('/run', [\App\Http\Controllers\MigrationController::class, 'run'])->middleware('throttle:10,1')->name('run');
+    Route::post('/cache', [\App\Http\Controllers\MigrationController::class, 'clearCache'])->middleware('throttle:10,1')->name('cache');
+    Route::post('/storage-link', [\App\Http\Controllers\MigrationController::class, 'storageLink'])->middleware('throttle:10,1')->name('storage-link');
+    Route::post('/unlock', [\App\Http\Controllers\MigrationController::class, 'unlock'])->middleware('throttle:10,1')->name('unlock');
+    Route::post('/lock', [\App\Http\Controllers\MigrationController::class, 'lock'])->name('lock');
+});
+Route::redirect('/migrate', '/migration');
+Route::redirect('/migrations', '/migration');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'login'])->name('login');

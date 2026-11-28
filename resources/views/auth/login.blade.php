@@ -179,6 +179,7 @@
                 </p>
             </div>
         </div>
+        <p class="text-center mt-5 text-xs"><a class="text-link" href="{{ route('developer.login') }}">Developer sign-in</a></p>
         @if(\App\Support\Repairs::enabled())<p class="text-center mt-5"><a class="text-link" href="{{ route('repairs.track') }}">Track your repair</a></p>@endif
     </main>
 

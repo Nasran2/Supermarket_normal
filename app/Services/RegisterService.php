@@ -3,10 +3,14 @@
 namespace App\Services;
 
 use App\Models\Register;
+use App\Models\RepairCost;
+use App\Models\RepairPayment;
 use App\Models\ReturnSettlement;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\Money;
+use App\Support\Registers;
+use App\Support\Repairs;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -18,6 +22,20 @@ class RegisterService
         $query = Register::where('open_user_id', $userId);
 
         return ($lock ? $query->lockForUpdate() : $query)->first();
+    }
+
+    public function forTransactions(int $userId, bool $lock = false): ?Register
+    {
+        if (Registers::enabled()) {
+            return $this->current($userId, $lock);
+        }
+
+        // Keep transaction relationships and cash accounting without a cashier shift workflow.
+        return DB::transaction(function () use ($userId) {
+            User::whereKey($userId)->lockForUpdate()->firstOrFail();
+
+            return $this->current($userId, true) ?? $this->open($userId, '0');
+        }, 3);
     }
 
     public function withSummary(Builder $query): Builder
@@ -47,9 +65,9 @@ class RegisterService
         $out = Money::round((string) ($register->movement_out ?? 0));
         $expenses = Money::round((string) ($register->cash_expenses ?? 0));
         // Physical drawer totals include posted cash even if its originating workspace is disabled.
-        $repairEntries = \App\Models\RepairPayment::where('register_id', $register->id);
+        $repairEntries = RepairPayment::where('register_id', $register->id);
         $repairCash = (string) (clone $repairEntries)->where('method_type', 'CASH')->sum('amount');
-        $repairCosts = (string) \App\Models\RepairCost::where('register_id', $register->id)->sum('amount');
+        $repairCosts = (string) RepairCost::where('register_id', $register->id)->sum('amount');
         $cash = Money::add($cash, $repairCash);
         $expenses = Money::add($expenses, $repairCosts);
         $expected = Money::sub(Money::sub(Money::add(Money::add($register->opening_cash, $cash), $in), $out), $expenses);
@@ -58,7 +76,7 @@ class RegisterService
             'due_collections' => Money::round((string) ($register->due_collections ?? 0)), 'refunds' => Money::round((string) ($register->total_refunds ?? 0)), 'returns' => Money::round((string) ($register->returned_amount ?? 0))];
         $customerReversals = ReturnSettlement::where('register_id', $register->id)->whereNotNull('sale_return_id')->where('kind', 'REVERSAL');
         $summary['collections'] = Money::add($summary['collections'], (string) (clone $customerReversals)->sum('amount'));
-        if (\App\Support\Repairs::enabled()) {
+        if (Repairs::enabled()) {
             $summary['collections'] = Money::add($summary['collections'], (string) (clone $repairEntries)->sum('amount'));
             $summary['refunds'] = Money::sub($summary['refunds'], (string) (clone $repairEntries)->where('kind', 'REFUND')->sum('amount'));
             $summary['repair_cash'] = Money::round($repairCash);
@@ -77,7 +95,7 @@ class RegisterService
         $paymentTotals = [];
         $dueTotals = $register->collections()->selectRaw('method_type, COUNT(*) as entries, SUM(amount) as amount')->groupBy('method_type')->get()->keyBy('method_type');
         $refundTotals = $register->returns()->where('refund_amount', '>', 0)->selectRaw('method_type, COUNT(*) as entries, SUM(refund_amount) as amount')->groupBy('method_type')->get()->keyBy('method_type');
-        $repairTotals = \App\Support\Repairs::enabled()
+        $repairTotals = Repairs::enabled()
             ? $repairEntries->selectRaw('method_type, COUNT(*) as entries, SUM(amount) as collected')->groupBy('method_type')->get()->keyBy('method_type')
             : collect();
         foreach (['CASH' => 'Cash', 'CARD' => 'Card', 'QR' => 'QR payment', 'BANK_TRANSFER' => 'Online transfer', 'OTHER' => 'Other payments'] as $type => $name) {

@@ -54,7 +54,7 @@ class SaleAftercareService
 
     public function returnItems(Sale $original, array $data, int $userId): SaleReturn
     {
-        if (! $this->registers->current($userId)) {
+        if (! $this->registers->forTransactions($userId)) {
             $this->fail('Open your register before recording a return.');
         }
 
@@ -64,7 +64,7 @@ class SaleAftercareService
     public function collect(Sale $original, array $data, int $userId): SaleCollection
     {
         return DB::transaction(function () use ($original, $data, $userId) {
-            $register = $this->registers->current($userId, true);
+            $register = $this->registers->forTransactions($userId, true);
             if (! $register) {
                 $this->fail('Open your register before collecting a due payment.');
             }

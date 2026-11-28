@@ -39,6 +39,11 @@ class ReportService
         }
 
         $titles = static::TITLES;
+        $titles = array_filter($titles, fn ($kind) => app(DeveloperAccess::class)->permissionAllowed('reports.'.$kind), ARRAY_FILTER_USE_KEY);
+
+        if (! \App\Support\Registers::enabled()) {
+            unset($titles['register'], $titles['cash']);
+        }
 
         if (class_exists(\App\Support\SecretControl::class) && \App\Support\SecretControl::isHidden('hide_profit')) {
             unset($titles['profit']);
@@ -741,7 +746,7 @@ class ReportService
                 $query->where('transactions.type', 'not like', 'Repair %');
             }
         } elseif ($kind === 'audit') {
-            $query = SalesVisibility::apply(AuditLog::with('user')->when(! \App\Support\Units::enabled(), fn ($q) => $q->where('action', 'not like', 'units.%')->where('action', 'not like', 'unit-presets.%')->where('action', '!=', 'unit.default'))->where('action', 'not like', 'hr.%')->when(! \App\Support\Repairs::enabled(), fn ($q) => $q->where('action', 'not like', 'repair.%'))->when(! config('features.barcode'), fn ($q) => $q->where('action', 'not like', 'barcode.%')->where('action', '!=', 'settings.barcode')), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
+            $query = SalesVisibility::apply(AuditLog::with('user')->when(! \App\Support\Registers::enabled(), fn ($q) => $q->where('action', 'not like', 'register.%'))->when(! \App\Support\Units::enabled(), fn ($q) => $q->where('action', 'not like', 'units.%')->where('action', 'not like', 'unit-presets.%')->where('action', '!=', 'unit.default'))->where('action', 'not like', 'hr.%')->when(! \App\Support\Repairs::enabled(), fn ($q) => $q->where('action', 'not like', 'repair.%'))->when(! config('features.barcode'), fn ($q) => $q->where('action', 'not like', 'barcode.%')->where('action', '!=', 'settings.barcode')), 'audit_logs.user_id')->whereBetween('created_at', [$start, $end])->latest();
             $query->where(function ($q) {
                 $q->where('subject_type', '!=', \App\Models\RepairJob::class);
                 if (\App\Support\Repairs::enabled() && auth()->user()?->hasPermission('repairs.view')) {
@@ -772,6 +777,17 @@ class ReportService
             $headers = array_map(fn ($header) => str_replace(' / unit', '', $header), $headers);
             $originalMap = $map;
             $map = fn ($row) => array_values(array_diff_key($originalMap($row), array_flip($hidden)));
+        }
+
+        if (! \App\Support\Registers::enabled() && ($column = array_search('Register', $headers, true)) !== false) {
+            array_splice($headers, $column, 1);
+            $originalMap = $map;
+            $map = function ($record) use ($originalMap, $column) {
+                $row = $originalMap($record);
+                array_splice($row, $column, 1);
+
+                return $row;
+            };
         }
 
         return compact('query', 'headers', 'map', 'cards');

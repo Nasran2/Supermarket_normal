@@ -258,7 +258,7 @@ class SalesReturnService
             if (! empty($data['quote_hash']) && ! hash_equals($q['quote_hash'], $data['quote_hash'])) {
                 ReturnSettlementService::fail('Stock, balances or payment settings changed. Review the return again.');
             }
-            $register = app(RegisterService::class)->current($user->id, true);
+            $register = app(RegisterService::class)->forTransactions($user->id, true);
             $fields = ['sale_id' => $sale->id, 'customer_id' => $sale->customer_id, 'register_id' => $register?->id, 'user_id' => $user->id, 'token' => $data['token'], 'reference' => $existing?->reference ?? app(DocumentNumberService::class)->next('SALES_RETURN', now()), 'reason' => $data['reason'] ?? '', 'notes' => $data['notes'] ?? null, 'amount' => $q['amount'], 'fee_refund' => $q['fee_refund'], 'cost_total' => $q['cost_total'], 'due_reduction' => $q['due_reduction'], 'refund_amount' => $q['refund_amount'], 'customer_due_applied' => $q['apply_due'], 'replacement_value' => $q['replacement_value'], 'resolution' => $q['resolution'], 'returned_at' => now(), 'approved_by' => $user->hasPermission('sales_returns.approve') ? $user->id : null];
             $fields += ['return_type' => 'INVOICE', 'verification_status' => 'VERIFIED', 'additional_payment' => '0.00', 'verified_amount' => $q['amount'], 'historical_cost_total' => $q['cost_total'], 'approved_at' => $user->hasPermission('sales_returns.approve') ? now() : null];
             $fields['status'] = 'COMPLETED';

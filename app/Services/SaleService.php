@@ -132,7 +132,7 @@ class SaleService
         abort_if(! empty($data['allow_due']) && ! $user->hasPermission('pos.due_sale'), 403);
 
         return DB::transaction(function () use ($data, $user) {
-            $register = $this->registers->current($user->id, true);
+            $register = $this->registers->forTransactions($user->id, true);
             if (! $register) {
                 throw ValidationException::withMessages(['register' => 'Open your register before selling.']);
             }
@@ -186,7 +186,7 @@ class SaleService
     /** An exchange uses the same quote and stock consumer as POS; credit is a ledger allocation, never a cash payment. */
     public function exchange(array $quote, ?int $customerId, User $user, string $token, string $reference): Sale
     {
-        $register = $this->registers->current($user->id, true);
+        $register = $this->registers->forTransactions($user->id, true);
         if (! $register) {
             throw ValidationException::withMessages(['register' => 'Open your register before issuing replacement products.']);
         }

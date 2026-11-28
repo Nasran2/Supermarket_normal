@@ -72,14 +72,14 @@ class DashboardController extends Controller
 
         $expiryRows = collect();
         $expiredBatches = 0;
-        if (Expiry::enabled() && $request->user()->hasPermission('expiry.view') && Expiry::setting('expiry_dashboard')) {
+        if (app(\App\Services\DeveloperAccess::class)->permissionAllowed('dashboard.expiry_alerts') && Expiry::enabled() && $request->user()->hasPermission('expiry.view') && Expiry::setting('expiry_dashboard')) {
             $expiryRows = app(ExpiryReportService::class)->query()->limit((int) Expiry::setting('expiry_dashboard_limit'))->get();
             $expiredBatches = app(ExpiryReportService::class)->query(['tab' => 'expired'])->count();
         }
 
-        $chequeAlerts = config('features.cheque') && $request->user()->hasPermission('cheques.dashboard') && Cheques::setting('cheque_dashboard') ? Cheque::visibleTo()->with('customer', 'supplier')->dueSoon()->limit(6)->get() : collect();
+        $chequeAlerts = app(\App\Services\DeveloperAccess::class)->permissionAllowed('dashboard.cheque_alerts') && config('features.cheque') && $request->user()->hasPermission('cheques.dashboard') && Cheques::setting('cheque_dashboard') ? Cheque::visibleTo()->with('customer', 'supplier')->dueSoon()->limit(6)->get() : collect();
 
-        $repairStats = $request->user()->hasPermission('repairs.view') && ! \App\Support\SecretControl::isHidden('hide_top_summary')
+        $repairStats = app(\App\Services\DeveloperAccess::class)->permissionAllowed('dashboard.repair_stats') && $request->user()->hasPermission('repairs.view') && ! \App\Support\SecretControl::isHidden('hide_top_summary')
             ? app(\App\Services\Repair\RepairReporting::class)->dashboard() : [];
 
         return view('dashboard', compact('repairStats', 'chequeAlerts', 'expiryRows', 'expiredBatches', 'period', 'from', 'to', 'summary', 'transactions', 'payments', 'days', 'overview', 'lowStock', 'recentSales', 'recentExpenses', 'topProducts', 'register', 'privacy'));
