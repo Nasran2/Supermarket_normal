@@ -56,6 +56,8 @@ Route::prefix('twininstall')->name('installer.')->withoutMiddleware([
     Route::get('/', [\App\Http\Controllers\InstallerController::class, 'show'])->name('show');
     Route::post('/', [\App\Http\Controllers\InstallerController::class, 'store'])->middleware('throttle:5,1')->name('store');
 });
+Route::redirect('/install', '/twininstall');
+Route::redirect('/setup', '/twininstall');
 
 Route::prefix('migration')->name('migration.')->withoutMiddleware([
     \App\Http\Middleware\BusinessContext::class,
