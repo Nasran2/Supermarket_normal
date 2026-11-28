@@ -18,10 +18,12 @@ return new class extends Migration
                 $t->boolean('available_for_repairs')->default(true);
             }
         });
-        if (! Schema::hasTable('repair_devices')) {
+
+        if (! Schema::hasTable('repair_devices') || ! Schema::hasColumn('repair_devices', 'brand')) {
+            Schema::dropIfExists('repair_devices');
             Schema::create('repair_devices', function (Blueprint $t) {
                 $t->id();
-                $t->foreignId('customer_id')->constrained()->restrictOnDelete();
+                $t->foreignId('customer_id')->index();
                 $t->string('brand', 80);
                 $t->string('model', 120);
                 $t->string('serial', 100)->nullable();
@@ -30,15 +32,17 @@ return new class extends Migration
                 $t->index(['customer_id', 'serial']);
             });
         }
-        if (! Schema::hasTable('repair_jobs')) {
+
+        if (! Schema::hasTable('repair_jobs') || ! Schema::hasColumn('repair_jobs', 'tracking')) {
+            Schema::dropIfExists('repair_jobs');
             Schema::create('repair_jobs', function (Blueprint $t) {
                 $t->id();
                 $t->uuid('submission')->unique();
                 $t->string('tracking', 32)->unique();
-                $t->foreignId('device_id')->constrained('repair_devices')->restrictOnDelete();
-                $t->foreignId('customer_id')->constrained()->restrictOnDelete();
-                $t->foreignId('user_id')->constrained()->restrictOnDelete();
-                $t->foreignId('technician_id')->nullable()->constrained('users')->nullOnDelete();
+                $t->foreignId('device_id')->index();
+                $t->foreignId('customer_id')->index();
+                $t->foreignId('user_id')->index();
+                $t->foreignId('technician_id')->nullable()->index();
                 $t->string('status', 25)->index();
                 $t->string('priority', 10);
                 $t->string('accessories', 500)->nullable();
@@ -65,27 +69,31 @@ return new class extends Migration
                 $t->timestamps();
             });
         }
+
         if (Schema::hasTable('stock_movements') && ! Schema::hasColumn('stock_movements', 'repair_job_id')) {
-            Schema::table('stock_movements', fn (Blueprint $t) => $t->foreignId('repair_job_id')->nullable()->constrained()->restrictOnDelete());
+            Schema::table('stock_movements', fn (Blueprint $t) => $t->foreignId('repair_job_id')->nullable()->index());
         }
+
         if (Schema::hasTable('cheques')) {
             Schema::table('cheques', function (Blueprint $t) {
                 if (! Schema::hasColumn('cheques', 'repair_job_id')) {
-                    $t->foreignId('repair_job_id')->nullable()->constrained()->restrictOnDelete();
+                    $t->foreignId('repair_job_id')->nullable()->index();
                 }
                 if (! Schema::hasColumn('cheques', 'repair_method_id')) {
-                    $t->foreignId('repair_method_id')->nullable()->constrained('payment_methods')->restrictOnDelete();
+                    $t->foreignId('repair_method_id')->nullable()->index();
                 }
                 if (! Schema::hasColumn('cheques', 'repair_submission')) {
                     $t->uuid('repair_submission')->nullable()->unique();
                 }
             });
         }
-        if (! Schema::hasTable('repair_events')) {
+
+        if (! Schema::hasTable('repair_events') || ! Schema::hasColumn('repair_events', 'kind')) {
+            Schema::dropIfExists('repair_events');
             Schema::create('repair_events', function (Blueprint $t) {
                 $t->id();
-                $t->foreignId('repair_job_id')->constrained()->restrictOnDelete();
-                $t->foreignId('user_id')->constrained()->restrictOnDelete();
+                $t->foreignId('repair_job_id')->index();
+                $t->foreignId('user_id')->index();
                 $t->string('kind', 25);
                 $t->text('note')->nullable();
                 $t->string('public_status', 25)->nullable();
@@ -93,11 +101,13 @@ return new class extends Migration
                 $t->timestamps();
             });
         }
-        if (! Schema::hasTable('repair_parts')) {
+
+        if (! Schema::hasTable('repair_parts') || ! Schema::hasColumn('repair_parts', 'name')) {
+            Schema::dropIfExists('repair_parts');
             Schema::create('repair_parts', function (Blueprint $t) {
                 $t->id();
-                $t->foreignId('repair_job_id')->constrained()->restrictOnDelete();
-                $t->foreignId('product_id')->constrained()->restrictOnDelete();
+                $t->foreignId('repair_job_id')->index();
+                $t->foreignId('product_id')->index();
                 $t->uuid('submission')->unique();
                 $t->string('name');
                 $t->decimal('quantity', 15, 3);
@@ -109,15 +119,17 @@ return new class extends Migration
                 $t->timestamps();
             });
         }
-        if (! Schema::hasTable('repair_payments')) {
+
+        if (! Schema::hasTable('repair_payments') || ! Schema::hasColumn('repair_payments', 'amount')) {
+            Schema::dropIfExists('repair_payments');
             Schema::create('repair_payments', function (Blueprint $t) {
                 $t->id();
-                $t->foreignId('repair_job_id')->constrained()->restrictOnDelete();
-                $t->foreignId('user_id')->constrained()->restrictOnDelete();
-                $t->foreignId('register_id')->nullable()->constrained()->restrictOnDelete();
-                $t->foreignId('payment_method_id')->nullable()->constrained()->restrictOnDelete();
-                $t->foreignId('bank_account_id')->nullable()->constrained()->restrictOnDelete();
-                $t->foreignId('reverses_id')->nullable()->unique()->constrained('repair_payments')->restrictOnDelete();
+                $t->foreignId('repair_job_id')->index();
+                $t->foreignId('user_id')->index();
+                $t->foreignId('register_id')->nullable()->index();
+                $t->foreignId('payment_method_id')->nullable()->index();
+                $t->foreignId('bank_account_id')->nullable()->index();
+                $t->foreignId('reverses_id')->nullable()->unique();
                 $t->uuid('submission')->nullable()->unique();
                 $t->string('kind', 15);
                 $t->string('method_type', 25);
@@ -131,34 +143,40 @@ return new class extends Migration
                 $t->index(['created_at', 'payment_method_id']);
             });
         }
-        if (! Schema::hasTable('repair_costs')) {
+
+        if (! Schema::hasTable('repair_costs') || ! Schema::hasColumn('repair_costs', 'amount')) {
+            Schema::dropIfExists('repair_costs');
             Schema::create('repair_costs', function (Blueprint $t) {
                 $t->id();
-                $t->foreignId('repair_job_id')->constrained()->restrictOnDelete();
-                $t->foreignId('user_id')->constrained()->restrictOnDelete();
-                $t->foreignId('supplier_id')->nullable()->constrained()->nullOnDelete();
-                $t->foreignId('payment_method_id')->nullable()->constrained()->restrictOnDelete();
-                $t->foreignId('bank_account_id')->nullable()->constrained()->restrictOnDelete();
-                $t->foreignId('register_id')->nullable()->constrained()->restrictOnDelete();
+                $t->foreignId('repair_job_id')->index();
+                $t->foreignId('user_id')->index();
+                $t->foreignId('supplier_id')->nullable()->index();
+                $t->foreignId('payment_method_id')->nullable()->index();
+                $t->foreignId('bank_account_id')->nullable()->index();
+                $t->foreignId('register_id')->nullable()->index();
                 $t->uuid('submission')->unique();
                 $t->string('description', 250);
                 $t->decimal('amount', 16, 2);
                 $t->timestamps();
             });
         }
-        if (! Schema::hasTable('repair_attachments')) {
+
+        if (! Schema::hasTable('repair_attachments') || ! Schema::hasColumn('repair_attachments', 'path')) {
+            Schema::dropIfExists('repair_attachments');
             Schema::create('repair_attachments', function (Blueprint $t) {
                 $t->id();
-                $t->foreignId('repair_job_id')->constrained()->restrictOnDelete();
-                $t->foreignId('user_id')->constrained()->restrictOnDelete();
+                $t->foreignId('repair_job_id')->index();
+                $t->foreignId('user_id')->index();
                 $t->string('name');
                 $t->string('path');
                 $t->timestamps();
             });
         }
+
         if (Schema::hasTable('sms_messages') && ! Schema::hasColumn('sms_messages', 'repair_job_id')) {
-            Schema::table('sms_messages', fn (Blueprint $t) => $t->foreignId('repair_job_id')->nullable()->constrained()->restrictOnDelete());
+            Schema::table('sms_messages', fn (Blueprint $t) => $t->foreignId('repair_job_id')->nullable()->index());
         }
+
         foreach (array_keys(Repairs::PERMISSIONS) as $action) {
             DB::table('permissions')->insertOrIgnore(['name' => 'repairs.'.$action, 'created_at' => now(), 'updated_at' => now()]);
         }
@@ -167,22 +185,16 @@ return new class extends Migration
     public function down(): void
     {
         if (Schema::hasTable('sms_messages') && Schema::hasColumn('sms_messages', 'repair_job_id')) {
-            Schema::table('sms_messages', fn (Blueprint $t) => $t->dropConstrainedForeignId('repair_job_id'));
+            Schema::table('sms_messages', fn (Blueprint $t) => $t->dropColumn('repair_job_id'));
         }
         if (Schema::hasTable('stock_movements') && Schema::hasColumn('stock_movements', 'repair_job_id')) {
-            Schema::table('stock_movements', fn (Blueprint $t) => $t->dropConstrainedForeignId('repair_job_id'));
+            Schema::table('stock_movements', fn (Blueprint $t) => $t->dropColumn('repair_job_id'));
         }
         if (Schema::hasTable('cheques')) {
             Schema::table('cheques', function (Blueprint $t) {
-                if (Schema::hasColumn('cheques', 'repair_job_id')) {
-                    $t->dropConstrainedForeignId('repair_job_id');
-                }
-                if (Schema::hasColumn('cheques', 'repair_method_id')) {
-                    $t->dropConstrainedForeignId('repair_method_id');
-                }
-                if (Schema::hasColumn('cheques', 'repair_submission')) {
-                    $t->dropUnique(['repair_submission']);
-                    $t->dropColumn('repair_submission');
+                $cols = array_filter(['repair_job_id', 'repair_method_id', 'repair_submission'], fn ($c) => Schema::hasColumn('cheques', $c));
+                if (! empty($cols)) {
+                    $t->dropColumn($cols);
                 }
             });
         }
